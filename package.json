@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "scan": "node scripts/security-scan.mjs",
+    "scan:history": "node scripts/security-scan.mjs --history"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

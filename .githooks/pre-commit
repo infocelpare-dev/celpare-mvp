@@ -1,0 +1,5 @@
+#!/bin/sh
+# Celpare pre-commit gate. See scripts/security-scan.mjs for what it checks and
+# what it deliberately does not. Bypass with --no-verify only when you have read
+# the finding and know it is wrong.
+exec node scripts/security-scan.mjs
