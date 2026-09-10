@@ -2,60 +2,75 @@ import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { Container, Section } from "@/components/ui/container";
 import { ButtonLink } from "@/components/ui/button";
-import { ProductPreview } from "./product-preview";
 
+/*
+  Split hero: copy on the left, mark on the right. Stacks to a single column
+  below lg, with the image first so the brand still leads on a phone.
+
+  One primary CTA, per the Hero-Centric pattern. Try Celpare is the dominant
+  action; Request a demo is secondary and Look around is a plain link.
+*/
 export function Hero() {
   return (
-    <Section className="pb-8 pt-14 sm:pb-10 sm:pt-20">
-      <Container className="text-center">
-        {/* The orca mark, large. Priority because it is the largest paint in
-            the viewport, so it should not arrive after the text. */}
-        <Image
-          src="/brand/celpare-mark-256.png"
-          alt=""
-          width={72}
-          height={72}
-          priority
-          className="mx-auto rounded-[18px]"
-        />
+    <Section className="pb-10 pt-12 sm:pt-16">
+      <Container>
+        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
+          {/* Copy. Second in DOM on small screens is avoided on purpose: the
+              heading should still be the first thing a screen reader hits. */}
+          <div className="order-2 text-center lg:order-1 lg:text-left">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border px-3.5 py-1.5 text-[13px] text-muted">
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
+              The home for AI tools and models
+            </span>
 
-        <span className="mt-7 inline-flex items-center gap-2 rounded-full border border-border px-3.5 py-1.5 text-[13px] text-muted">
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
-          The home for AI tools and models
-        </span>
+            <h1 className="mt-6 font-display text-[clamp(2.2rem,5.5vw,3.6rem)] font-bold leading-[1.05] tracking-tight">
+              Right tool.
+              <br />
+              Right result.
+            </h1>
 
-        <h1 className="mx-auto mt-6 max-w-[15ch] font-display text-[clamp(2.2rem,6vw,3.6rem)] font-bold leading-[1.05] tracking-tight">
-          Right tool. Right result.
-        </h1>
+            <p className="mx-auto mt-5 max-w-[52ch] text-[17px] leading-relaxed text-muted lg:mx-0 sm:text-[18px]">
+              Stop guessing which AI tool to use. Describe what you are trying
+              to accomplish, and Celpare finds, compares and explains the tools
+              that can actually do it.
+            </p>
 
-        <p className="mx-auto mt-5 max-w-[620px] text-[17px] leading-relaxed text-muted sm:text-[18px]">
-          Stop guessing which AI tool to use. Describe what you are trying to
-          accomplish, and Celpare finds, compares and explains the tools that
-          can actually do it.
-        </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+              <ButtonLink href="/signup">
+                Try Celpare
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </ButtonLink>
+              <ButtonLink href="/demo" variant="outline">
+                Request a demo
+              </ButtonLink>
+            </div>
 
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <ButtonLink href="/signup">
-            Try Celpare
-            <ArrowRight className="h-4 w-4" aria-hidden />
-          </ButtonLink>
-          <ButtonLink href="/demo" variant="outline">
-            Request a demo
-          </ButtonLink>
+            <p className="mt-4 text-[13px] text-muted">
+              Free to start. No card required.{" "}
+              <a
+                href="/explore"
+                className="underline underline-offset-4 transition-colors duration-200 ease-out hover:text-foreground"
+              >
+                Or look around first
+              </a>
+              .
+            </p>
+          </div>
+
+          {/* Mark. Decorative, so it carries an empty alt and the heading does
+              the describing. */}
+          <div className="order-1 lg:order-2">
+            <Image
+              src="/brand/celpare-mark-256.png"
+              alt=""
+              width={420}
+              height={420}
+              priority
+              sizes="(max-width: 1024px) 60vw, 420px"
+              className="mx-auto h-auto w-full max-w-[260px] rounded-[28px] sm:max-w-[320px] lg:max-w-[420px]"
+            />
+          </div>
         </div>
-
-        <p className="mt-4 text-[13px] text-muted">
-          Free to start. No card required.{" "}
-          <a
-            href="/explore"
-            className="underline underline-offset-4 transition-colors duration-200 ease-out hover:text-foreground"
-          >
-            Or look around first
-          </a>
-          .
-        </p>
-
-        <ProductPreview />
       </Container>
     </Section>
   );

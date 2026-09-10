@@ -31,7 +31,7 @@ const results = [
 
 export function ProductPreview() {
   return (
-    <div className="mx-auto mt-12 w-full max-w-[880px]">
+    <div className="mx-auto w-full max-w-[880px]">
       <div
         aria-hidden
         className="overflow-hidden rounded-[16px] border border-border bg-surface text-left"

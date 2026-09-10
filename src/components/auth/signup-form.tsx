@@ -7,7 +7,7 @@ import { signUp, type AuthState } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Field, PasswordField, FormAlert } from "@/components/ui/field";
 import { PasswordStrength } from "./password-strength";
-import { HumanCheck } from "./human-check";
+import { Turnstile } from "./turnstile";
 
 const initial: AuthState = { status: "idle", message: "" };
 
@@ -24,6 +24,7 @@ function Submit() {
 export function SignupForm() {
   const [state, formAction] = useActionState(signUp, initial);
   const [password, setPassword] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
   const nameId = useId();
   const emailId = useId();
   const passwordId = useId();
@@ -69,7 +70,8 @@ export function SignupForm() {
           <PasswordStrength value={password} />
         </div>
 
-        <HumanCheck invalid={state.field === "human"} />
+        <Turnstile onToken={setCaptchaToken} invalid={state.field === "captcha"} />
+        <input type="hidden" name="captchaToken" value={captchaToken} />
       </div>
 
       <Submit />

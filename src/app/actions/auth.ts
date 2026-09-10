@@ -8,7 +8,7 @@ export type AuthState = {
   status: "idle" | "error" | "success";
   message: string;
   /* Which field failed, so the form can point at it. */
-  field?: "fullName" | "email" | "password" | "code" | "human";
+  field?: "fullName" | "email" | "password" | "code" | "captcha";
 };
 
 const notConfigured: AuthState = {
@@ -34,9 +34,12 @@ const signUpSchema = z.object({
     .min(1, "Enter your email address.")
     .max(254, "That email address is too long.")
     .email("That does not look like a valid email address."),
-  human: z
-    .string()
-    .refine((v) => v === "on", "Confirm you are not a robot."),
+  /*
+    Turnstile token. Only required when a site key is configured, so local
+    development without Cloudflare keys still works. Supabase verifies the
+    token against Cloudflare, so an attacker cannot forge one.
+  */
+  captchaToken: z.string(),
   password: z
     .string()
     .min(10, "Use at least 10 characters.")
@@ -90,18 +93,33 @@ export async function signUp(
     fullName: formData.get("fullName") ?? "",
     email: formData.get("email") ?? "",
     password: formData.get("password") ?? "",
-    human: formData.get("human") ?? "",
+    captchaToken: String(formData.get("captchaToken") ?? ""),
   });
   if (!parsed.success) return firstIssue(parsed.error, "Please check the form.");
   if (!isSupabaseConfigured()) return notConfigured;
 
-  const { fullName, email, password } = parsed.data;
+  const { fullName, email, password, captchaToken } = parsed.data;
+
+  // Enforced only when Turnstile is actually configured, so a missing key is a
+  // dev convenience and never a silent hole in production.
+  const captchaRequired = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
+  if (captchaRequired && !captchaToken) {
+    return {
+      status: "error",
+      field: "captcha",
+      message: "Complete the bot check before continuing.",
+    };
+  }
+
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName } },
+    options: {
+      data: { full_name: fullName },
+      ...(captchaToken ? { captchaToken } : {}),
+    },
   });
 
   /*
@@ -140,6 +158,13 @@ export async function signUp(
         status: "error",
         message:
           "Our email service has hit its hourly limit, so the code cannot be sent right now. Use Continue with Google instead, or try again later.",
+      };
+    }
+    if (/captcha/i.test(error.message)) {
+      return {
+        status: "error",
+        field: "captcha",
+        message: "The bot check failed. Reload the page and try again.",
       };
     }
     console.error("[auth] signUp failed", error.message);
