@@ -1,13 +1,14 @@
+import { ArrowRight } from "lucide-react";
 import { Container, Section } from "@/components/ui/container";
-import { WaitlistForm } from "./waitlist-form";
+import { ButtonLink } from "@/components/ui/button";
 
 /*
-  Ink panel, not a lime one. The waitlist button is lime, so a lime panel would
-  put lime on lime. Ink also keeps this identical in light and dark mode, which
-  makes it the one fixed anchor on the page.
+  Ink panel, not lime, because the primary button is lime and lime on lime does
+  not work (D14). Ink also renders identically in both themes, which makes this
+  the one fixed anchor on the page.
 
-  The panel re-points the role tokens to their dark values rather than passing
-  a variant prop down, so every nested component stays theme agnostic.
+  The panel re-points the role tokens to their dark values rather than passing a
+  variant prop down, so nested components stay theme agnostic.
 */
 const inkPanel = {
   "--background": "var(--celpare-ink)",
@@ -20,7 +21,7 @@ const inkPanel = {
 
 export function CTA() {
   return (
-    <Section id="waitlist" className="scroll-mt-[68px] border-t border-border">
+    <Section className="border-t border-border">
       <Container>
         <div
           style={inkPanel}
@@ -30,10 +31,16 @@ export function CTA() {
             Ready to stop guessing?
           </h2>
           <p className="mx-auto mt-3 max-w-[48ch] text-[16px] leading-relaxed text-muted">
-            Join the waitlist and get early access when Celpare opens.
+            Find the right AI tool in minutes instead of an afternoon of tabs.
           </p>
-          <div className="mt-8">
-            <WaitlistForm />
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <ButtonLink href="/signup">
+              Get started free
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </ButtonLink>
+            <ButtonLink href="/login" variant="outline">
+              Log in
+            </ButtonLink>
           </div>
         </div>
       </Container>

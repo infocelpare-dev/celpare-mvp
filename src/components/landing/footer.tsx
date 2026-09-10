@@ -9,25 +9,26 @@ const columns = [
   {
     title: "Product",
     links: [
+      { label: "How it works", href: "#how" },
       { label: "Why Celpare", href: "#why" },
       { label: "Categories", href: "#tools" },
       { label: "Community", href: "#audience" },
-      { label: "Early access", href: "#waitlist" },
+      { label: "Get started", href: "/signup" },
     ],
   },
   {
     title: "For builders",
     links: [
-      { label: "Submit a tool", href: "#waitlist" },
-      { label: "Developer plans", href: "#waitlist" },
-      { label: "Verified badge", href: "#waitlist" },
+      { label: "Submit a tool", href: "/signup" },
+      { label: "Developer plans", href: "/signup" },
+      { label: "Verified badge", href: "/signup" },
     ],
   },
   {
     title: "Company",
     links: [
       { label: "Contact", href: "mailto:infocelpare@gmail.com" },
-      { label: "Get early access", href: "#waitlist" },
+      { label: "Log in", href: "/login" },
     ],
   },
 ];

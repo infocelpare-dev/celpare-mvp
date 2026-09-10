@@ -1,12 +1,41 @@
+import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /*
-  Wordmark fallback. The supplied logo is a JPEG with the lime background baked
-  in, so the orca mark cannot sit on a white or black surface cleanly.
-  Tracked as G7 / task 1.9. Swap the square for the real SVG once it exists.
+  The mark is the founder's orca on lime, used as a rounded square. The source
+  is a square JPEG with the lime baked in, which is exactly right for an app
+  icon shape and needs no transparency. Generated sizes live in public/brand.
 */
-export function Logo({ className }: { className?: string }) {
+export function LogoMark({
+  size = 32,
+  className,
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <Image
+      src="/brand/celpare-mark-256.png"
+      alt=""
+      width={size}
+      height={size}
+      priority
+      className={cn("rounded-[9px]", className)}
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
+export function Logo({
+  className,
+  size = 32,
+  showWordmark = true,
+}: {
+  className?: string;
+  size?: number;
+  showWordmark?: boolean;
+}) {
   return (
     <Link
       href="/"
@@ -16,15 +45,12 @@ export function Logo({ className }: { className?: string }) {
       )}
       aria-label="Celpare home"
     >
-      <span
-        aria-hidden
-        className="grid h-8 w-8 place-items-center rounded-[9px] bg-accent font-display text-[15px] font-bold text-on-accent"
-      >
-        C
-      </span>
-      <span className="font-display text-[18px] font-bold tracking-tight">
-        Celpare
-      </span>
+      <LogoMark size={size} />
+      {showWordmark && (
+        <span className="font-display text-[18px] font-bold tracking-tight">
+          Celpare
+        </span>
+      )}
     </Link>
   );
 }

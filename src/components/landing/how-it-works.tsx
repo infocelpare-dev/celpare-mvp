@@ -34,7 +34,7 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <Section className="border-y border-border bg-surface py-14 sm:py-16">
+    <Section id="how" className="scroll-mt-[68px] border-y border-border bg-surface py-14 sm:py-16">
       <Container>
         <ol className="grid grid-cols-1 gap-x-8 gap-y-9 sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((s, i) => (

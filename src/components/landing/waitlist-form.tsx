@@ -13,7 +13,7 @@ function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending} className="sm:w-auto">
-      {pending ? "Joining..." : "Join the waitlist"}
+      {pending ? "Sending..." : "Get early access"}
       {!pending && <ArrowRight className="h-4 w-4" aria-hidden />}
     </Button>
   );

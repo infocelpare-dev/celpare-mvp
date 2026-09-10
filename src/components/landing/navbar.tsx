@@ -9,6 +9,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const links = [
+  { href: "#how", label: "How it works" },
   { href: "#why", label: "Why Celpare" },
   { href: "#tools", label: "AI Tools" },
   { href: "#audience", label: "Community" },
@@ -43,7 +44,7 @@ export function Navbar() {
       <Container className="flex h-[68px] items-center justify-between gap-4">
         <Logo />
 
-        <nav aria-label="Main" className="hidden items-center gap-7 md:flex">
+        <nav aria-label="Main" className="hidden items-center gap-6 lg:flex">
           {links.map((l) => (
             <a
               key={l.href}
@@ -61,17 +62,17 @@ export function Navbar() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="hidden items-center gap-3 lg:flex">
           <ThemeToggle />
-          <ButtonLink href="#waitlist" variant="outline" size="sm">
+          <ButtonLink href="/login" variant="outline" size="sm">
             Log in
           </ButtonLink>
-          <ButtonLink href="#waitlist" size="sm">
+          <ButtonLink href="/signup" size="sm">
             Sign up
           </ButtonLink>
         </div>
 
-        <div className="flex items-center gap-2 md:hidden">
+        <div className="flex items-center gap-2 lg:hidden">
           <ThemeToggle />
           <Button
             variant="outline"
@@ -94,7 +95,7 @@ export function Navbar() {
       <div
         id="mobile-nav"
         hidden={!open}
-        className="border-t border-border md:hidden"
+        className="border-t border-border lg:hidden"
       >
         <Container className="flex flex-col gap-1 py-4">
           {links.map((l) => (
@@ -108,8 +109,16 @@ export function Navbar() {
             </a>
           ))}
           <ButtonLink
-            href="#waitlist"
+            href="/login"
+            variant="outline"
             className="mt-2"
+            onClick={() => setOpen(false)}
+          >
+            Log in
+          </ButtonLink>
+          <ButtonLink
+            href="/signup"
+            className="mt-1"
             onClick={() => setOpen(false)}
           >
             Sign up
