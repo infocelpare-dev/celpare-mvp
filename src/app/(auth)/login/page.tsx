@@ -1,47 +1,49 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ButtonLink } from "@/components/ui/button";
+import { LoginForm } from "@/components/auth/login-form";
+import { GoogleButton, AuthDivider } from "@/components/auth/google-button";
+import { FormAlert } from "@/components/ui/field";
 
 export const metadata: Metadata = {
   title: "Log in",
   description: "Log in to Celpare.",
 };
 
-/*
-  No auth backend yet, so this does not pretend to have one. A fake email and
-  password form that always fails is worse than an honest message.
-  Replaced by real Supabase Auth in Phase 3.
-*/
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+  const params = await searchParams;
+  const oauthFailed = params?.error === "google";
+
   return (
     <div>
       <h1 className="font-display text-[28px] font-bold leading-tight">
         Log in to Celpare
       </h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-muted">
-        Logging in is not available yet. Celpare is still being built, and
-        accounts open with early access.
+      <p className="mt-2 text-[15px] text-muted">
+        Welcome back.
       </p>
 
-      <div className="mt-8 rounded-[16px] border border-border p-6">
-        <h2 className="font-display text-[15px] font-semibold">
-          Want in early?
-        </h2>
-        <p className="mt-2 text-[14px] leading-relaxed text-muted">
-          Leave your email and you will be among the first to get an account.
-        </p>
-        <ButtonLink href="/signup" className="mt-5 w-full">
-          Get early access
-        </ButtonLink>
+      {oauthFailed && (
+        <div className="mt-6">
+          <FormAlert>
+            Google sign in did not complete. Try again, or use your email and
+            password.
+          </FormAlert>
+        </div>
+      )}
+
+      <div className="mt-8">
+        <GoogleButton label="Continue with Google" />
+        <AuthDivider />
+        <LoginForm />
       </div>
 
-      <p className="mt-8 border-t border-border pt-6 text-[14px] text-muted">
-        Questions?{" "}
+      <p className="mt-8 border-t border-border pt-6 text-center text-[14px] text-muted">
+        New to Celpare?{" "}
         <Link
-          href="mailto:infocelpare@gmail.com"
+          href="/signup"
           className="text-foreground underline underline-offset-4 transition-colors duration-200 ease-out hover:text-muted"
         >
-          Get in touch
+          Create an account
         </Link>
       </p>
     </div>

@@ -24,11 +24,11 @@ export function Hero() {
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <ButtonLink href="/signup">
-            Get started free
+            Try Celpare
             <ArrowRight className="h-4 w-4" aria-hidden />
           </ButtonLink>
-          <ButtonLink href="#how" variant="outline">
-            See how it works
+          <ButtonLink href="/demo" variant="outline">
+            Request a demo
           </ButtonLink>
         </div>
 

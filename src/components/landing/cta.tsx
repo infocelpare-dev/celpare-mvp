@@ -35,11 +35,11 @@ export function CTA() {
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <ButtonLink href="/signup">
-              Get started free
+              Try Celpare
               <ArrowRight className="h-4 w-4" aria-hidden />
             </ButtonLink>
-            <ButtonLink href="/login" variant="outline">
-              Log in
+            <ButtonLink href="/demo" variant="outline">
+              Request a demo
             </ButtonLink>
           </div>
         </div>
