@@ -1,0 +1,151 @@
+@import "tailwindcss";
+
+/*
+  Celpare design tokens.
+  Palette sampled from the logo: near black orca on lime.
+  Contrast measured, not estimated:
+    ink on lime   14.52  AAA
+    lime on ink   14.52  AAA
+    ink on paper  17.04  AAA
+    white on lime  1.17  FAIL, never do this
+  Lime is a background for ink text or an accent on ink. Never a text color
+  on white, never carrying white text.
+  See docs/context/04-brand.md
+*/
+
+:root {
+  /* brand constants, identical in both modes */
+  --celpare-ink: #1c1c1c;
+  --celpare-paper: #ffffff;
+  --celpare-lime: #d1fe03;
+  --celpare-lime-dim: #b8e002;
+
+  /* light mode roles */
+  --background: var(--celpare-paper);
+  --surface: #fafafa;
+  --foreground: var(--celpare-ink);
+  --muted: #6b6b6b;
+  --border: #e5e5e5;
+  --accent: var(--celpare-lime);
+  --on-accent: var(--celpare-ink);
+  --ring: var(--celpare-ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: var(--celpare-ink);
+    --surface: #232323;
+    --foreground: #f2f2f2;
+    --muted: #a3a3a3;
+    --border: #2e2e2e;
+    --accent: var(--celpare-lime);
+    --on-accent: var(--celpare-ink);
+    --ring: var(--celpare-lime);
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: var(--celpare-ink);
+  --surface: #232323;
+  --foreground: #f2f2f2;
+  --muted: #a3a3a3;
+  --border: #2e2e2e;
+  --accent: var(--celpare-lime);
+  --on-accent: var(--celpare-ink);
+  --ring: var(--celpare-lime);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-dm-sans);
+  --font-display: var(--font-space-grotesk);
+  --font-mono: var(--font-jetbrains-mono);
+
+  /* structural scale carried over from the Notion landing spec */
+  --radius-brand: 16px;
+  --spacing-section: 88px;
+  --container-page: 1140px;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Flat Design per D11: no gradients, no drop shadows. Hairlines separate surfaces. */
+
+/* One consistent, always visible focus ring. Never remove it. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Respect reduced motion globally rather than per component. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/*
+  Theme toggle icons, decided in CSS so the right one paints on the first
+  frame with no hydration mismatch. Mirrors the palette selectors above.
+  Light mode shows the moon (go dark), dark mode shows the sun (go light).
+  Both icons occupy the same grid cell, so there is no layout shift.
+*/
+.theme-icon-light {
+  display: block;
+}
+.theme-icon-dark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-icon-light {
+    display: none;
+  }
+  :root:not([data-theme="light"]) .theme-icon-dark {
+    display: block;
+  }
+}
+
+:root[data-theme="dark"] .theme-icon-light {
+  display: none;
+}
+:root[data-theme="dark"] .theme-icon-dark {
+  display: block;
+}
+
+:root[data-theme="light"] .theme-icon-light {
+  display: block;
+}
+:root[data-theme="light"] .theme-icon-dark {
+  display: none;
+}
