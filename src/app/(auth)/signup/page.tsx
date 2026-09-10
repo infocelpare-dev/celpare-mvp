@@ -28,6 +28,15 @@ export default function SignupPage() {
         <SignupForm />
       </div>
 
+      <p className="mt-6 text-center text-[14px] text-muted">
+        <Link
+          href="/explore"
+          className="underline underline-offset-4 transition-colors duration-200 ease-out hover:text-foreground"
+        >
+          Skip for now and look around
+        </Link>
+      </p>
+
       <p className="mt-8 border-t border-border pt-6 text-center text-[14px] text-muted">
         Already have an account?{" "}
         <Link

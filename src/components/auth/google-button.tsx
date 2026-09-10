@@ -1,4 +1,7 @@
-import { signInWithGoogle } from "@/app/actions/auth";
+"use client";
+
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 /* Google mark. Inlined rather than loaded from a CDN so it works offline and
    cannot be blocked. The colours are Google's and must not be restyled. */
@@ -25,17 +28,60 @@ function GoogleIcon() {
   );
 }
 
+/*
+  OAuth is started from the browser, not from a Server Action.
+
+  A Server Action that calls redirect() with Google's URL makes Next return a
+  redirect the client router then tries to follow as an RSC request. It is
+  cross origin, so the response is not RSC, and the router fails with
+  "An unexpected response was received from the server". The browser client
+  performs a normal top level navigation instead, which is what OAuth needs.
+*/
 export function GoogleButton({ label }: { label: string }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function start() {
+    setPending(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const origin = window.location.origin;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${origin}/auth/callback`,
+          queryParams: { access_type: "offline", prompt: "consent" },
+        },
+      });
+      if (error) {
+        setError("Google sign in could not start. Try again.");
+        setPending(false);
+      }
+      // On success the browser navigates away, so nothing more to do here.
+    } catch {
+      setError("Google sign in could not start. Try again.");
+      setPending(false);
+    }
+  }
+
   return (
-    <form action={signInWithGoogle}>
+    <div>
       <button
-        type="submit"
-        className="flex h-11 w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-border bg-background text-[15px] font-medium text-foreground transition-colors duration-200 ease-out hover:bg-surface"
+        type="button"
+        onClick={start}
+        disabled={pending}
+        className="flex h-11 w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-border bg-background text-[15px] font-medium text-foreground transition-colors duration-200 ease-out hover:bg-surface disabled:opacity-60"
       >
         <GoogleIcon />
-        {label}
+        {pending ? "Redirecting to Google..." : label}
       </button>
-    </form>
+      {error ? (
+        <p role="alert" className="mt-2 text-[13px] text-foreground">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

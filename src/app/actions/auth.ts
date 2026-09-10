@@ -1,7 +1,6 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { z } from "zod";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
@@ -9,7 +8,7 @@ export type AuthState = {
   status: "idle" | "error" | "success";
   message: string;
   /* Which field failed, so the form can point at it. */
-  field?: "fullName" | "email" | "password" | "code";
+  field?: "fullName" | "email" | "password" | "code" | "human";
 };
 
 const notConfigured: AuthState = {
@@ -35,6 +34,9 @@ const signUpSchema = z.object({
     .min(1, "Enter your email address.")
     .max(254, "That email address is too long.")
     .email("That does not look like a valid email address."),
+  human: z
+    .string()
+    .refine((v) => v === "on", "Confirm you are not a robot."),
   password: z
     .string()
     .min(10, "Use at least 10 characters.")
@@ -88,6 +90,7 @@ export async function signUp(
     fullName: formData.get("fullName") ?? "",
     email: formData.get("email") ?? "",
     password: formData.get("password") ?? "",
+    human: formData.get("human") ?? "",
   });
   if (!parsed.success) return firstIssue(parsed.error, "Please check the form.");
   if (!isSupabaseConfigured()) return notConfigured;
@@ -142,6 +145,13 @@ export async function signUp(
     console.error("[auth] signUp failed", error.message);
     return { status: "error", message: "Could not create the account. Please try again." };
   }
+
+  /*
+    When "Confirm email" is off in Supabase, signUp returns a live session and
+    no code is ever sent. Sending that person to /verify would strand them on a
+    page waiting for an email that does not exist. Handle both configurations.
+  */
+  if (data.session) redirect("/dashboard");
 
   redirect(`/verify?email=${encodeURIComponent(email)}`);
 }
@@ -230,29 +240,6 @@ export async function resendCode(
     return { status: "error", message: "Could not send a new code." };
   }
   return { status: "success", message: "New code sent. Check your inbox." };
-}
-
-export async function signInWithGoogle() {
-  if (!isSupabaseConfigured()) return;
-
-  const supabase = await createClient();
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    (await headers()).get("origin") ??
-    "http://localhost:3000";
-
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: `${origin}/auth/callback`,
-      queryParams: { access_type: "offline", prompt: "consent" },
-    },
-  });
-
-  if (error || !data.url) {
-    redirect("/login?error=google");
-  }
-  redirect(data.url);
 }
 
 export async function signOut() {

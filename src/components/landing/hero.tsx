@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { Container, Section } from "@/components/ui/container";
 import { ButtonLink } from "@/components/ui/button";
@@ -7,7 +8,18 @@ export function Hero() {
   return (
     <Section className="pb-8 pt-14 sm:pb-10 sm:pt-20">
       <Container className="text-center">
-        <span className="inline-flex items-center gap-2 rounded-full border border-border px-3.5 py-1.5 text-[13px] text-muted">
+        {/* The orca mark, large. Priority because it is the largest paint in
+            the viewport, so it should not arrive after the text. */}
+        <Image
+          src="/brand/celpare-mark-256.png"
+          alt=""
+          width={72}
+          height={72}
+          priority
+          className="mx-auto rounded-[18px]"
+        />
+
+        <span className="mt-7 inline-flex items-center gap-2 rounded-full border border-border px-3.5 py-1.5 text-[13px] text-muted">
           <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
           The home for AI tools and models
         </span>
@@ -33,7 +45,14 @@ export function Hero() {
         </div>
 
         <p className="mt-4 text-[13px] text-muted">
-          Free to start. No card required.
+          Free to start. No card required.{" "}
+          <a
+            href="/explore"
+            className="underline underline-offset-4 transition-colors duration-200 ease-out hover:text-foreground"
+          >
+            Or look around first
+          </a>
+          .
         </p>
 
         <ProductPreview />

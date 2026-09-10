@@ -7,6 +7,7 @@ import { signUp, type AuthState } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Field, PasswordField, FormAlert } from "@/components/ui/field";
 import { PasswordStrength } from "./password-strength";
+import { HumanCheck } from "./human-check";
 
 const initial: AuthState = { status: "idle", message: "" };
 
@@ -67,6 +68,8 @@ export function SignupForm() {
           />
           <PasswordStrength value={password} />
         </div>
+
+        <HumanCheck invalid={state.field === "human"} />
       </div>
 
       <Submit />
