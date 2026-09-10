@@ -36,7 +36,7 @@ export function Hero() {
             </p>
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
-              <ButtonLink href="/signup">
+              <ButtonLink href="/get-started">
                 Try Celpare
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </ButtonLink>

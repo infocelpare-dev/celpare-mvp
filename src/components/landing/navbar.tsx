@@ -67,7 +67,7 @@ export function Navbar() {
           <ButtonLink href="/login" variant="outline" size="sm">
             Log in
           </ButtonLink>
-          <ButtonLink href="/signup" size="sm">
+          <ButtonLink href="/get-started" size="sm">
             Sign up
           </ButtonLink>
         </div>
@@ -117,7 +117,7 @@ export function Navbar() {
             Log in
           </ButtonLink>
           <ButtonLink
-            href="/signup"
+            href="/get-started"
             className="mt-1"
             onClick={() => setOpen(false)}
           >

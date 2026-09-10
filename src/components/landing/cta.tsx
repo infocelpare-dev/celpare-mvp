@@ -34,7 +34,7 @@ export function CTA() {
             Find the right AI tool in minutes instead of an afternoon of tabs.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <ButtonLink href="/signup">
+            <ButtonLink href="/get-started">
               Try Celpare
               <ArrowRight className="h-4 w-4" aria-hidden />
             </ButtonLink>

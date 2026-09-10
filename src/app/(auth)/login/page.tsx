@@ -39,7 +39,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
       <p className="mt-6 text-center text-[14px] text-muted">
         <Link
-          href="/explore"
+          href="/app"
           className="underline underline-offset-4 transition-colors duration-200 ease-out hover:text-foreground"
         >
           Skip for now and look around

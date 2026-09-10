@@ -176,7 +176,7 @@ export async function signUp(
     no code is ever sent. Sending that person to /verify would strand them on a
     page waiting for an email that does not exist. Handle both configurations.
   */
-  if (data.session) redirect("/dashboard");
+  if (data.session) redirect("/app");
 
   redirect(`/verify?email=${encodeURIComponent(email)}`);
 }
@@ -209,7 +209,7 @@ export async function signIn(
     };
   }
 
-  redirect("/dashboard");
+  redirect("/app");
 }
 
 export async function verifyCode(
@@ -240,7 +240,7 @@ export async function verifyCode(
     };
   }
 
-  redirect("/dashboard");
+  redirect("/app");
 }
 
 export async function resendCode(
