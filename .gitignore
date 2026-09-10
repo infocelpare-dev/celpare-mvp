@@ -45,5 +45,11 @@ yarn-error.log*
 # sentry
 .sentryclirc
 
-# claude local overrides
-.claude/settings.local.json
+# Internal working documents. Kept local, never published.
+# The repo is public, so the product strategy, pricing, decisions and open
+# questions stay off it. Everything here still exists on disk.
+.claude/
+CLAUDE.md
+AGENTS.md
+TRACKER.md
+docs/
