@@ -308,11 +308,14 @@ function main() {
     if (allow.has(file)) continue;
 
     /*
-      An env file that is not the template. .env.local holds the real keys, and
-      committing it is the single most damaging accident available here.
+      Any env file at all, template included. .env.local holds the real keys and
+      committing it is the single most damaging accident available here, but the
+      template was no better: on a public repo it named the Supabase project and
+      spelled out how the Turnstile keys are split. The variable set is
+      documented locally now, so nothing here belongs in a commit.
     */
-    if (/(^|\/)\.env/.test(file) && !/\.env\.example$/.test(file)) {
-      add(BLOCK, file, 0, "env-file", "An environment file is staged.");
+    if (/(^|\/)\.env/.test(file)) {
+      add(BLOCK, file, 0, "env-file", "An environment file is staged. No .env file belongs in this repo, including the template.");
       continue;
     }
 

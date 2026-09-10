@@ -45,15 +45,11 @@ export function Hero() {
               </ButtonLink>
             </div>
 
+            {/* One primary CTA. A third route out of the hero competes with
+                Try Celpare, and /explore is still reachable from the entry
+                gate's Skip for now. */}
             <p className="mt-4 text-[13px] text-muted">
-              Free to start. No card required.{" "}
-              <a
-                href="/explore"
-                className="underline underline-offset-4 transition-colors duration-200 ease-out hover:text-foreground"
-              >
-                Or look around first
-              </a>
-              .
+              Free to start. No card required.
             </p>
           </div>
 
