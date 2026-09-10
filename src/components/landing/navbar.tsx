@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { Logo } from "@/components/ui/logo";
@@ -8,11 +9,22 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+/*
+  Hrefs are root relative on purpose. This nav is shared by every page, but the
+  sections only exist on the home page, so a bare "#how" scrolls to nothing on
+  /explore and /demo. "/#how" resolves to a plain fragment scroll when we are
+  already home and navigates home first when we are not.
+
+  `id` is kept separate because the scroll spy compares against the raw hash.
+  They are next/link rather than plain anchors so that the hash is honoured after
+  the home page renders. A bare <a> arrives before the section exists and leaves
+  the visitor at the top of the page.
+*/
 const links = [
-  { href: "#how", label: "How it works" },
-  { href: "#why", label: "Why Celpare" },
-  { href: "#tools", label: "AI Tools" },
-  { href: "#audience", label: "Community" },
+  { id: "#how", href: "/#how", label: "How it works" },
+  { id: "#why", href: "/#why", label: "Why Celpare" },
+  { id: "#tools", href: "/#tools", label: "AI Tools" },
+  { id: "#audience", href: "/#audience", label: "Community" },
 ];
 
 export function Navbar() {
@@ -22,7 +34,7 @@ export function Navbar() {
   // Active section indicator. UX guideline: current location must be visually
   // indicated, otherwise every nav link reads the same.
   useEffect(() => {
-    const ids = links.map((l) => l.href.slice(1));
+    const ids = links.map((l) => l.id.slice(1));
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
@@ -46,19 +58,19 @@ export function Navbar() {
 
         <nav aria-label="Main" className="hidden items-center gap-6 lg:flex">
           {links.map((l) => (
-            <a
+            <Link
               key={l.href}
               href={l.href}
-              aria-current={active === l.href ? "true" : undefined}
+              aria-current={active === l.id ? "true" : undefined}
               className={cn(
                 "border-b-2 py-1 text-[15px] transition-colors duration-200 ease-out",
-                active === l.href
+                active === l.id
                   ? "border-accent text-foreground"
                   : "border-transparent text-muted hover:text-foreground",
               )}
             >
               {l.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -99,14 +111,14 @@ export function Navbar() {
       >
         <Container className="flex flex-col gap-1 py-4">
           {links.map((l) => (
-            <a
+            <Link
               key={l.href}
               href={l.href}
               onClick={() => setOpen(false)}
               className="rounded-lg px-2 py-2.5 text-[15px] text-muted transition-colors duration-200 hover:bg-surface hover:text-foreground"
             >
               {l.label}
-            </a>
+            </Link>
           ))}
           <ButtonLink
             href="/login"

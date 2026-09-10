@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useId } from "react";
+import { useActionState, useId, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowRight } from "lucide-react";
 import { signIn, type AuthState } from "@/app/actions/auth";
@@ -19,8 +19,16 @@ function Submit() {
   );
 }
 
+/*
+  React resets a form once its action resolves. Left alone that clears the email
+  on every failed attempt, so a mistyped password costs you the address as well.
+  The email is controlled and kept; the password is left uncontrolled so it
+  clears, which is the usual convention and the right one here, since a wrong
+  password is the likely reason we are back on this screen.
+*/
 export function LoginForm() {
   const [state, formAction] = useActionState(signIn, initial);
+  const [email, setEmail] = useState("");
   const emailId = useId();
   const passwordId = useId();
 
@@ -37,6 +45,8 @@ export function LoginForm() {
           autoComplete="email"
           required
           placeholder="ameag@gmail.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           invalid={state.field === "email"}
         />
         <PasswordField

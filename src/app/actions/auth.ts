@@ -167,8 +167,25 @@ export async function signUp(
         message: "The bot check failed. Reload the page and try again.",
       };
     }
+    /*
+      The account cannot be created because the confirmation email cannot be
+      sent. Supabase reports this as "Error sending confirmation email". It is
+      not retryable from the visitor's side, so telling them to try again sends
+      them round a loop that cannot end. See G14: this clears with custom SMTP.
+    */
+    if (/sending.*email|email.*not.*sent|smtp/i.test(error.message)) {
+      return {
+        status: "error",
+        message:
+          "We could not send the confirmation code, so the account was not created. This is our email service, not you. Use Continue with Google to get in now.",
+      };
+    }
     console.error("[auth] signUp failed", error.message);
-    return { status: "error", message: "Could not create the account. Please try again." };
+    return {
+      status: "error",
+      message:
+        "Something went wrong creating the account. Nothing was saved, so it is safe to submit again.",
+    };
   }
 
   /*

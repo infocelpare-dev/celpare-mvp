@@ -1,18 +1,21 @@
+import Link from "next/link";
 import { Container } from "@/components/ui/container";
 import { Logo } from "@/components/ui/logo";
 
 /*
-  Every link points at a real section on this page or at a placeholder that is
-  honestly labelled. No dead links to routes that do not exist yet.
+  Section hrefs are root relative. The footer renders on /explore and /demo too,
+  where "#how" would scroll to a section that is not on the page, so the link has
+  to carry the route with it. On the home page "/#how" resolves to the same plain
+  fragment scroll.
 */
 const columns = [
   {
     title: "Product",
     links: [
-      { label: "How it works", href: "#how" },
-      { label: "Why Celpare", href: "#why" },
-      { label: "Categories", href: "#tools" },
-      { label: "Community", href: "#audience" },
+      { label: "How it works", href: "/#how" },
+      { label: "Why Celpare", href: "/#why" },
+      { label: "Categories", href: "/#tools" },
+      { label: "Community", href: "/#audience" },
       { label: "Get started", href: "/signup" },
     ],
   },
@@ -53,12 +56,7 @@ export function Footer() {
               <ul className="mt-3 space-y-2">
                 {c.links.map((l) => (
                   <li key={l.label}>
-                    <a
-                      href={l.href}
-                      className="text-[14px] text-muted transition-colors duration-200 ease-out hover:text-foreground"
-                    >
-                      {l.label}
-                    </a>
+                    <FooterLink href={l.href}>{l.label}</FooterLink>
                   </li>
                 ))}
               </ul>
@@ -72,5 +70,27 @@ export function Footer() {
         </div>
       </Container>
     </footer>
+  );
+}
+
+/*
+  mailto and any future external link stay plain anchors. Everything internal
+  goes through next/link so that a "/#how" from /explore or /demo actually lands
+  on the section rather than at the top of the home page.
+*/
+function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
+  const className =
+    "text-[14px] text-muted transition-colors duration-200 ease-out hover:text-foreground";
+  if (href.startsWith("/")) {
+    return (
+      <Link href={href} className={className}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <a href={href} className={className}>
+      {children}
+    </a>
   );
 }

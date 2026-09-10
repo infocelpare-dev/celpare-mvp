@@ -21,8 +21,20 @@ function Submit() {
   );
 }
 
+/*
+  React resets a form once its action resolves, which clears every uncontrolled
+  input. On a failed signup that meant retyping everything, including a password
+  that had just been composed to satisfy four rules, so every field is now
+  controlled and survives the round trip.
+
+  Signup keeps the password too, unlike login. The thing that fails here is
+  almost always the email or the bot check, and the password rules are shown
+  live next to the field, so wiping it punishes the wrong mistake.
+*/
 export function SignupForm() {
   const [state, formAction] = useActionState(signUp, initial);
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const nameId = useId();
@@ -42,6 +54,8 @@ export function SignupForm() {
           required
           maxLength={120}
           placeholder="Ada Lovelace"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
           invalid={state.field === "fullName"}
         />
         <Field
@@ -52,6 +66,8 @@ export function SignupForm() {
           autoComplete="email"
           required
           placeholder="ameag@gmail.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           invalid={state.field === "email"}
         />
         <div>

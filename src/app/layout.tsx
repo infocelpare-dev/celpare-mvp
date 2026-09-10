@@ -64,6 +64,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
+      /*
+        globals.css sets scroll-behavior: smooth. Next disables its own scroll
+        handling when it sees that, unless the page opts in here, which is why a
+        "/#how" link used to arrive at the top of the page instead of at the
+        section. This is the documented opt in, not a style.
+      */
+      data-scroll-behavior="smooth"
       className={`${dmSans.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
