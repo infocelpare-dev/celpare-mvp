@@ -36,7 +36,7 @@ export function LoginForm() {
           label="Email"
           autoComplete="email"
           required
-          placeholder="you@company.com"
+          placeholder="ameag@gmail.com"
           invalid={state.field === "email"}
         />
         <PasswordField

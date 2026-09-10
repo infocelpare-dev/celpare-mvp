@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState, useId } from "react";
+import { useActionState, useId, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowRight } from "lucide-react";
 import { signUp, type AuthState } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Field, PasswordField, FormAlert } from "@/components/ui/field";
+import { PasswordStrength } from "./password-strength";
 
 const initial: AuthState = { status: "idle", message: "" };
 
@@ -21,6 +22,7 @@ function Submit() {
 
 export function SignupForm() {
   const [state, formAction] = useActionState(signUp, initial);
+  const [password, setPassword] = useState("");
   const nameId = useId();
   const emailId = useId();
   const passwordId = useId();
@@ -47,20 +49,24 @@ export function SignupForm() {
           label="Email"
           autoComplete="email"
           required
-          placeholder="you@company.com"
+          placeholder="ameag@gmail.com"
           invalid={state.field === "email"}
         />
-        <PasswordField
-          id={passwordId}
-          name="password"
-          label="Password"
-          autoComplete="new-password"
-          required
-          minLength={8}
-          placeholder="At least 8 characters"
-          hint="At least 8 characters."
-          invalid={state.field === "password"}
-        />
+        <div>
+          <PasswordField
+            id={passwordId}
+            name="password"
+            label="Password"
+            autoComplete="new-password"
+            required
+            minLength={10}
+            placeholder="Use something long and unique"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            invalid={state.field === "password"}
+          />
+          <PasswordStrength value={password} />
+        </div>
       </div>
 
       <Submit />

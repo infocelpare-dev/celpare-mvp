@@ -37,9 +37,26 @@ const signUpSchema = z.object({
     .email("That does not look like a valid email address."),
   password: z
     .string()
-    .min(8, "Use at least 8 characters.")
-    .max(72, "Passwords are limited to 72 characters."),
+    .min(10, "Use at least 10 characters.")
+    .max(72, "Passwords are limited to 72 characters.")
+    .regex(/[a-z]/, "Include a lowercase letter.")
+    .regex(/[A-Z]/, "Include an uppercase letter.")
+    .regex(/[0-9]/, "Include a number.")
+    .refine(
+      (v) => !COMMON_PASSWORDS.has(v.toLowerCase()),
+      "That password is too common. Pick something harder to guess.",
+    ),
 });
+
+/* A short deny list of the passwords that show up first in every credential
+   stuffing list. Not a substitute for length, but it stops the worst choices
+   at zero cost. */
+const COMMON_PASSWORDS = new Set([
+  "password", "password1", "password123", "passw0rd", "p@ssw0rd", "p@ssword1",
+  "qwerty123", "qwertyuiop", "welcome123", "admin123", "letmein123",
+  "iloveyou1", "abc123456", "123456789", "1234567890", "changeme1",
+  "football1", "monkey123", "dragon123", "sunshine1", "princess1",
+]);
 
 const signInSchema = z.object({
   email: z.string().trim().min(1, "Enter your email address.").email("That does not look like a valid email address."),
@@ -78,11 +95,26 @@ export async function signUp(
   const { fullName, email, password } = parsed.data;
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: { data: { full_name: fullName } },
   });
+
+  /*
+    Supabase does not error when the address is already registered. It returns
+    a user with an empty identities array, so that nobody can probe which
+    emails have accounts. Without this check the person is sent to /verify to
+    wait for a code that is never sent.
+  */
+  if (!error && data.user && (data.user.identities?.length ?? 0) === 0) {
+    return {
+      status: "error",
+      field: "email",
+      message:
+        "That email already has an account. Log in instead, and use Continue with Google if that is how you signed up.",
+    };
+  }
 
   if (error) {
     // Supabase returns this when the address is already registered and
@@ -95,10 +127,16 @@ export async function signUp(
         message: "That email already has an account. Try logging in instead.",
       };
     }
+    /*
+      Supabase's built-in email service is capped at a couple of messages per
+      hour on the free tier, so this fires long before any real abuse. Saying
+      "wait a minute" would be a lie. Custom SMTP removes this, see G14.
+    */
     if (/rate limit|too many/i.test(error.message)) {
       return {
         status: "error",
-        message: "Too many attempts. Wait a minute and try again.",
+        message:
+          "Our email service has hit its hourly limit, so the code cannot be sent right now. Use Continue with Google instead, or try again later.",
       };
     }
     console.error("[auth] signUp failed", error.message);
@@ -185,7 +223,8 @@ export async function resendCode(
     if (/rate limit|too many|security purposes/i.test(error.message)) {
       return {
         status: "error",
-        message: "A code was just sent. Wait a minute before asking for another.",
+        message:
+          "A code was just sent, or the hourly email limit was reached. Check spam, then try again later.",
       };
     }
     return { status: "error", message: "Could not send a new code." };

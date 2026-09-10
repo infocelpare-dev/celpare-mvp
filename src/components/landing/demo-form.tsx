@@ -41,7 +41,7 @@ export function DemoForm() {
           type="email"
           required
           autoComplete="email"
-          placeholder="you@company.com"
+          placeholder="ameag@gmail.com"
           aria-invalid={state.status === "error" || undefined}
           className="h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-4 text-[15px] text-foreground placeholder:text-muted"
         />
