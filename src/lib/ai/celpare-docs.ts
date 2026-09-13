@@ -60,7 +60,7 @@ export const CELPARE_DOCS: DocSection[] = [
     id: "ask-limits",
     title: "Assistant usage limits",
     keywords: ["how many messages", "limit", "run out", "rate limit", "quota", "daily", "reset", "used up"],
-    body: `Message limits are per day and reset at midnight. Signed out visitors get 5 questions a day and their chats are not saved. Free accounts get 25 a day, Pro 150 and Premium 500. Longer answers and more conversation history are available on the higher plans. Web search is available on Pro and Premium.`,
+    body: `Message limits are per day and reset at midnight. Signed out visitors get 5 questions a day and their chats are not saved. Free accounts get 25 a day, Pro 150 and Premium 500. Longer answers, more conversation history and a higher token ceiling come with the higher plans. Searching the Celpare catalogue is on every plan, including signed out. Web search is available to any account, so Free, Pro and Premium. Deep research, which searches several angles and answers from all of them, is Premium only.`,
   },
   {
     id: "accounts",

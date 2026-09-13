@@ -37,8 +37,18 @@ export type PlanLimits = {
            "USER PREMIUM $19.99". 7,500,000 / 1,000,000 monthly.
 
   Pro is NOT in the GLM block. Notion only gives Free and Research for GLM, so
-  the numbers below are interpolated and are flagged as G24. They sit at roughly
-  a third of Premium, which matches the $7.99 to $19.99 price gap.
+  the numbers below are interpolated and are still flagged as G24.
+
+  The first interpolation put Pro at roughly a third of Premium, reasoning from
+  the $7.99 to $19.99 price gap, and nobody checked it against Free. A third of
+  Premium is BELOW Free, so a paying Pro account had a lower token ceiling than
+  a free one and would hit the wall while Free still had headroom. Pro now sits
+  at the midpoint between Free and Premium, which is the only shape that cannot
+  be wrong in that direction: whatever the real numbers turn out to be, paying
+  more must never buy less.
+
+  assertPlanOrder below now enforces that, so the next edit cannot reintroduce
+  it quietly.
 */
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   anon: {
@@ -74,12 +84,13 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     savesHistory: true,
   },
   pro: {
-    // Interpolated. Notion has no GLM row for Pro. See G24.
+    // Interpolated, midway between Free and Premium. Notion has no GLM row for
+    // Pro. See G24.
     messagesPerDay: 150,
-    dailyInputTokens: 83_333,
-    dailyOutputTokens: 11_111,
-    monthlyInputTokens: 2_500_000,
-    monthlyOutputTokens: 333_333,
+    dailyInputTokens: 187_500,
+    dailyOutputTokens: 25_000,
+    monthlyInputTokens: 5_625_000,
+    monthlyOutputTokens: 750_000,
     maxOutputPerReply: 1_500,
     historyTurns: 16,
     toolSearch: true,
@@ -101,6 +112,76 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     savesHistory: true,
   },
 };
+
+/*
+  Paying more must never buy less.
+
+  A table of four plans read as four separate blocks is easy to get wrong in one
+  direction at a time, which is exactly what happened: Pro was interpolated from
+  Premium, in isolation, and landed under Free. Nothing in the code noticed,
+  because every individual number looked reasonable.
+
+  So the relationship is checked rather than trusted. It runs once when the
+  module loads, throws in development where somebody is there to read it, and
+  logs in production, because a limit table that is generous in the wrong place
+  is not worth taking the product down over.
+
+  Booleans are checked the same way: a capability granted on a lower plan must
+  stay granted on every higher one.
+*/
+const PLAN_LADDER: Plan[] = ["anon", "free", "pro", "premium"];
+
+const MUST_NOT_DECREASE = [
+  "messagesPerDay",
+  "dailyInputTokens",
+  "dailyOutputTokens",
+  "monthlyInputTokens",
+  "monthlyOutputTokens",
+  "maxOutputPerReply",
+  "historyTurns",
+] as const;
+
+const MUST_NOT_BE_REVOKED = [
+  "toolSearch",
+  "webSearch",
+  "researchMode",
+  "savesHistory",
+] as const;
+
+function assertPlanOrder(): void {
+  const problems: string[] = [];
+
+  for (let i = 1; i < PLAN_LADDER.length; i += 1) {
+    const lower = PLAN_LADDER[i - 1];
+    const higher = PLAN_LADDER[i];
+
+    for (const key of MUST_NOT_DECREASE) {
+      if (PLAN_LIMITS[higher][key] < PLAN_LIMITS[lower][key]) {
+        problems.push(
+          `${higher}.${key} (${PLAN_LIMITS[higher][key]}) is lower than ${lower}.${key} (${PLAN_LIMITS[lower][key]})`,
+        );
+      }
+    }
+
+    for (const key of MUST_NOT_BE_REVOKED) {
+      if (PLAN_LIMITS[lower][key] && !PLAN_LIMITS[higher][key]) {
+        problems.push(`${higher}.${key} is off while ${lower}.${key} is on`);
+      }
+    }
+  }
+
+  if (problems.length === 0) return;
+
+  const message = `[ai] PLAN_LIMITS is not monotonic, so a higher plan buys less than a lower one:\n  ${problems.join("\n  ")}`;
+
+  if (process.env.NODE_ENV === "production") {
+    console.error(message);
+    return;
+  }
+  throw new Error(message);
+}
+
+assertPlanOrder();
 
 /*
   Per feature tool permissions (D41). Notion is explicit: tool permissions are
