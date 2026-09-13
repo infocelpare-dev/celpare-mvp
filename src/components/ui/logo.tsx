@@ -31,10 +31,15 @@ export function Logo({
   className,
   size = 32,
   showWordmark = true,
+  wordmarkClassName,
 }: {
   className?: string;
   size?: number;
   showWordmark?: boolean;
+  /* Lets a caller hide the wordmark at one breakpoint and keep it at another,
+     which the product nav needs: at 390 the two destinations matter more than
+     the name, and the mark still says Celpare on its own. */
+  wordmarkClassName?: string;
 }) {
   return (
     <Link
@@ -47,7 +52,12 @@ export function Logo({
     >
       <LogoMark size={size} />
       {showWordmark && (
-        <span className="font-display text-[18px] font-bold tracking-tight">
+        <span
+          className={cn(
+            "font-display text-[18px] font-bold tracking-tight",
+            wordmarkClassName,
+          )}
+        >
           Celpare
         </span>
       )}
