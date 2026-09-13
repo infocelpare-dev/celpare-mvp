@@ -92,6 +92,23 @@ body {
   border-radius: 4px;
 }
 
+/*
+  The one exception, and it is an exception rather than a deletion.
+
+  On a large rounded field the ring reads as a lime halo around the thing you
+  are typing into, which the founder asked to remove. An element carrying this
+  class must show focus another way: the Ask composer lifts its whole border to
+  the foreground colour, which is a clear indicator and passes the same test the
+  ring exists to pass. Never put this on a control that then shows nothing.
+
+  It lives here, unlayered, because the rule above is unlayered too: a Tailwind
+  utility sits in @layer utilities and loses to it whatever its specificity.
+*/
+.focus-ring-none:focus-visible,
+.focus-ring-none:focus {
+  outline: none;
+}
+
 /* Respect reduced motion globally rather than per component. */
 @media (prefers-reduced-motion: reduce) {
   *,
