@@ -35,8 +35,8 @@ export const CELPARE_DOCS: DocSection[] = [
   {
     id: "surfaces",
     title: "What Celpare offers",
-    keywords: ["features", "surfaces", "sections", "what does celpare have", "explore", "compare", "directory", "community"],
-    body: `Celpare has seven surfaces. Community is the home feed. Search covers tools, models, companies, resources, posts, people and categories. Explore is discovery without a target: trending and new tools, popular discussions, categories. Ask Celpare is this assistant. Compare puts tools side by side on features, pricing, strengths, weaknesses and platform support. Recommendations learn from what you search, view and save. The directory holds structured records for AI tools and models. Community, Explore and Compare are still being built; Ask Celpare and the tool directory are live.`,
+    keywords: ["features", "surfaces", "sections", "what does celpare have", "explore", "compare", "directory", "community", "profile", "follow", "followers"],
+    body: `Celpare has seven surfaces. Community is the home feed. Search covers tools, models, companies, resources, posts, people and categories. Explore is discovery without a target: trending and new tools, popular discussions, categories. Ask Celpare is this assistant. Compare puts tools side by side on features, pricing, strengths, weaknesses and platform support. Recommendations learn from what you search, view and save. The directory holds structured records for AI tools and models. Ask Celpare, the tool directory and profiles are live. The community feed and Explore and Compare are still being built.`,
   },
   {
     id: "ask-celpare",
@@ -66,7 +66,7 @@ export const CELPARE_DOCS: DocSection[] = [
     id: "accounts",
     title: "Accounts and signing in",
     keywords: ["sign up", "signup", "log in", "login", "account", "register", "google", "password", "verify"],
-    body: `You can use Celpare signed out, including the assistant, but nothing is saved. Creating an account lets Celpare keep your chats and saved tools. Sign up with Google, or with a name, email and password confirmed by a six digit code. There is one account type for everybody; developer mode is a setting you turn on inside your profile rather than a separate signup.`,
+    body: `You can use Celpare signed out, including the assistant, but nothing is saved. Creating an account lets Celpare keep your chats and saved tools. Sign up with Google, or with a name, email and password confirmed by a six digit code. There is one account type for everybody; developer mode is a switch on your profile rather than a separate signup. Turning it on opens a developer workspace where you can submit AI tools and models to the catalogue and track their review. Every submission is reviewed by Celpare before it is published, and a developer cannot approve or verify their own. Submission forms are being built. You cannot turn developer mode off once you have submitted something. Your profile lives at /profile and its public version at /u/your-username, which anyone can read signed out. You can set a display name, username, bio, location, website, AI interests and skills, and follow other people. What you save and what you like are private to you. Profile pictures cannot be uploaded yet: it is the picture from the account you signed in with, or your initials.`,
   },
   {
     id: "submitting",
