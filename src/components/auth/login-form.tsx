@@ -6,6 +6,7 @@ import { ArrowRight } from "lucide-react";
 import { signIn, type AuthState } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Field, PasswordField, FormAlert } from "@/components/ui/field";
+import { Turnstile } from "./turnstile";
 
 const initial: AuthState = { status: "idle", message: "" };
 
@@ -29,6 +30,13 @@ function Submit() {
 export function LoginForm() {
   const [state, formAction] = useActionState(signIn, initial);
   const [email, setEmail] = useState("");
+  /*
+    Sign in carries a captcha token for the same reason signup does: Supabase
+    enforces captcha protection at the project level, so signInWithPassword is
+    rejected without one. A token is single use, so this widget runs its own
+    challenge rather than sharing signup's.
+  */
+  const [captchaToken, setCaptchaToken] = useState("");
   const emailId = useId();
   const passwordId = useId();
 
@@ -58,6 +66,11 @@ export function LoginForm() {
           placeholder="Your password"
           invalid={state.field === "password"}
         />
+      </div>
+
+      <div className="mt-5">
+        <Turnstile onToken={setCaptchaToken} invalid={state.field === "captcha"} />
+        <input type="hidden" name="captchaToken" value={captchaToken} />
       </div>
 
       <Submit />

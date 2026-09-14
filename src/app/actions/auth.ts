@@ -66,6 +66,17 @@ const COMMON_PASSWORDS = new Set([
 const signInSchema = z.object({
   email: z.string().trim().min(1, "Enter your email address.").email("That does not look like a valid email address."),
   password: z.string().min(1, "Enter your password."),
+  /*
+    Sign in needs a captcha token too, and this was the bug.
+
+    Supabase has captcha protection enabled at the PROJECT level, which applies
+    to signInWithPassword exactly as it applies to signUp. Signup sent a token
+    and worked; sign in sent none, so every single login failed at the auth
+    server with "captcha protection: request disallowed (no captcha_token
+    found)" before any password was ever checked. Verified against the live
+    endpoint.
+  */
+  captchaToken: z.string(),
 });
 
 const verifySchema = z.object({
@@ -205,19 +216,47 @@ export async function signIn(
   const parsed = signInSchema.safeParse({
     email: formData.get("email") ?? "",
     password: formData.get("password") ?? "",
+    captchaToken: String(formData.get("captchaToken") ?? ""),
   });
   if (!parsed.success) return firstIssue(parsed.error, "Please check the form.");
   if (!isSupabaseConfigured()) return notConfigured;
 
-  const { email, password } = parsed.data;
+  const { email, password, captchaToken } = parsed.data;
+
+  const captchaRequired = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
+  if (captchaRequired && !captchaToken) {
+    return {
+      status: "error",
+      message: "Confirm you are not a robot, then sign in.",
+      field: "captcha",
+    };
+  }
+
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+    ...(captchaToken ? { options: { captchaToken } } : {}),
+  });
 
   if (error) {
     if (/email not confirmed/i.test(error.message)) {
       redirect(`/verify?email=${encodeURIComponent(email)}`);
     }
+    /*
+      A captcha failure is NOT a wrong password, and saying so is the
+      difference between a person retrying and a person giving up convinced
+      their account is gone.
+    */
+    if (/captcha/i.test(error.message)) {
+      return {
+        status: "error",
+        message: "That check did not pass. Tap the box again, then sign in.",
+        field: "captcha",
+      };
+    }
+
     // Deliberately vague. Saying which of the two was wrong tells an attacker
     // whether an address is registered.
     return {
