@@ -153,7 +153,25 @@ export function AppSidebar({
         ) : null}
 
         {secondary ? (
-          <div className="flex min-h-0 flex-1 flex-col border-t border-border">
+          /*
+            Close the drawer when anything inside the secondary slot navigates.
+
+            The nav links above each carry their own onClose, but `secondary` is
+            an arbitrary node passed down from a server component, so a callback
+            cannot be handed to it: functions do not serialise across that
+            boundary. Catching the click as it bubbles is what does work, and it
+            keeps the rule in one place rather than asking every future slot to
+            remember it.
+
+            Without this the drawer stayed open on top of the chat you just
+            opened, which on a phone means tapping a chat appears to do nothing.
+          */
+          <div
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest("a")) onClose();
+            }}
+            className="flex min-h-0 flex-1 flex-col border-t border-border"
+          >
             {secondary}
           </div>
         ) : null}

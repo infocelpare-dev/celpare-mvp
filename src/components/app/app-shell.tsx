@@ -1,13 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { History, Menu, Settings } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { Menu } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { AppRail } from "./app-rail";
 import { AppSidebar } from "./app-sidebar";
 
 /*
@@ -31,21 +28,19 @@ export function AppShell({
   signOutAction,
   secondary,
   fullHeight = false,
-  /* The quick access rail beside the conversation. Ask Celpare only: chats,
-     settings and profile are what you reach for while chatting, and on a feed
-     or a pricing page they would be three icons with nothing to do. */
-  rail = false,
+  /* A column rendered before the page, inside the content row. Ask Celpare
+     uses it for the chat history rail and panel. Nothing else has one. */
+  asideStart,
   children,
 }: {
   signedIn: boolean;
   signOutAction?: React.ReactNode;
   secondary?: React.ReactNode;
   fullHeight?: boolean;
-  rail?: boolean;
+  asideStart?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
 
   return (
     /* dvh rather than vh: on a phone the browser chrome collapses, and vh
@@ -78,36 +73,8 @@ export function AppShell({
           </div>
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-3">
-            {/*
-              Chats and settings sit beside the conversation, not inside the
-              drawer, on founder instruction. They are the two things you reach
-              for while chatting, and making the history a two step trip through
-              a menu is how people stop using their own history.
-            */}
-            {rail && secondary ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-9 px-0 lg:hidden"
-                onClick={() => setOpen(true)}
-                aria-label="Your chats"
-                title="Your chats"
-                aria-controls="app-sidebar"
-              >
-                <History className="size-4" aria-hidden />
-              </Button>
-            ) : null}
-            {rail && signedIn ? (
-              <Link
-                href="/settings"
-                aria-label="Settings"
-                title="Settings"
-                aria-current={pathname === "/settings" ? "page" : undefined}
-                className="rounded-lg p-2 text-muted transition-colors duration-200 hover:bg-surface hover:text-foreground lg:hidden"
-              >
-                <Settings className="size-4" aria-hidden />
-              </Link>
-            ) : null}
+            {/* Chats live in the sidebar, reachable from the one menu button,
+                rather than being repeated here and in a rail. */}
             <ThemeToggle />
             {signedIn ? (
               signOutAction
@@ -119,13 +86,8 @@ export function AppShell({
           </div>
         </header>
 
-        {/* The rail sits inside the content row, under the bar and against the
-            conversation, rather than at the window edge where it would read as
-            a second sidebar. */}
         <div className="flex min-h-0 flex-1">
-          {rail ? (
-            <AppRail onOpenChats={() => setOpen(true)} showChats={Boolean(secondary)} />
-          ) : null}
+          {asideStart}
 
           <main
             className={
