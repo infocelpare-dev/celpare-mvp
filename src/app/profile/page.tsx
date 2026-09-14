@@ -1,33 +1,66 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Container } from "@/components/ui/container";
 import { AppShell } from "@/components/app/app-shell";
-import { PlaceholderPage } from "@/components/app/placeholder-page";
+import { ProfileView } from "@/components/profile/profile-view";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { signOut } from "@/app/actions/auth";
+import {
+  getFeaturedTools,
+  getProfileById,
+  getTabRows,
+  isTabKey,
+  visibleTabs,
+} from "@/lib/profile/queries";
 
 export const metadata: Metadata = {
   title: "Profile",
-  // A profile page is about one person, so it stays out of the index until
-  // there is a public version with its own rules.
+  // Your own profile stays out of the index. The public version at
+  // /u/[username] is the one built to be found.
   robots: { index: false, follow: false },
 };
 
 export const dynamic = "force-dynamic";
 
-export default async function ProfilePage() {
-  let signedIn = false;
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  if (!isSupabaseConfigured()) redirect("/community");
 
-  if (isSupabaseConfigured()) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    signedIn = Boolean(user);
-  }
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // A profile belongs to an account. This guard was missing while the page was
+  // a placeholder: a signed out visitor used to get the placeholder rather
+  // than the gate. Same pattern as settings/page.tsx.
+  if (!user) redirect("/get-started");
+
+  const profile = await getProfileById(supabase, user.id);
+
+  // The signup trigger creates this row, so its absence means something is
+  // genuinely wrong rather than that the person is new.
+  if (!profile) redirect("/community");
+
+  const tabs = visibleTabs(true, profile.plan);
+  const params = await searchParams;
+  const activeTab = isTabKey(params.tab, tabs) ? params.tab : "posts";
+
+  const [rows, featuredTools, submissions] = await Promise.all([
+    getTabRows(supabase, activeTab, profile, true),
+    getFeaturedTools(supabase, profile.id),
+    /* Counts your own tools and models. Used only to explain why Developer
+       Mode is locked, never to decide anything. */
+    supabase.rpc("my_submission_count"),
+  ]);
 
   return (
     <AppShell
-      signedIn={signedIn}
+      signedIn
       signOutAction={
         <form action={signOut}>
           <Button variant="outline" size="sm" type="submit">
@@ -36,11 +69,20 @@ export default async function ProfilePage() {
         </form>
       }
     >
-      <PlaceholderPage
-        name="Profile"
-        what="Your username, your bio, the tools you saved and the posts you wrote. The public version of it lives at /u/your-username. Ask Celpare preferences are already at /settings."
-        when="Phase 4, once profiles carry a username."
-      />
+      <Container className="max-w-[720px] py-10 sm:py-14">
+        <ProfileView
+          profile={profile}
+          isOwner
+          viewerSignedIn
+          following={false}
+          tabs={tabs}
+          activeTab={activeTab}
+          rows={rows}
+          featuredTools={featuredTools}
+          basePath="/profile"
+          submissionCount={Number(submissions.data ?? 0)}
+        />
+      </Container>
     </AppShell>
   );
 }

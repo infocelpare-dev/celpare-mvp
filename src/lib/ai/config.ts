@@ -27,6 +27,17 @@ export type PlanLimits = {
   webSearch: boolean;
   researchMode: boolean;
   savesHistory: boolean;
+  /* Catalogue caps, from 05-pricing-plans.md. Infinity means unlimited, which
+     orders correctly under the `<` comparison assertPlanOrder already uses, so
+     it needs no sentinel value.
+
+     These two are ALSO in the `plan_limits` table in the database, which is
+     what the BEFORE INSERT trigger reads and is therefore the actual control.
+     The copy here is for rendering "5 of 5 used" without a round trip. If the
+     two ever disagree, the database is the one that is true. */
+  savedTools: number;
+  savedModels: number;
+  collections: number;
 };
 
 /*
@@ -65,6 +76,10 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     webSearch: false,
     researchMode: false,
     savesHistory: false, // D36. Nothing anonymous is ever persisted.
+    // Saving needs an account to own the row.
+    savedTools: 0,
+    savedModels: 0,
+    collections: 0,
   },
   free: {
     messagesPerDay: 25,
@@ -82,6 +97,9 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     webSearch: true,
     researchMode: false,
     savesHistory: true,
+    savedTools: 5,
+    savedModels: 5,
+    collections: 0, // Free has no collections at all, per the pricing page.
   },
   pro: {
     // Interpolated, midway between Free and Premium. Notion has no GLM row for
@@ -97,6 +115,9 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     webSearch: true,
     researchMode: false,
     savesHistory: true,
+    savedTools: 15,
+    savedModels: 15,
+    collections: 10,
   },
   premium: {
     messagesPerDay: 500,
@@ -110,6 +131,9 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     webSearch: true,
     researchMode: true,
     savesHistory: true,
+    savedTools: Number.POSITIVE_INFINITY,
+    savedModels: Number.POSITIVE_INFINITY,
+    collections: Number.POSITIVE_INFINITY,
   },
 };
 
@@ -139,6 +163,13 @@ const MUST_NOT_DECREASE = [
   "monthlyOutputTokens",
   "maxOutputPerReply",
   "historyTurns",
+  // Registered here so the ladder check covers the catalogue caps the same way
+  // it covers tokens. Without this line a future edit could put Pro below Free
+  // on saved tools and nothing would notice, which is the exact bug this
+  // function exists to catch.
+  "savedTools",
+  "savedModels",
+  "collections",
 ] as const;
 
 const MUST_NOT_BE_REVOKED = [
