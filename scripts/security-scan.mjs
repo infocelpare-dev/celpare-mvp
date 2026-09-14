@@ -225,6 +225,22 @@ function scanHistory() {
     return 0;
   }
 
+  /*
+    The history scan honours the same escape hatches as the staged scan.
+
+    It did not, and that was a real bug rather than a nuance. The mock AI
+    provider deliberately contains a published example JWT and an obviously
+    fake sk- key, both marked scan-allow, because they are the fixtures that
+    prove the output filter redacts secrets. The staged scan skipped them and
+    the history scan flagged them, so every run ended in "2 findings in
+    history. Do not push yet." and advised rotating a key that does not exist
+    and rewriting history that is already on the remote.
+
+    A gate that blocks every push on the same two known safe lines is worse
+    than no gate, because it teaches you to push past it. A finding has to mean
+    something.
+  */
+  const allow = loadAllowList();
   const hits = [];
   for (const sha of shas) {
     const subject = git(["log", "-1", "--format=%s", sha]).trim();
@@ -243,7 +259,9 @@ function scanHistory() {
       }
       if (!raw.startsWith("+") || raw.startsWith("+++")) continue;
       const text = raw.slice(1);
+      if (/scan-allow/.test(text)) continue;
       for (const rule of SECRET_RULES) {
+        if (allow.has(`${file}:${rule.id}`) || allow.has(file)) continue;
         const m = text.match(rule.re);
         if (!m) continue;
         if (rule.skip && rule.skip(m)) continue;
