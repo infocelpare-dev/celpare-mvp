@@ -459,7 +459,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
           canary, the same scope rule and the same safety block.
         */
         const system = conversational
-          ? buildChatPrompt({ canary, docs, bio: identity.bio, plan: identity.plan })
+          ? buildChatPrompt({ canary, docs, bio: identity.bio, interests: identity.interests, skills: identity.skills, plan: identity.plan })
           : doDeepResearch
             ? buildResearchPrompt({
                 canary,
@@ -467,6 +467,8 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
                 docs,
                 web: research,
                 bio: identity.bio,
+                interests: identity.interests,
+                skills: identity.skills,
                 plan: identity.plan,
                 questions: researchQuestions,
               })
@@ -476,6 +478,8 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
                 docs,
                 web: research,
                 bio: identity.bio,
+                interests: identity.interests,
+                skills: identity.skills,
                 plan: identity.plan,
               });
 

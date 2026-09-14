@@ -80,6 +80,8 @@ export type Identity = {
   userId: string | null;
   plan: Plan;
   bio: string | null;
+  interests: string[];
+  skills: string[];
   settings: AskSettings;
   /* The Redis key. Never a raw IP and never an email. */
   subject: string;
@@ -99,7 +101,7 @@ export async function identify(): Promise<Identity> {
     if (user) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("plan, bio, ask_settings")
+        .select("plan, bio, interests, skills, ask_settings")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -108,6 +110,8 @@ export async function identify(): Promise<Identity> {
         userId: user.id,
         plan: plan === "anon" ? "free" : plan,
         bio: profile?.bio ?? null,
+        interests: profile?.interests ?? [],
+        skills: profile?.skills ?? [],
         settings: (profile?.ask_settings ?? {}) as AskSettings,
         subject: `u:${user.id}`,
         anonHash: null,
@@ -127,6 +131,8 @@ export async function identify(): Promise<Identity> {
     userId: null,
     plan: "anon",
     bio: null,
+    interests: [],
+    skills: [],
     // Anonymous visitors have no stored settings, and saveHistory is false by
     // construction rather than by preference (D36).
     settings: {},
