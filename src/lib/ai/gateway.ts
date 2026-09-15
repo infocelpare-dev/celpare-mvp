@@ -20,6 +20,7 @@ import { getProvider, models, providerName } from "./providers";
 import { checkLimits, countMessage, countTokens } from "./ratelimit";
 import { loadToolCards, searchTools, type ToolCard } from "./tool-search";
 import { estimateTokens, recordUsage } from "./usage";
+import { recordAiCall } from "./observability";
 import { webSearch } from "./web-search";
 import type {
   AiFeature,
@@ -612,6 +613,35 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
         webSearch: webUsed,
         deepResearch: doDeepResearch,
         searchCalls,
+      });
+
+      /*
+        The same facts again, to Sentry, for the AI Agents dashboard.
+
+        Not a replacement for recordUsage: ai_usage_records is ours, it is
+        complete, and /admin/ai reads it. This is the operational view, sampled,
+        with latency distributions and error rates across deployments. Sends no
+        part of the question or the answer, see observability.ts.
+      */
+      recordAiCall({
+        feature: input.feature,
+        provider: providerName(),
+        model: main,
+        plan: identity.plan,
+        userId: identity.userId,
+        startedAt: started,
+        endedAt: Date.now(),
+        inputTokens,
+        outputTokens,
+        status,
+        toolSearch: doToolSearch,
+        webSearch: webUsed,
+        deepResearch: doDeepResearch,
+        searchCalls,
+        citations: citations.length,
+        conversationId,
+        question: cleaned.text,
+        answer,
       });
 
       emit(controller, { t: "done", conversationId });

@@ -42,7 +42,13 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /* Everything except static assets and images. */
-    "/((?!_next/static|_next/image|favicon.ico|brand/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    /* Everything except static assets, images, and the Sentry tunnel.
+
+       /monitoring is where the browser posts error and trace payloads, routed
+       through our own origin so an ad blocker cannot silently drop them
+       (tunnelRoute in next.config.ts). Running the session refresh on it would
+       put a Supabase round trip in front of every event the SDK sends, for a
+       request that has no session and needs none. */
+    "/((?!monitoring|_next/static|_next/image|favicon.ico|brand/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
