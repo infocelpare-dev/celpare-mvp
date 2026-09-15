@@ -1,0 +1,65 @@
+name: CI
+
+# Two jobs in one file, and it exists for two reasons.
+#
+# The first is the obvious one: nothing was checking this repository on push.
+# tsc and eslint pass locally or they do not get committed, but "locally" is one
+# machine and one Node version.
+#
+# The second is less obvious and worth writing down. GitHub's default code
+# scanning setup analyses two languages here, javascript-typescript and actions.
+# The actions analysis reads workflow files. When the old CodeQL workflow was
+# removed this was the only one left, so that analysis had nothing to read and
+# failed with the repository reporting no code. A workflow directory that is
+# never empty is now load bearing.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Types, lint and secrets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          # The secret scan walks history, so it needs history.
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      # The same scan .githooks/pre-commit runs, over the whole history rather
+      # than the staged set. It catches a commit made with --no-verify, or one
+      # pushed from a machine that never installed the hook.
+      - name: Scan history for secrets
+        run: npm run scan:history
+
+# `next build` is deliberately absent.
+#
+# It reads NEXT_PUBLIC_SUPABASE_URL and friends at build time, and putting real
+# values in CI means either committing them or wiring repository secrets for a
+# check that proves less than the two above. A type error and a lint error are
+# what actually break a build here, and both are caught without a single secret
+# leaving the founder's machine. Add it when there is a deploy pipeline that
+# needs the artefact anyway.
