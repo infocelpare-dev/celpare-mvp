@@ -43,6 +43,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
+        # This list was empty, and an empty matrix is an invalid workflow: every
+        # run failed before executing a step, which looked like the commit had
+        # broken something when nothing had. Celpare is TypeScript throughout,
+        # and build-mode 'none' is correct because CodeQL reads the source
+        # directly for interpreted languages rather than needing a compile.
+        - language: javascript-typescript
+          build-mode: none
+        # 'actions' scans the workflow files themselves, which is worth having
+        # given this one shipped broken.
+        - language: actions
+          build-mode: none
         # CodeQL supports the following values keywords for 'language': 'actions', 'c-cpp', 'csharp', 'go', 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'rust', 'swift'
         # Use `c-cpp` to analyze code written in C, C++ or both
         # Use 'java-kotlin' to analyze code written in Java, Kotlin or both
