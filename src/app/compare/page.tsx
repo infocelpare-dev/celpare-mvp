@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/app/app-shell";
+import { AccountNotices } from "@/components/app/account-notices";
+import { AdminLink } from "@/components/app/admin-link";
 import { PlaceholderPage } from "@/components/app/placeholder-page";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { signOut } from "@/app/actions/auth";
@@ -25,7 +27,7 @@ export default async function ComparePage() {
   }
 
   return (
-    <AppShell
+    <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn={signedIn}
       signOutAction={
         <form action={signOut}>

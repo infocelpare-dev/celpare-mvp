@@ -46,6 +46,11 @@ export function AppSidebar({
   onClose,
   secondary,
   signedIn,
+  /* Rendered above Settings when the account holds a staff role. A server
+     component, passed in rather than decided here, because this file is a
+     client component and the role must be read server side. Null for everybody
+     else, so the section simply is not there. */
+  adminLink,
 }: {
   open: boolean;
   onClose: () => void;
@@ -56,6 +61,7 @@ export function AppSidebar({
      of saved chats. It lives here rather than in a column of its own, so a
      laptop does not lose 490px of width to two sidebars. */
   secondary?: React.ReactNode;
+  adminLink?: React.ReactNode;
 }) {
   const pathname = usePathname();
 
@@ -126,6 +132,12 @@ export function AppSidebar({
             })}
           </ul>
         </nav>
+
+        {adminLink ? (
+          <div className="shrink-0 border-t border-border p-2" onClick={onClose}>
+            {adminLink}
+          </div>
+        ) : null}
 
         {signedIn ? (
           <div className="shrink-0 border-t border-border p-2">

@@ -5,12 +5,15 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { AppShell } from "@/components/app/app-shell";
+import { AccountNotices } from "@/components/app/account-notices";
+import { AdminLink } from "@/components/app/admin-link";
 import {
   createAnonClient,
   createClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/server";
 import { signOut } from "@/app/actions/auth";
+import { recordToolView } from "@/lib/telemetry";
 
 /*
   The tool record an Ask Celpare citation points at.
@@ -27,6 +30,7 @@ import { signOut } from "@/app/actions/auth";
 export const dynamic = "force-dynamic";
 
 type Tool = {
+  id: string;
   slug: string;
   name: string;
   tagline: string | null;
@@ -51,7 +55,7 @@ async function getTool(slug: string): Promise<Tool | null> {
   const { data, error } = await supabase
     .from("tools")
     .select(
-      "slug, name, tagline, description, website_url, docs_url, pricing, pricing_model, tags, features, platforms, rating, verified, source, submitted_at",
+      "id, slug, name, tagline, description, website_url, docs_url, pricing, pricing_model, tags, features, platforms, rating, verified, source, submitted_at",
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -88,16 +92,32 @@ export default async function ToolPage({
   if (!tool) notFound();
 
   let signedIn = false;
+  let userId: string | null = null;
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
     signedIn = Boolean(user);
+    userId = user?.id ?? null;
   }
 
+  /*
+    Record the view, after the page has already resolved.
+
+    Not awaited: a telemetry insert must never be something a reader waits on,
+    and if it fails the page is unaffected. This is what turns the search log
+    into a conversion rate, because a search nobody acted on and a search that
+    led somewhere are otherwise indistinguishable.
+
+    The source is "direct" because a server render cannot see where the click
+    came from without a referrer check, and guessing would make the search
+    attribution wrong in the flattering direction.
+  */
+  void recordToolView({ toolId: tool.id, userId, source: "direct" });
+
   return (
-    <AppShell
+    <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn={signedIn}
       signOutAction={
         <form action={signOut}>

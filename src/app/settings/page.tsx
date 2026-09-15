@@ -3,8 +3,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Container } from "@/components/ui/container";
 import { BackLink } from "@/components/ui/back-link";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { isStaffRole, ROLE_LABEL, type Role } from "@/lib/admin/capabilities";
 import { AppShell } from "@/components/app/app-shell";
+import { AccountNotices } from "@/components/app/account-notices";
+import { AdminLink } from "@/components/app/admin-link";
 import {
   AskSettingsForm,
   type AskSettingsValues,
@@ -37,7 +40,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("plan, ask_settings, is_developer, username, full_name, avatar_url")
+    .select("plan, ask_settings, is_developer, username, full_name, avatar_url, role")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -59,7 +62,7 @@ export default async function SettingsPage() {
     : "Web search is not switched on yet. It needs a search provider key.";
 
   return (
-    <AppShell
+    <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn
       signOutAction={
         <form action={signOut}>
@@ -125,6 +128,35 @@ export default async function SettingsPage() {
             webSearchReason={webSearchReason}
           />
         </section>
+
+        {/*
+          The way in to the admin dashboard, for the people who have one.
+
+          The sidebar now carries one too, added in Phase 4Q. This one stays
+          because it does something the sidebar entry does not: it names the
+          role and what it means, which is the thing somebody comes to settings
+          to check. The original note here said the sidebar was impossible
+          because threading a role through thirteen pages would put the link on
+          some and not others. 4Q threaded the notice bar through those same
+          thirteen, so the pattern is applied uniformly rather than avoided.
+
+          isStaffRole is a render decision and grants nothing: /admin gates on
+          the same role server side, and every routine behind it checks a
+          capability in SQL.
+        */}
+        {isStaffRole(profile?.role) ? (
+          <section className="mt-12 border-t border-border pt-10">
+            <h2 className="font-display text-[17px] font-semibold">Administration</h2>
+            <p className="mt-2 text-[15px] leading-relaxed text-muted">
+              Your account holds the {ROLE_LABEL[profile!.role as Role]} role.
+            </p>
+            <div className="mt-4">
+              <ButtonLink href="/admin" variant="outline" size="sm">
+                Open the admin dashboard
+              </ButtonLink>
+            </div>
+          </section>
+        ) : null}
 
       </Container>
     </AppShell>

@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { BackLink } from "@/components/ui/back-link";
 import { AppShell } from "@/components/app/app-shell";
+import { AccountNotices } from "@/components/app/account-notices";
+import { AdminLink } from "@/components/app/admin-link";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { AvatarUpload } from "@/components/profile/avatar-upload";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
@@ -31,7 +33,7 @@ export default async function EditProfilePage() {
   if (!profile) redirect("/community");
 
   return (
-    <AppShell
+    <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn
       signOutAction={
         <form action={signOut}>

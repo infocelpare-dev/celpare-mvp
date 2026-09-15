@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/app/app-shell";
+import { AccountNotices } from "@/components/app/account-notices";
+import { AdminLink } from "@/components/app/admin-link";
 import { ChatHistoryPanel } from "@/components/ask/chat-history-panel";
 import { listConversations } from "@/lib/ai/conversations";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
@@ -60,7 +62,7 @@ export default async function AskLayout({
   const conversations = signedIn ? await listConversations() : [];
 
   return (
-    <AppShell
+    <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn={signedIn}
       fullHeight
       asideStart={

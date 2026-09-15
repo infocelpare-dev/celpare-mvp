@@ -1,6 +1,8 @@
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { AppShell } from "@/components/app/app-shell";
+import { AccountNotices } from "@/components/app/account-notices";
+import { AdminLink } from "@/components/app/admin-link";
 import { Card } from "@/components/ui/card";
 import { signOut } from "@/app/actions/auth";
 
@@ -17,7 +19,7 @@ import { signOut } from "@/app/actions/auth";
 */
 export function ModeOff() {
   return (
-    <AppShell
+    <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn
       signOutAction={
         <form action={signOut}>

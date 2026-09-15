@@ -31,6 +31,14 @@ export function AppShell({
   /* A column rendered before the page, inside the content row. Ask Celpare
      uses it for the chat history rail and panel. Nothing else has one. */
   asideStart,
+  /* The notice strip: suspension, and the platform announcement. Passed in
+     rather than fetched here, because this is a client component and both
+     sources are server reads. Every page inside the product supplies it from
+     <AccountNotices />, so the one place a suspended person cannot miss it is
+     every page they can reach. */
+  banner,
+  /* The admin entry, for staff. Forwarded straight to the sidebar. */
+  adminLink,
   children,
 }: {
   signedIn: boolean;
@@ -38,6 +46,8 @@ export function AppShell({
   secondary?: React.ReactNode;
   fullHeight?: boolean;
   asideStart?: React.ReactNode;
+  banner?: React.ReactNode;
+  adminLink?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -51,6 +61,7 @@ export function AppShell({
         onClose={() => setOpen(false)}
         secondary={secondary}
         signedIn={signedIn}
+        adminLink={adminLink}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -85,6 +96,8 @@ export function AppShell({
             )}
           </div>
         </header>
+
+        {banner}
 
         <div className="flex min-h-0 flex-1">
           {asideStart}

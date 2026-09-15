@@ -1,8 +1,11 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { isEnabled } from "@/lib/platform/settings";
+import { clientIp, recordSecurityEvent } from "@/lib/telemetry";
 
 export type AuthState = {
   status: "idle" | "error" | "success";
@@ -108,6 +111,16 @@ export async function signUp(
   });
   if (!parsed.success) return firstIssue(parsed.error, "Please check the form.");
   if (!isSupabaseConfigured()) return notConfigured;
+
+  /* The flag an administrator sets in /admin/settings. Checked here rather than
+     only on the page, because the page is a courtesy and the action is the
+     door: hiding the form does nothing about a direct POST. */
+  if (!(await isEnabled("features.public_signup"))) {
+    return {
+      status: "error",
+      message: "New accounts are paused right now. Try again later.",
+    };
+  }
 
   const { fullName, email, password, captchaToken } = parsed.data;
 
@@ -233,6 +246,9 @@ export async function signIn(
   }
 
   const supabase = await createClient();
+  /* Recorded on failure only, and only ever the address that was typed. The
+     password never reaches this function's log, its record or its return. */
+  const ip = clientIp(await headers());
 
   const { error } = await supabase.auth.signInWithPassword({
     email,
@@ -250,12 +266,38 @@ export async function signIn(
       their account is gone.
     */
     if (/captcha/i.test(error.message)) {
+      /* Medium rather than low: a captcha that fails for a real person is a
+         configuration problem the security centre should surface, and one that
+         fails repeatedly is something automated being turned away. */
+      void recordSecurityEvent({
+        kind: "captcha_failed",
+        severity: "medium",
+        subject: email,
+        ip,
+        detail: { surface: "sign_in" },
+      });
       return {
         status: "error",
         message: "That check did not pass. Tap the box again, then sign in.",
         field: "captcha",
       };
     }
+
+    /*
+      One event per failed attempt, carrying the address as typed.
+
+      That address is a claim, not an account: it is never joined to a profile
+      and the security centre shows it as a subject rather than as a person.
+      Recording it is what makes a burst against one address visible, which is
+      the entire reason this row exists.
+    */
+    void recordSecurityEvent({
+      kind: "login_failed",
+      severity: "low",
+      subject: email,
+      ip,
+      detail: { surface: "sign_in" },
+    });
 
     // Deliberately vague. Saying which of the two was wrong tells an attacker
     // whether an address is registered.

@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
+import { AccountNotices } from "@/components/app/account-notices";
+import { AdminLink } from "@/components/app/admin-link";
 import { Button } from "@/components/ui/button";
 import { ToolsShowcase } from "@/components/landing/tools-showcase";
+import { FeaturedShelf } from "@/components/app/featured-tools";
 import { Container, Section } from "@/components/ui/container";
 import { ButtonLink } from "@/components/ui/button";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
@@ -39,7 +42,7 @@ export default async function ExplorePage() {
   }
 
   return (
-    <AppShell
+    <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn={signedIn}
       signOutAction={
         <form action={signOut}>
@@ -60,6 +63,10 @@ export default async function ExplorePage() {
           </p>
         </Container>
       </Section>
+
+      {/* Renders nothing unless an administrator has actually featured
+          something, so the page is unchanged until then. */}
+      <FeaturedShelf />
 
       <ToolsShowcase />
 

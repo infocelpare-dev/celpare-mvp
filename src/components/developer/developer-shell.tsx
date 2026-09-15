@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { AppShell } from "@/components/app/app-shell";
+import { AccountNotices } from "@/components/app/account-notices";
+import { AdminLink } from "@/components/app/admin-link";
 import { DeveloperNav } from "@/components/developer/developer-nav";
 import { Badge } from "@/components/ui/card";
 import { BackLink } from "@/components/ui/back-link";
@@ -32,7 +34,7 @@ export function DeveloperShell({
   children: React.ReactNode;
 }) {
   return (
-    <AppShell
+    <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn
       signOutAction={
         <form action={signOut}>

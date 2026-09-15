@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { isEnabled } from "@/lib/platform/settings";
 import { DEVELOPER_TERMS_VERSION } from "@/lib/developer/queries";
 
 export type DeveloperState = {
@@ -121,6 +122,12 @@ export async function submitTool(
 ): Promise<DeveloperState> {
   if (!isSupabaseConfigured()) return { status: "error", message: "Not connected." };
 
+  /* Operational switch, not authorization: RLS still decides who may submit.
+     This decides whether the door is open to anybody at all. */
+  if (!(await isEnabled("features.tool_submission"))) {
+    return { status: "error", message: "Tool submissions are paused right now. Nothing you submitted was lost." };
+  }
+
   const raw = {
     slug: formData.get("slug") ?? "",
     name: formData.get("name") ?? "",
@@ -212,6 +219,12 @@ export async function submitModel(
   formData: FormData,
 ): Promise<DeveloperState> {
   if (!isSupabaseConfigured()) return { status: "error", message: "Not connected." };
+
+  /* Operational switch, not authorization: RLS still decides who may submit.
+     This decides whether the door is open to anybody at all. */
+  if (!(await isEnabled("features.model_submission"))) {
+    return { status: "error", message: "Model submissions are paused right now. Nothing you submitted was lost." };
+  }
 
   const ctx = String(formData.get("contextWindow") ?? "").trim();
   const parsed = modelSchema.safeParse({

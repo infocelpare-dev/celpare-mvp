@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { ask } from "@/lib/ai/gateway";
 import { INPUT_MAX_CHARS } from "@/lib/ai/config";
+import { isEnabled } from "@/lib/platform/settings";
 
 /* Reads cookies and streams, so it must never be prerendered or cached. */
 export const dynamic = "force-dynamic";
@@ -45,6 +46,29 @@ export async function POST(request: NextRequest) {
     // message. This bound exists to stop a multi megabyte body being parsed at
     // all, so the response here is deliberately terse.
     return NextResponse.json({ error: "That request was not valid." }, { status: 400 });
+  }
+
+  /*
+    The one operational control the gateway has, and the reason it is worth a
+    round trip on a path that is otherwise deliberately free of database reads:
+    it is the only way to stop AI spend during an incident without a redeploy.
+
+    It does not move the provider, the models or the keys into the database.
+    Those stay environment variables read at request time, for the reasons the
+    gateway page gives. This switch answers a different question: whether the
+    door is open at all.
+
+    One indexed read against a settings document, next to a call that takes
+    seconds and costs money. The cost is not the concern here.
+  */
+  if (!(await isEnabled("features.ask_celpare"))) {
+    return NextResponse.json(
+      {
+        error: "Ask Celpare is paused right now. Everything else on Celpare still works.",
+        kind: "paused",
+      },
+      { status: 503 },
+    );
   }
 
   const result = await ask({

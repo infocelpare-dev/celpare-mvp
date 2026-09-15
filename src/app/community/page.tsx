@@ -3,6 +3,8 @@ import { MessagesSquare } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/app/app-shell";
+import { AccountNotices } from "@/components/app/account-notices";
+import { AdminLink } from "@/components/app/admin-link";
 import { SparkIcon } from "@/components/ui/spark-icon";
 import { AskBox } from "@/components/ask/ask-box";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
@@ -42,7 +44,7 @@ export default async function CommunityPage() {
   }
 
   return (
-    <AppShell
+    <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn={signedIn}
       signOutAction={
         <form action={signOut}>
