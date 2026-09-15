@@ -47,6 +47,45 @@ export async function createClient() {
   });
 }
 
+/*
+  The same session aware client, plus the caller's own IP address under a header
+  only this server sets.
+
+  It exists for one reason: public.admin_audit records where an administrative
+  action came from, and the address PostgREST sees is this server's, not the
+  administrator's. Supabase's edge sets x-forwarded-for to whoever called it,
+  which for a server rendered app is the app. Forwarding the real client address
+  explicitly is the only way the audit log can be right about it.
+
+  Still the publishable key and still the caller's own session, so every policy
+  and every capability check applies exactly as before. The header carries no
+  authority: nothing reads it to decide anything, it is only written down.
+*/
+export async function createAdminScopedClient(clientIp: string | null) {
+  assertConfigured();
+  const cookieStore = await cookies();
+
+  return createServerClient(url()!, key()!, {
+    global: {
+      headers: clientIp ? { "x-celpare-client-ip": clientIp } : {},
+    },
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options),
+          );
+        } catch {
+          // Called from a Server Component, where cookies are read only.
+        }
+      },
+    },
+  });
+}
+
 /* Stateless client for anonymous writes that need no session, such as the
    demo request form. */
 export function createAnonClient() {

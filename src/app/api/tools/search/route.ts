@@ -3,6 +3,7 @@ import { z } from "zod";
 import { searchTools } from "@/lib/ai/tool-search";
 import { identify } from "@/lib/ai/identity";
 import { checkLimits, countMessage } from "@/lib/ai/ratelimit";
+import { recordSearch } from "@/lib/telemetry";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -47,6 +48,25 @@ export async function GET(request: NextRequest) {
   await countMessage(identity.subject);
 
   const tools = await searchTools(parsed.data.q, parsed.data.limit);
+
+  /*
+    Record the outcome, after the fact.
+
+    Not awaited and never allowed to throw: the search has already run and
+    returned, so logging it cannot slow the query down, cannot change what it
+    finds, and cannot fail the request. A zero result search is the single most
+    useful row in that table, which is why the count is recorded rather than
+    only the successes.
+
+    Written server side with the service role rather than through a public
+    insert policy, so nobody can manufacture searches and bury the real ones.
+  */
+  void recordSearch({
+    query: parsed.data.q,
+    resultCount: tools.length,
+    userId: identity.userId,
+    source: "api",
+  });
 
   const response = NextResponse.json({ tools });
   if (identity.setCookie) {

@@ -166,3 +166,89 @@ html {
 :root[data-theme="light"] .theme-icon-dark {
   display: none;
 }
+
+/*
+  Status colours, added for the admin dashboard.
+
+  The brand is monochrome plus one lime accent, and that stands everywhere a
+  colour is decoration. A status badge is not decoration: an operations page
+  where "healthy", "degraded" and "down" are three shades of grey does not do
+  the one job it exists for, and colour is the fastest channel a person has for
+  severity.
+
+  So the palette gains exactly three state colours and no more.
+
+    ok      lime, the accent it already has. Healthy, approved, active.
+    warn    amber. Pending, degraded, changes required.
+    danger  red. Failed, suspended, rejected, critical.
+
+  Rules, so this does not become a second palette:
+    They are only ever used to state a condition, never to style a control.
+    Nothing interactive takes them: buttons, links and focus rings stay lime.
+    Every one of them carries ink or a near black, never white, the same
+    contrast rule lime already lives under.
+
+  Measured against their own surfaces at the tints below, not against paper:
+  each pairs its text colour above 7:1 in both modes.
+*/
+:root {
+  --ok: var(--celpare-lime);
+  --ok-surface: #f4ffcc;
+  --ok-text: #3d4d00;
+
+  --warn: #f5a623;
+  --warn-surface: #fff4e0;
+  --warn-text: #6b4200;
+
+  --danger: #e5484d;
+  --danger-surface: #ffeaea;
+  --danger-text: #7a1216;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ok-surface: #2b3300;
+    --ok-text: #dcff7a;
+
+    --warn-surface: #3a2a08;
+    --warn-text: #ffcc77;
+
+    --danger-surface: #3a1416;
+    --danger-text: #ff9b9e;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ok-surface: #2b3300;
+  --ok-text: #dcff7a;
+
+  --warn-surface: #3a2a08;
+  --warn-text: #ffcc77;
+
+  --danger-surface: #3a1416;
+  --danger-text: #ff9b9e;
+}
+
+@theme inline {
+  --color-ok: var(--ok);
+  --color-ok-surface: var(--ok-surface);
+  --color-ok-text: var(--ok-text);
+  --color-warn: var(--warn);
+  --color-warn-surface: var(--warn-surface);
+  --color-warn-text: var(--warn-text);
+  --color-danger: var(--danger);
+  --color-danger-surface: var(--danger-surface);
+  --color-danger-text: var(--danger-text);
+}
+
+/*
+  Tabular figures for every number in a table or a metric tile.
+
+  Proportional digits make a column of counts ragged, so the eye cannot compare
+  magnitudes down the column without reading each one. This is the single
+  cheapest thing that makes a dense table legible.
+*/
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
