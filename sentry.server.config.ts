@@ -45,6 +45,20 @@ if (dsn) {
     ignoreErrors: ["The destination stream closed early."],
 
     /*
+      Sentry's own ingest traffic, which tunnelRoute makes visible.
+
+      The browser posts events to /monitoring on our origin, this server
+      forwards them to Sentry, and that forward is an outgoing HTTP call the SDK
+      then traces. The result was 204 spans against Sentry's own envelope
+      endpoint at p95 1974ms, making Sentry itself the busiest thing the app
+      appeared to do.
+
+      Dropped here rather than only filtered out of the dashboard query, because
+      it is quota spent on watching ourselves.
+    */
+    ignoreTransactions: [/\/api\/\d+\/envelope\//],
+
+    /*
       No request bodies, no user identity harvested automatically.
 
       An Ask Celpare request body is somebody's question, and a sign in body is

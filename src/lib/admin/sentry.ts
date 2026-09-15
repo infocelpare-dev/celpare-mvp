@@ -20,6 +20,9 @@ import "server-only";
 
 const ORG = "celpare";
 const PROJECT = "javascript-nextjs";
+/* The numeric id, which the events and replays endpoints want. The slug works
+   for /projects/ paths and is rejected by the org level ones. */
+const PROJECT_ID = "4512056189714512";
 
 /* The org is in Sentry's EU region. api.sentry.io would answer 404 for these
    paths, which reads as "no data" rather than "wrong host", so getting this
@@ -228,4 +231,161 @@ export async function getSentrySnapshot(days = 14): Promise<SentrySnapshot> {
     droppedWindow,
     series,
   };
+}
+
+/* ---------------------------------------------------------------- panels */
+
+/*
+  The rest of what Sentry holds, read into the dashboard rather than linked out
+  to. The first version of this page linked to Replay, Traces, Logs and Metrics
+  on the argument that Sentry's own interfaces are better. The founder's answer
+  was that a dashboard you have to leave is not a dashboard, which is fair.
+
+  Every endpoint below was found by probing the live API, because guessing at
+  this one has already cost once: `events-stats` answers 200 with a series of
+  zeroes while real errors exist.
+
+  Each panel fetches only when its tab is open, so the page costs one request
+  rather than six.
+*/
+
+const EVENTS = (query: string) => `/organizations/${ORG}/events/?${query}`;
+
+function fields(...names: string[]): string {
+  return names.map((n) => `field=${encodeURIComponent(n)}`).join("&");
+}
+
+/* Sentry's own ingest traffic, which the tunnel route makes visible as an
+   outgoing HTTP call from our server. It is not Celpare doing work and it would
+   otherwise be the busiest transaction on the page. */
+const NOT_SENTRY_INGEST = '!transaction:"POST https://*/api/*/envelope/"';
+
+function scope(days: number): string {
+  return `&project=${PROJECT_ID}&statsPeriod=${days}d&per_page=10`;
+}
+
+export type SpanRow = { label: string; count: number; p50: number; p95: number };
+
+export async function getSentryPerformance(days = 14): Promise<{
+  byOp: SpanRow[];
+  byTransaction: SpanRow[];
+}> {
+  const [ops, txs] = await Promise.all([
+    call<{ data?: Record<string, unknown>[] }>(
+      EVENTS(
+        `dataset=spans&${fields("span.op", "count()", "p50(span.duration)", "p95(span.duration)")}` +
+          `&query=${encodeURIComponent(NOT_SENTRY_INGEST)}&sort=${encodeURIComponent("-count()")}${scope(days)}`,
+      ),
+    ),
+    call<{ data?: Record<string, unknown>[] }>(
+      EVENTS(
+        `dataset=spans&${fields("transaction", "count()", "p50(span.duration)", "p95(span.duration)")}` +
+          `&query=${encodeURIComponent(`is_transaction:true ${NOT_SENTRY_INGEST}`)}` +
+          `&sort=${encodeURIComponent("-count()")}${scope(days)}`,
+      ),
+    ),
+  ]);
+
+  const map = (rows: Record<string, unknown>[] | undefined, key: string): SpanRow[] =>
+    (rows ?? []).map((r) => ({
+      label: String(r[key] ?? "unknown"),
+      count: Number(r["count()"] ?? 0),
+      p50: Number(r["p50(span.duration)"] ?? 0),
+      p95: Number(r["p95(span.duration)"] ?? 0),
+    }));
+
+  return { byOp: map(ops?.data, "span.op"), byTransaction: map(txs?.data, "transaction") };
+}
+
+export type AiSpanRow = { model: string; calls: number; tokens: number };
+
+/* The agent spans this app writes itself, read back. /admin/ai reports the same
+   ground truth from our own ai_usage_records and is not sampled; this is the
+   sampled view, and the two disagreeing is expected rather than alarming. */
+export async function getSentryAgent(days = 14): Promise<AiSpanRow[]> {
+  const res = await call<{ data?: Record<string, unknown>[] }>(
+    EVENTS(
+      `dataset=spans&${fields("gen_ai.request.model", "count()", "sum(gen_ai.usage.total_tokens)")}` +
+        `&query=${encodeURIComponent("span.op:gen_ai.chat")}&sort=${encodeURIComponent("-count()")}${scope(days)}`,
+    ),
+  );
+  return (res?.data ?? []).map((r) => ({
+    model: String(r["gen_ai.request.model"] ?? "unknown"),
+    calls: Number(r["count()"] ?? 0),
+    tokens: Number(r["sum(gen_ai.usage.total_tokens)"] ?? 0),
+  }));
+}
+
+export type ReplayRow = {
+  id: string;
+  startedAt: string;
+  durationMs: number;
+  errors: number;
+  deadClicks: number;
+  rageClicks: number;
+  url: string | null;
+  permalink: string;
+};
+
+export async function getSentryReplays(days = 14): Promise<ReplayRow[]> {
+  const res = await call<{ data?: Record<string, unknown>[] }>(
+    `/organizations/${ORG}/replays/?${fields(
+      "id",
+      "started_at",
+      "duration",
+      "count_errors",
+      "count_dead_clicks",
+      "count_rage_clicks",
+      "urls",
+    )}&sort=-started_at${scope(days)}`,
+  );
+
+  return (res?.data ?? []).map((r) => {
+    const urls = Array.isArray(r.urls) ? (r.urls as string[]) : [];
+    const id = String(r.id ?? "");
+    return {
+      id,
+      startedAt: String(r.started_at ?? ""),
+      /* The API reports seconds. */
+      durationMs: Number(r.duration ?? 0) * 1000,
+      errors: Number(r.count_errors ?? 0),
+      deadClicks: Number(r.count_dead_clicks ?? 0),
+      rageClicks: Number(r.count_rage_clicks ?? 0),
+      url: urls[0] ?? null,
+      permalink: `${SENTRY_URL}/explore/replays/${id}/`,
+    };
+  });
+}
+
+export type LogRow = { timestamp: string; message: string; severity: string };
+
+export async function getSentryLogs(days = 14): Promise<LogRow[]> {
+  const res = await call<{ data?: Record<string, unknown>[] }>(
+    EVENTS(
+      `dataset=ourlogs&${fields("timestamp", "message", "severity")}&sort=-timestamp${scope(days)}`,
+    ),
+  );
+  return (res?.data ?? []).map((r) => ({
+    timestamp: String(r.timestamp ?? ""),
+    message: String(r.message ?? ""),
+    severity: String(r.severity ?? "info"),
+  }));
+}
+
+export type MetricRow = { name: string; count: number; avg: number };
+
+export async function getSentryMetrics(days = 14): Promise<MetricRow[]> {
+  /* count(value), not count(). The bare form is rejected: "Invalid number of
+     arguments for count, was expecting 1 arguments". */
+  const res = await call<{ data?: Record<string, unknown>[] }>(
+    EVENTS(
+      `dataset=tracemetrics&${fields("metric.name", "count(value)", "avg(value)")}` +
+        `&sort=${encodeURIComponent("-count(value)")}${scope(days)}`,
+    ),
+  );
+  return (res?.data ?? []).map((r) => ({
+    name: String(r["metric.name"] ?? "unknown"),
+    count: Number(r["count(value)"] ?? 0),
+    avg: Number(r["avg(value)"] ?? 0),
+  }));
 }
