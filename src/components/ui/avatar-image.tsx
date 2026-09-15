@@ -21,6 +21,30 @@ import { cn } from "@/lib/utils";
   A failed load falls back to the same initials a person with no picture gets,
   in identical markup, so nothing shifts.
 */
+/*
+  Only an https URL is ever handed to the img.
+
+  profiles.avatar_url is in the client UPDATE grant, so a direct PostgREST call
+  could put any string there, and this component renders it into a public
+  profile that every visitor loads. public.profiles now carries a CHECK
+  constraint that refuses anything else, and that constraint is the control.
+  This is the second layer, for the rows that predate it and for any future
+  caller that hands this component a URL from somewhere new.
+
+  Returns the parsed and re-serialised href rather than the original string, so
+  what reaches the attribute is something URL() produced rather than text that
+  merely passed a test. CodeQL alert #1 was raised against the original.
+*/
+function safeHttps(candidate: string): string | null {
+  try {
+    const url = new URL(candidate);
+    return url.protocol === "https:" ? url.href : null;
+  } catch {
+    // Not a URL at all. Relative paths included: an avatar is always absolute.
+    return null;
+  }
+}
+
 export function AvatarImage({
   src,
   initials,
@@ -32,6 +56,7 @@ export function AvatarImage({
 }) {
   const [failed, setFailed] = useState(false);
   const ref = useRef<HTMLImageElement>(null);
+  const href = safeHttps(src);
 
   useEffect(() => {
     const img = ref.current;
@@ -39,9 +64,12 @@ export function AvatarImage({
     // Already finished, and finished with nothing. The onError we would have
     // listened for fired before this component was ever hydrated.
     if (img.complete && img.naturalWidth === 0) setFailed(true);
-  }, [src]);
+  }, [href]);
 
-  if (failed) {
+  /* A rejected URL falls back to the initials, which is the same thing a
+     failed load does, so a hostile value is indistinguishable from no picture
+     rather than being a visible hole. */
+  if (failed || !href) {
     return (
       <span aria-hidden className={className}>
         {initials}
@@ -56,8 +84,9 @@ export function AvatarImage({
     /* eslint-disable-next-line @next/next/no-img-element */
     <img
       ref={ref}
-      src={src}
+      src={href}
       alt=""
+      referrerPolicy="no-referrer"
       loading="lazy"
       onError={() => setFailed(true)}
       className={cn(className, "bg-surface object-cover")}
