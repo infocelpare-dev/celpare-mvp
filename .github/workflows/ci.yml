@@ -43,6 +43,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # tsconfig includes next-env.d.ts and .next/types, and both are generated
+      # and gitignored, correctly. Without this step tsc fails in CI while
+      # passing locally, on "Cannot find name 'PageProps'" and its siblings,
+      # which is a confusing way to learn that the checkout is simply missing
+      # files your machine has.
+      #
+      # typegen rather than build: it produces exactly those types, needs no
+      # NEXT_PUBLIC_SUPABASE_URL, and takes seconds.
+      - name: Generate Next route types
+        run: npx next typegen
+
       - name: Typecheck
         run: npx tsc --noEmit
 
