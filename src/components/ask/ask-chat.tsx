@@ -14,6 +14,7 @@ import { SparkIcon } from "@/components/ui/spark-icon";
 import { RichText } from "./rich-text";
 import { ToolCards, type ToolCitation } from "./tool-cards";
 import { Composer, type Grants, type ModeKey, type Modes } from "./composer";
+import { useNewChatToken } from "./new-chat";
 
 type WebSource = { title: string; url: string; snippet: string };
 
@@ -79,6 +80,25 @@ export function AskChat({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [turns]);
+
+  /*
+    New chat, pressed in the history panel. A fresh chat lives at /ask and a
+    saved one at /ask/[id], so the button cannot rely on the route changing:
+    from /ask it links to the page you are already on. Clearing the state here
+    is what actually empties the screen, and dropping the conversation id is
+    what stops the next question appending to the chat just left behind.
+  */
+  const newChatToken = useNewChatToken();
+  const clearedAt = useRef(newChatToken);
+  useEffect(() => {
+    if (newChatToken === clearedAt.current) return;
+    clearedAt.current = newChatToken;
+    abortRef.current?.abort();
+    setTurns([]);
+    setConversationId(null);
+    setValue("");
+    setBusy(false);
+  }, [newChatToken]);
 
   const send = useCallback(
     async (raw: string) => {
@@ -200,6 +220,38 @@ export function AskChat({
               // The server created or reused the conversation, so subsequent
               // turns in this tab append to it rather than starting a new one.
               setConversationId(event.conversationId);
+
+              /*
+                The first answer is where a new chat earns a URL of its own.
+                Until now it lived at /ask with its id held in state alone, so
+                a reload lost your place, the chat could not be linked, and the
+                history list had no way to mark the one on screen as open.
+
+                `replaceState` rather than a route change, because the chat is
+                already rendered: navigating to /ask/[id] would fetch the
+                conversation back from the database and throw away what is
+                here, including an answer still arriving. Next patches
+                `replaceState` and dispatches a restore that keeps the rendered
+                tree and moves only the URL, which is exactly the trade wanted.
+                It replaces rather than pushes: a Back that changed the URL
+                without changing the chat would be a button that does nothing.
+              */
+              if (!conversationId) {
+                /*
+                  No `router.refresh()` here to put the chat straight into the
+                  panel's list, though it was tried: the restore that
+                  `replaceState` dispatches supersedes a refresh queued in the
+                  same tick, so the list never changed, and moving the refresh
+                  after the URL lands is the one ordering that is unsafe, since
+                  a refresh resolves the current URL against the tree already
+                  rendered. The list catches up on New chat or a reload.
+                */
+                window.history.replaceState(
+                  null,
+                  "",
+                  `/ask/${encodeURIComponent(event.conversationId)}`,
+                );
+              }
             }
           }
         }
