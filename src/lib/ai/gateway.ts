@@ -236,27 +236,43 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
             used: { toolSearch: false, webSearch: false, deepResearch: false },
           });
         emit(controller, { t: "text", v: reply });
-        /* Appended to a conversation that already exists, never the reason to
-           create one: a saved chat titled "hi" is noise in the sidebar. */
+        /*
+          Saved like any other turn, and it creates the conversation if it is
+          the first thing said. Founder instruction 2026-09-18, replacing the
+          rule that small talk only ever appended to a chat that already
+          existed: a person who says hello has started a chat, and losing it
+          because of how they opened is the wrong side to err on.
+
+          The greeting names the chat, so the list never shows a row called
+          "New chat". The name is marked provisional, so the first real
+          question takes it over: a chat opened with "hi" is called "hi" for
+          exactly as long as there is nothing better to call it.
+        */
         let conversationId: string | null = null;
         if (
           identity.userId &&
           limits.savesHistory &&
-          identity.settings.saveHistory !== false &&
-          input.conversationId
+          identity.settings.saveHistory !== false
         ) {
           try {
-            await saveTurn({
-              conversationId: input.conversationId,
-              question: cleaned.text,
-              answer: reply,
-              citations: [],
-              model: "local",
-              provider: "local",
-              inputTokens: 0,
-              outputTokens: 0,
-            });
-            conversationId = input.conversationId;
+            conversationId = await ensureConversation(
+              identity.userId,
+              cleaned.text,
+              input.conversationId,
+              true,
+            );
+            if (conversationId) {
+              await saveTurn({
+                conversationId,
+                question: cleaned.text,
+                answer: reply,
+                citations: [],
+                model: "local",
+                provider: "local",
+                inputTokens: 0,
+                outputTokens: 0,
+              });
+            }
           } catch (err) {
             console.error("[ai] persisting the small talk turn failed", err);
           }

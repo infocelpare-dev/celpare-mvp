@@ -87,23 +87,80 @@ export async function loadConversation(
   };
 }
 
+/* One line for the sidebar, from the message that earned it. */
+function titleFor(message: string): string {
+  const trimmed = message.trim();
+  return trimmed.length > 57 ? `${trimmed.slice(0, 57)}...` : trimmed;
+}
+
+/*
+  Has this conversation only ever been small talk?
+
+  Read from the messages rather than stored on the row. Small talk is answered
+  locally with no model call and saved with `model = 'local'`, so a chat with
+  no model written answer has never been about anything yet. That beats a
+  column that would need a migration and then need keeping true.
+
+  A user row carries `model` null, and in SQL `null <> 'local'` is null rather
+  than true, so those rows cannot satisfy this filter. The role check is there
+  anyway, because relying on that would be a trick rather than a rule.
+*/
+async function titleIsProvisional(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  conversationId: string,
+  title: string | null,
+): Promise<boolean> {
+  if (!title) return true;
+  const { data } = await supabase
+    .from("messages")
+    .select("id")
+    .eq("conversation_id", conversationId)
+    .eq("role", "assistant")
+    .neq("model", "local")
+    .limit(1)
+    .maybeSingle();
+  return !data;
+}
+
 /* Creates the conversation on the first message and titles it from that
    message. Returns null when nothing should be saved, which is the anonymous
-   case and the "history off in settings" case. */
+   case and the "history off in settings" case.
+
+   `provisional` marks a title that is only standing in until there is a better
+   one. A greeting names the chat "hi", which is true and is not a topic, so
+   the first real question takes the name over. Founder instruction
+   2026-09-18: every chat carries a topic, and the list never shows a row
+   called "New chat". */
 export async function ensureConversation(
   userId: string,
   firstMessage: string,
   existingId?: string | null,
+  provisional = false,
 ): Promise<string | null> {
   const supabase = await createClient();
 
   if (existingId) {
     const { data } = await supabase
       .from("conversations")
-      .select("id")
+      .select("id, title")
       .eq("id", existingId)
       .maybeSingle();
-    if (data) return data.id;
+    if (data) {
+      /* A real question claims the name off a greeting, and off any row that
+         reached the database without a title. */
+      if (!provisional && (await titleIsProvisional(supabase, data.id, data.title))) {
+        const { error } = await supabase
+          .from("conversations")
+          .update({ title: titleFor(firstMessage) })
+          .eq("id", data.id);
+        if (error) {
+          // A chat keeping the wrong name is a smaller loss than a turn that
+          // never gets written, so this is logged, not thrown.
+          console.error("[ai] titling the conversation failed", error.code, error.message);
+        }
+      }
+      return data.id;
+    }
     // An id that does not resolve is treated as absent rather than as an
     // error: the likeliest cause is a stale tab pointing at a deleted chat.
   }
@@ -112,7 +169,7 @@ export async function ensureConversation(
     .from("conversations")
     .insert({
       user_id: userId,
-      title: firstMessage.trim().slice(0, 57) + (firstMessage.trim().length > 57 ? "..." : ""),
+      title: titleFor(firstMessage),
       feature: "ask",
     })
     .select("id")
