@@ -48,7 +48,7 @@ export default async function ProfilePage({
   // genuinely wrong rather than that the person is new.
   if (!profile) redirect("/community");
 
-  const tabs = visibleTabs(true, profile.plan);
+  const tabs = visibleTabs(true, profile);
   const params = await searchParams;
   const activeTab = isTabKey(params.tab, tabs) ? params.tab : "posts";
 

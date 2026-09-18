@@ -1,18 +1,21 @@
 import Link from "next/link";
-import { CalendarDays, Link2, MapPin } from "lucide-react";
+import { CalendarDays, Link2, Lock, MapPin } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge, Card, ChipLink } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
-import { Tabs, type TabItem } from "@/components/ui/tabs";
+import { Tabs, type TabIconName, type TabItem } from "@/components/ui/tabs";
 import { formatCount } from "@/lib/format";
 import { FollowButton } from "@/components/profile/follow-button";
 import { DeveloperModeToggle } from "@/components/profile/developer-mode-toggle";
+import { ClearRecent } from "@/components/profile/clear-recent";
+import { RecentList } from "@/components/profile/recent-list";
 import type {
   CollectionRow,
   CommentRow,
   ModelRow,
   PostRow,
   Profile,
+  RecentRow,
   TabKey,
   ToolRow,
 } from "@/lib/profile/queries";
@@ -37,8 +40,31 @@ const TAB_LABELS: Record<TabKey, string> = {
   tools: "Tools",
   models: "Models",
   collections: "Collections",
+  recent: "Recent",
 };
 
+/*
+  An icon per section, founder instruction 2026-09-18, so the whole set is
+  legible as tiles at phone width rather than as a row of words that runs off
+  the screen. Each one is decorative: the label is always beside it, at both
+  widths, so none of these carries meaning on its own.
+
+  Two of them are deliberately the same marks the developer nav uses: Wrench
+  for tools and Boxes for models. A person moving between their profile and
+  their developer workspace should not have to learn the icon twice.
+*/
+const TAB_ICONS: Record<TabKey, TabIconName> = {
+  posts: "posts",
+  replies: "replies",
+  media: "media",
+  reposts: "reposts",
+  liked: "liked",
+  saved: "saved",
+  tools: "tools",
+  models: "models",
+  collections: "collections",
+  recent: "recent",
+};
 function joinedOn(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", {
     month: "long",
@@ -91,6 +117,7 @@ export function ProfileView({
     tools?: ToolRow[];
     models?: ModelRow[];
     collections?: CollectionRow[];
+    recent?: RecentRow[];
   };
   featuredTools: ToolRow[];
   basePath: string;
@@ -99,9 +126,24 @@ export function ProfileView({
 }) {
   const displayName = profile.full_name?.trim() || profile.username;
 
+  /*
+    A private account, seen by somebody else. The picture, the name, the
+    @username, the counts and a Follow button stay: that is what makes the
+    account findable and followable at all, and the founder named exactly those.
+    Everything a person WROTE goes: bio, location, website, interests, skills,
+    featured tools and every section.
+
+    Following a private account is allowed and shows the follower nothing.
+    There is no approval flow, because none was asked for, and half an approval
+    system is worse than none. Tracked as a gap.
+  */
+  const hidden = profile.is_private && !isOwner;
+  const showFollows = isOwner || profile.show_follows;
+
   const tabItems: TabItem[] = tabs.map((key) => ({
     key,
     label: TAB_LABELS[key],
+    icon: TAB_ICONS[key],
     href: key === "posts" ? basePath : `${basePath}?tab=${key}`,
   }));
 
@@ -158,21 +200,21 @@ export function ProfileView({
           ) : null}
 
 
-          {profile.bio ? (
+          {profile.bio && !hidden ? (
             <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">
               {profile.bio}
             </p>
           ) : null}
 
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[14px] text-muted">
-            {profile.location ? (
+            {profile.location && !hidden ? (
               <span className="inline-flex items-center gap-1.5">
                 <MapPin className="size-4 shrink-0" aria-hidden />
                 {profile.location}
               </span>
             ) : null}
 
-            {profile.website_url ? (
+            {profile.website_url && !hidden ? (
               <a
                 href={profile.website_url}
                 target="_blank"
@@ -195,22 +237,36 @@ export function ProfileView({
             </span>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[14px]">
-            <span>
-              <strong className="font-medium tabular-nums">
-                {formatCount(profile.following_count)}
-              </strong>{" "}
-              <span className="text-muted">Following</span>
-            </span>
-            <span>
-              <strong className="font-medium tabular-nums">
-                {formatCount(profile.follower_count)}
-              </strong>{" "}
-              <span className="text-muted">
-                {profile.follower_count === 1 ? "Follower" : "Followers"}
+          {/*
+            Follower and following counts.
+
+            show_follows hides them from everybody but the owner. Be clear about
+            what that is worth: the counts are plain columns on `profiles`,
+            which is publicly readable, so this is a rendering decision and NOT
+            a boundary. What it does control for real is the `follows` table
+            itself, whose select policy now needs both parties to be sharing, so
+            a follower LIST cannot be enumerated. Closing the count properly
+            means moving profile reads behind a view, which is tracked as a gap
+            rather than half done here.
+          */}
+          {showFollows ? (
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[14px]">
+              <span>
+                <strong className="font-medium tabular-nums">
+                  {formatCount(profile.following_count)}
+                </strong>{" "}
+                <span className="text-muted">Following</span>
               </span>
-            </span>
-          </div>
+              <span>
+                <strong className="font-medium tabular-nums">
+                  {formatCount(profile.follower_count)}
+                </strong>{" "}
+                <span className="text-muted">
+                  {profile.follower_count === 1 ? "Follower" : "Followers"}
+                </span>
+              </span>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -236,6 +292,32 @@ export function ProfileView({
         </div>
       ) : null}
 
+      {/*
+        The private account wall. Everything below it is skipped, so there is
+        one place that decides rather than a `hidden &&` on each section.
+
+        It says what is true and stops. No follower teaser, no blurred posts,
+        no count of what is being withheld: that is a different product's idea
+        of a private account, and it leaks the thing it pretends to hide.
+      */}
+      {hidden ? (
+        <div className="mt-8 rounded-2xl border border-border px-6 py-12 text-center">
+          <span
+            aria-hidden
+            className="mx-auto flex size-10 items-center justify-center rounded-full border border-border text-muted"
+          >
+            <Lock className="size-5" />
+          </span>
+          <p className="mt-4 font-display text-[17px] font-semibold">
+            This account is private
+          </p>
+          <p className="mx-auto mt-2 max-w-[42ch] text-[14px] leading-relaxed text-muted">
+            {displayName} has chosen not to show their posts, replies or saved
+            tools. You can still follow them.
+          </p>
+        </div>
+      ) : (
+      <>
       {/* Interests and skills, both optional, both plain labels */}
       {profile.interests.length > 0 || profile.skills.length > 0 ? (
         <div className="mt-7 space-y-4">
@@ -281,6 +363,8 @@ export function ProfileView({
           />
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
@@ -444,11 +528,43 @@ function TabPanel({
     tools?: ToolRow[];
     models?: ModelRow[];
     collections?: CollectionRow[];
+    recent?: RecentRow[];
   };
   isOwner: boolean;
   displayName: string;
 }) {
   const who = isOwner ? "You have" : `${displayName} has`;
+
+  /*
+    Recent. Owner only, and it is the only tab whose contents nobody else can
+    ever be shown: visibleTabs never offers it on another profile, and
+    my_recent_activity answers for the caller rather than for the profile being
+    viewed, so there is no combination of URL and session that reaches somebody
+    else's list.
+  */
+  if (tab === "recent") {
+    const recent = rows.recent ?? [];
+    if (recent.length === 0) {
+      return (
+        <EmptyState
+          title="Nothing here yet"
+          detail="Searches you run and tools you open show up here, so you can get back to them. Only you can see this."
+        />
+      );
+    }
+    return (
+      <div>
+        <p className="mb-4 text-[13px] leading-relaxed text-muted">
+          Only you can see this. It is never shown on your public profile.
+        </p>
+        <RecentList rows={recent} />
+
+        <div className="mt-5">
+          <ClearRecent />
+        </div>
+      </div>
+    );
+  }
 
   if (tab === "replies") {
     const comments = rows.comments ?? [];

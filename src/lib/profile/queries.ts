@@ -13,7 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 /* The public columns. This list is the whole public surface of a person. */
 const PUBLIC_COLUMNS =
-  "id, username, full_name, avatar_url, bio, location, website_url, interests, skills, is_developer, plan, created_at, follower_count, following_count, developer_profiles(handle)";
+  "id, username, full_name, avatar_url, bio, location, website_url, interests, skills, is_developer, plan, created_at, follower_count, following_count, is_private, show_replies, show_follows, show_saved_tools, show_saved_models, developer_profiles(handle)";
 
 export type Profile = {
   id: string;
@@ -30,6 +30,17 @@ export type Profile = {
   created_at: string;
   follower_count: number;
   following_count: number;
+  /*
+    Privacy, added 2026-09-18. These decide what RENDERS. They are not the
+    control: profile_shares() in the database is, and every policy and shared
+    reader calls it. Somebody who forges a request past this file still gets
+    nothing back, which is verified live rather than assumed from the text.
+  */
+  is_private: boolean;
+  show_replies: boolean;
+  show_follows: boolean;
+  show_saved_tools: boolean;
+  show_saved_models: boolean;
   /*
     Present only when this person actually became a developer: agreed to the
     terms and had a developer profile created. `is_developer` is just the UI
@@ -48,7 +59,8 @@ export type TabKey =
   | "saved"
   | "tools"
   | "models"
-  | "collections";
+  | "collections"
+  | "recent";
 
 /*
   Which tabs this viewer may see on this profile.
@@ -63,18 +75,41 @@ export type TabKey =
   05-pricing-plans.md prices them at zero for free. A tab that can never hold
   anything is not an empty state, it is a dead end.
 */
-export function visibleTabs(isOwner: boolean, plan: Profile["plan"]): TabKey[] {
+export function visibleTabs(isOwner: boolean, profile: Profile): TabKey[] {
   /*
     Order is founder instruction 2026-09-14: Tools sits next to Posts, and
     Models next to Tools. What somebody uses is the point of this product, so
     it outranks what they wrote. The conversation tabs follow.
   */
-  if (!isOwner) return ["posts", "replies", "media", "reposts"];
+  if (!isOwner) {
+    /*
+      A private account has no sections at all. The page still renders the
+      picture, the name, the counts and a Follow button, and says it is
+      private. Founder instruction 2026-09-18.
+    */
+    if (profile.is_private) return [];
 
+    const open: TabKey[] = ["posts"];
+    if (profile.show_saved_tools) open.push("tools");
+    if (profile.show_saved_models) open.push("models");
+    if (profile.show_replies) open.push("replies");
+    open.push("media", "reposts");
+    return open;
+  }
+
+  const plan = profile.plan;
+
+  /*
+    Recent sits last, and only ever here. It is the searches you ran and the
+    tools you opened, which is the most sensitive thing on the account, so
+    there is no setting that publishes it and no branch above that could put it
+    on somebody else's profile. Founder decision 2026-09-18.
+  */
   const tabs: TabKey[] = [
     "posts", "tools", "models", "replies", "media", "reposts", "liked", "saved",
   ];
   if (plan !== "free") tabs.push("collections");
+  tabs.push("recent");
   return tabs;
 }
 
@@ -186,6 +221,16 @@ export type CollectionRow = {
   item_count: number;
 };
 
+/* One thing you did: a search you ran or a tool you opened. Shaped by
+   my_recent_activity, which is the only way to read either event table. */
+export type RecentRow = {
+  kind: "search" | "tool";
+  occurred_at: string;
+  label: string;
+  href: string;
+  detail: string | null;
+};
+
 const POST_COLUMNS =
   "id, body, link_url, created_at, like_count, comment_count, save_count, repost_count, status";
 
@@ -207,6 +252,7 @@ export async function getTabRows(
   tools?: ToolRow[];
   models?: ModelRow[];
   collections?: CollectionRow[];
+  recent?: RecentRow[];
 }> {
   switch (tab) {
     case "posts": {
@@ -289,7 +335,30 @@ export async function getTabRows(
       return { posts: rows.map((r) => r.posts).filter(Boolean) };
     }
 
+    /*
+      Saved tools and models read two different ways, and the reason is the
+      `note` column.
+
+      A save can carry a private annotation: "too expensive", "ask legal", "the
+      one that broke the build". `note` is in the SELECT column grant, and a
+      column grant is role wide and cannot be narrowed per row, so widening the
+      row policy to publish a shared list would publish the notes with it.
+      Somebody switching on "show my saved tools" is publishing a list of
+      tools, not their diary.
+
+      So the owner reads the table, notes and all, and everybody else reads
+      public_saved_tools, which is SECURITY DEFINER, checks profile_shares()
+      and has no note column to return. anon holds no grant on either table.
+    */
     case "tools": {
+      if (!isOwner) {
+        const { data, error } = await db.rpc("public_saved_tools", {
+          p_owner: profile.id,
+          p_limit: PAGE_SIZE,
+        });
+        if (error) console.error("[profile] shared tools failed", error.code, error.message);
+        return { tools: (data as ToolRow[]) ?? [] };
+      }
       const { data } = await db
         .from("user_saved_tools")
         .select("created_at, tools!inner(id, slug, name, tagline, logo_url, pricing)")
@@ -301,6 +370,14 @@ export async function getTabRows(
     }
 
     case "models": {
+      if (!isOwner) {
+        const { data, error } = await db.rpc("public_saved_models", {
+          p_owner: profile.id,
+          p_limit: PAGE_SIZE,
+        });
+        if (error) console.error("[profile] shared models failed", error.code, error.message);
+        return { models: (data as ModelRow[]) ?? [] };
+      }
       const { data } = await db
         .from("user_saved_models")
         .select("created_at, models!inner(id, slug, name, provider, description)")
@@ -320,6 +397,30 @@ export async function getTabRows(
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
       return { collections: (data as CollectionRow[]) ?? [] };
+    }
+
+    /*
+      Recent is the one tab that does not read a table.
+
+      search_events and tool_view_events are ungranted to anon and to
+      authenticated, on purpose: they are the analytics tables, and a client
+      that can filter them can also count somebody else's. my_recent_activity
+      is SECURITY DEFINER and answers only for auth.uid(), so there is no
+      profile.id to pass and no way to ask for another person's history.
+
+      That is also why isOwner is not consulted here. It cannot leak: the
+      database returns the CALLER's rows regardless of whose profile is being
+      rendered. visibleTabs keeps the tab off other people's profiles, and this
+      would return the viewer's own list rather than theirs even if it did not.
+    */
+    case "recent": {
+      if (!isOwner) return { recent: [] };
+      const { data, error } = await db.rpc("my_recent_activity", { p_limit: PAGE_SIZE });
+      if (error) {
+        console.error("[profile] recent failed", error.code, error.message);
+        return { recent: [] };
+      }
+      return { recent: (data as RecentRow[]) ?? [] };
     }
   }
 }

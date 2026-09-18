@@ -17,7 +17,51 @@ import { PLAN_LIMITS } from "@/lib/ai/config";
 import { isWebSearchConfigured } from "@/lib/ai/web-search";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { signOut } from "@/app/actions/auth";
+import { PrivacyForm } from "@/components/settings/privacy-form";
+import { ClearRecent } from "@/components/profile/clear-recent";
+import type { PrivacyValues } from "@/app/actions/settings";
 import type { Plan } from "@/lib/ai/types";
+
+const PLAN_LABEL: Record<Plan, string> = {
+  /* `anon` is a plan in the AI gateway's sense, a signed out asker. It cannot
+     occur here because this page redirects a signed out visitor, but Plan
+     includes it so the map has to. */
+  anon: "Free",
+  free: "Free",
+  pro: "Pro",
+  premium: "Premium",
+};
+
+/* Suspension is evaluated on read, because there is no scheduler to flip it
+   (D79). account_status can still say suspended after the date has passed, so
+   this never claims more than the column does. */
+const STATUS_LABEL: Record<string, string> = {
+  active: "Active",
+  suspended: "Suspended",
+  banned: "Banned",
+  deleted: "Closed",
+};
+
+/* Pinned to UTC. Without a timeZone this formats in the runtime's own zone, and
+   the server and the browser are not always in the same one, which caused a
+   real hydration error on /admin/security. */
+function longDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3">
+      <dt className="text-muted">{label}</dt>
+      <dd className="min-w-0 break-words text-right font-medium">{value}</dd>
+    </div>
+  );
+}
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -40,7 +84,9 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("plan, ask_settings, is_developer, username, full_name, avatar_url, role")
+    .select(
+      "plan, ask_settings, is_developer, username, full_name, avatar_url, role, created_at, account_status, is_private, show_replies, show_follows, show_saved_tools, show_saved_models",
+    )
     .eq("id", user.id)
     .maybeSingle();
 
@@ -60,6 +106,23 @@ export default async function SettingsPage() {
   const webSearchReason = !limits.webSearch
     ? `Web search is available on Pro and Premium. You are on the ${plan} plan.`
     : "Web search is not switched on yet. It needs a search provider key.";
+
+  /*
+    The email comes from the auth session, NOT from profiles.
+
+    profiles.email is not in the SELECT grant for authenticated at all, so it
+    cannot reach a page even by mistake, and that is worth keeping. The address
+    on the session is the same value and is already the caller's own.
+  */
+  const email = user.email ?? null;
+
+  const privacy: PrivacyValues = {
+    isPrivate: profile?.is_private ?? false,
+    showReplies: profile?.show_replies ?? true,
+    showFollows: profile?.show_follows ?? true,
+    showSavedTools: profile?.show_saved_tools ?? false,
+    showSavedModels: profile?.show_saved_models ?? false,
+  };
 
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
@@ -90,19 +153,30 @@ export default async function SettingsPage() {
           questions a day. Limits reset at midnight.
         </p>
 
+        {/*
+          Profile and account, the first section, founder instruction
+          2026-09-18: somebody who opens Settings and touches Profile should
+          find their actual account details there, not a link away from them.
+
+          Everything in the facts list is read only. The email cannot be
+          changed here because changing an email means re-verifying it, which
+          is an auth flow that does not exist yet, and a field that looks
+          editable and is not is worse than no field.
+        */}
         <section className="mt-12 border-t border-border pt-10">
-          <h2 className="font-display text-[17px] font-semibold">Profile</h2>
+          <h2 className="font-display text-[17px] font-semibold">Profile and account</h2>
           <p className="mt-2 text-[15px] leading-relaxed text-muted">
-            Your name, username, picture, bio and interests. All of it is public.
+            Who you are on Celpare, and what the account itself says.
           </p>
-          <div className="mt-4 flex flex-wrap items-center gap-4">
+
+          <div className="mt-5 flex flex-wrap items-center gap-4">
             <Avatar
               size="md"
               fullName={profile?.full_name ?? null}
               username={profile?.username ?? ""}
               avatarUrl={profile?.avatar_url ?? null}
             />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[15px] font-medium">
                 {profile?.full_name?.trim() || profile?.username}
               </p>
@@ -114,6 +188,57 @@ export default async function SettingsPage() {
             >
               Edit profile
             </Link>
+          </div>
+
+          <dl className="mt-5 divide-y divide-border rounded-2xl border border-border text-[14px]">
+            <Fact label="Email" value={email ?? "Not set"} />
+            <Fact
+              label="Account created"
+              value={profile?.created_at ? longDate(profile.created_at) : "Unknown"}
+            />
+            <Fact label="Plan" value={PLAN_LABEL[plan]} />
+            <Fact
+              label="Profile visibility"
+              value={privacy.isPrivate ? "Private" : "Public"}
+            />
+            <Fact label="Status" value={STATUS_LABEL[profile?.account_status ?? "active"] ?? "Active"} />
+          </dl>
+
+          <p className="mt-3 text-[13px] leading-relaxed text-muted">
+            Your name, username, picture, bio and interests are public whenever
+            your account is. The email is yours alone: it is never shown on your
+            profile and is not readable by anybody else.
+          </p>
+        </section>
+
+        {/*
+          Privacy. Its own section rather than four checkboxes inside Profile,
+          because "who is this" and "who may see it" are different questions and
+          the second one is the one people come here worried about.
+        */}
+        <section className="mt-12 border-t border-border pt-10">
+          <h2 className="font-display text-[17px] font-semibold">Privacy</h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-muted">
+            What a visitor to your profile can see. Every one of these is
+            enforced in the database, not just hidden on the page.
+          </p>
+          <PrivacyForm values={privacy} />
+        </section>
+
+        {/*
+          Recent activity. It is not a privacy toggle, because it has no public
+          setting at all: searches and the tools you opened are never shown to
+          anybody. What belongs here is the way to delete it.
+        */}
+        <section className="mt-12 border-t border-border pt-10">
+          <h2 className="font-display text-[17px] font-semibold">Recent activity</h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-muted">
+            Celpare records what you searched for and which tools you opened, so
+            you can get back to them from the Recent section of your profile.
+            Only you can ever see it, and there is no setting that publishes it.
+          </p>
+          <div className="mt-4">
+            <ClearRecent />
           </div>
         </section>
 

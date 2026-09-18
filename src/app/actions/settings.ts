@@ -152,3 +152,74 @@ export async function setDeveloperMode(
     message: wanted ? "Developer mode is on." : "Developer mode is off.",
   };
 }
+
+/* ---------------------------------------------------------------- privacy */
+
+export type PrivacyValues = {
+  isPrivate: boolean;
+  showReplies: boolean;
+  showFollows: boolean;
+  showSavedTools: boolean;
+  showSavedModels: boolean;
+};
+
+/*
+  Who can see what on your profile. Founder instruction 2026-09-18.
+
+  Same doctrine as saveAskSettings, and the same division of labour. This
+  writes the flags and produces a sentence. It decides nothing about who may
+  READ them: public.profile_shares() does, and every select policy on posts,
+  comments, reposts and follows calls it, as do public_saved_tools and
+  public_saved_models. Verified live against anon and against a signed in
+  stranger, both with the flags on and off, rather than read off the policy.
+
+  All five columns are in the authenticated UPDATE grant, and the grant is
+  column scoped, so a payload that tried to reach `plan`, `role` or
+  `account_status` is refused by the database rather than by this function.
+*/
+export async function savePrivacySettings(
+  _prev: SettingsState,
+  formData: FormData,
+): Promise<SettingsState> {
+  if (!isSupabaseConfigured()) {
+    return { status: "error", message: "Not connected. Set the Supabase keys in .env.local." };
+  }
+
+  /* An unchecked box is absent from FormData, which is not the same thing as
+     false until it is written down. Every flag is read explicitly, so a box
+     somebody cleared is stored as false rather than left at its old value. */
+  const on = (name: string) => formData.get(name) === "on";
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { status: "error", message: "Sign in to change your settings." };
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      is_private: on("isPrivate"),
+      show_replies: on("showReplies"),
+      show_follows: on("showFollows"),
+      show_saved_tools: on("showSavedTools"),
+      show_saved_models: on("showSavedModels"),
+    })
+    .eq("id", user.id);
+
+  if (error) {
+    console.error("[settings] privacy update failed", error.code, error.message);
+    return { status: "error", message: "Could not save that. Please try again." };
+  }
+
+  /* Both profile routes render from these flags, so neither should keep
+     serving a cached page that shows what somebody just hid. */
+  revalidatePath("/settings");
+  revalidatePath("/profile");
+  revalidatePath("/u", "layout");
+
+  return { status: "success", message: "Saved." };
+}

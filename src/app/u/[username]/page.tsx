@@ -81,7 +81,7 @@ export default async function PublicProfilePage({
   // pointing at yourself.
   const isOwner = user?.id === profile.id;
 
-  const tabs = visibleTabs(isOwner, profile.plan);
+  const tabs = visibleTabs(isOwner, profile);
   const search = await searchParams;
   const activeTab = isTabKey(search.tab, tabs) ? search.tab : "posts";
 
