@@ -1,171 +1,270 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useActionState, useState, useTransition } from "react";
+import { Switch } from "@/components/ui/switch";
 import {
-  savePrivacySettings,
+  setPrivacyFlag,
+  type PrivacyFlag,
+  type PrivacyState,
   type PrivacyValues,
-  type SettingsState,
 } from "@/app/actions/settings";
 
 /*
   Who can see what. Founder instruction 2026-09-18.
 
-  Two levels, and the form says so rather than presenting six equal switches.
-  Making the account private overrides every section below it, so those
-  controls are DISABLED while it is on instead of silently doing nothing. A
-  control that is still tappable while having no effect is the kind of thing
-  people file as a bug six months later.
+  SWITCHES THAT SAVE THEMSELVES, NOT CHECKBOXES AND A SAVE BUTTON. Same shape as
+  Developer Mode, which was already doing this. The first version was five
+  checkboxes in one form, and it carried a bug that this design cannot have: a
+  disabled input is not submitted, so saving the form overwrote every flag that
+  happened to be inert at the time. One flag per call has nothing to overwrite.
 
-  The disabling is cosmetic honesty, not enforcement: profile_shares() checks
-  is_private first and returns false whatever the section flags say, so the
-  answer is the same whether or not the browser cooperated.
+  WHICH SWITCHES EXIST DEPENDS ON THE ACCOUNT, and they are not the same set:
 
-  Uncontrolled inputs with a keyed remount, which is what works in React 19:
-  the form resets once the action completes, and a reset restores a checkbox to
-  its HTML default rather than to what was just saved. The key is bumped on
-  every successful save so the boxes mount again carrying the new defaults.
+    public   saved tools, saved models, replies. Follows are NOT offered,
+             because a public account may not hide them.
+    private  follows only. Everything else is already hidden, so a control for
+             it would be a control that does nothing.
+
+  That is the founder's rule, not an interface convenience: hiding your
+  followers is something you get by going private. `profile_shares()` enforces
+  it, and a public account's follows are shared without the flag being consulted
+  at all. Verified against all four combinations as a stranger.
+
+  So nothing here is ever disabled. The earlier version greyed four switches out
+  while the account was private, which is how the overwrite bug arrived. A
+  control that does not apply is absent and the reason is written where it was.
 */
 
-const initial: SettingsState = { status: "idle", message: "" };
-
 function Toggle({
-  name,
+  flag,
   label,
-  hint,
-  defaultChecked,
-  disabled,
-  onChange,
+  on,
+  off,
+  initial,
 }: {
-  name: string;
+  flag: PrivacyFlag;
   label: string;
-  hint: string;
-  defaultChecked: boolean;
-  disabled?: boolean;
-  onChange?: (checked: boolean) => void;
+  /* What is true when it is on, and when it is off. Said in full both ways,
+     because "Show my replies: OFF" makes somebody work out the consequence and
+     a privacy control is the wrong place to make people infer. */
+  on: string;
+  off: string;
+  initial: boolean;
 }) {
-  return (
-    /* htmlFor and siblings rather than a wrapping label: a label that contains
-       its own input double fires the change event, which cost an afternoon
-       once already and is written down in docs/RESUME.md. */
-    <div className="flex items-start gap-3 rounded-xl border border-border px-4 py-3 has-[:disabled]:opacity-55">
-      {/*
-        A DISABLED INPUT IS NOT SUBMITTED. Without the hidden twin below,
-        switching the account to private would post nothing for these four, the
-        action would read each one as false, and it would quietly overwrite the
-        choices somebody had made. They would then find everything switched off
-        when they made the account public again, with nothing to explain it.
+  const [state, action] = useActionState<PrivacyState, FormData>(setPrivacyFlag, {
+    status: "idle",
+    value: initial,
+    message: "",
+  });
 
-        So the checkbox carries the name only while it is live, and a hidden
-        field carries the stored value while it is not. Exactly one input has
-        this name at any moment, so there is never an ambiguous FormData.
-      */}
-      {disabled ? (
-        <input type="hidden" name={name} value={defaultChecked ? "on" : ""} />
+  /*
+    useActionState's dispatch has to be called inside a transition. A form
+    `action` does that implicitly; calling it from an onChange does not, and
+    calling it bare throws and leaves isPending permanently wrong. Same note as
+    developer-mode-toggle.tsx, which hit this first.
+  */
+  const [isPending, startTransition] = useTransition();
+  const [optimistic, setOptimistic] = useState<boolean | null>(null);
+
+  /* Before any call, the prop. After one, whatever the server says it stored,
+     which is how a refusal snaps the switch back instead of leaving it showing
+     a state the database never took. While in flight, the optimistic value. */
+  const settled = state.status === "idle" ? initial : state.value;
+  const shown = isPending && optimistic !== null ? optimistic : settled;
+
+  function onChange(next: boolean) {
+    setOptimistic(next);
+    const data = new FormData();
+    data.set("flag", flag);
+    if (next) data.set("value", "on");
+    startTransition(() => action(data));
+  }
+
+  return (
+    <div className="rounded-xl border border-border px-4 py-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-medium">{label}</p>
+          <p className="mt-0.5 text-[13px] leading-relaxed text-muted">
+            {shown ? on : off}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2.5">
+          {/* The switch announces its own state, so this word is decorative and
+              is not read out a second time. */}
+          <span
+            aria-hidden
+            className={
+              shown
+                ? "text-[12px] font-semibold tracking-wide text-foreground"
+                : "text-[12px] font-semibold tracking-wide text-muted"
+            }
+          >
+            {shown ? "ON" : "OFF"}
+          </span>
+          <Switch
+            isSelected={shown}
+            onChange={onChange}
+            isDisabled={isPending}
+            aria-label={label}
+          />
+        </div>
+      </div>
+
+      {state.status === "error" ? (
+        <p role="status" aria-atomic="true" className="mt-2.5 text-[13px] text-foreground">
+          {state.message}
+        </p>
       ) : null}
-      <input
-        id={`privacy-${name}`}
-        type="checkbox"
-        name={disabled ? undefined : name}
-        defaultChecked={defaultChecked}
-        disabled={disabled}
-        onChange={(e) => onChange?.(e.currentTarget.checked)}
-        className="mt-1 size-4 shrink-0 accent-[var(--celpare-lime)] disabled:cursor-not-allowed"
-      />
-      <label htmlFor={`privacy-${name}`} className="cursor-pointer">
-        <span className="block text-[15px] font-medium">{label}</span>
-        <span className="block text-[13px] leading-relaxed text-muted">{hint}</span>
-      </label>
     </div>
   );
 }
 
 export function PrivacyForm({ values }: { values: PrivacyValues }) {
-  const [state, action, pending] = useActionState(savePrivacySettings, initial);
+  /*
+    Local, because the set of switches below depends on it and waiting for a
+    round trip to redraw them would leave somebody looking at controls that no
+    longer apply. The server is still the record: the account switch reports
+    what it stored, and a refusal puts this back.
+  */
   const [isPrivate, setIsPrivate] = useState(values.isPrivate);
-  const [attempt, setAttempt] = useState(0);
 
   return (
-    <form
-      key={`${attempt}-${state.status}`}
-      action={action}
-      onSubmit={() => setAttempt((n) => n + 1)}
-      className="mt-6 space-y-8"
-    >
-      <fieldset>
-        <legend className="text-[14px] font-medium text-foreground">Your account</legend>
+    <div className="mt-6 space-y-8">
+      <section>
+        <h3 className="text-[14px] font-medium text-foreground">Your account</h3>
         <div className="mt-3">
-          <Toggle
-            name="isPrivate"
-            label="Make my account private"
-            hint="People who are not you see your picture, your name, your counts and a Follow button, and are told the account is private. Nothing else. Following you is still allowed and still shows them nothing, because there is no approval step yet."
-            defaultChecked={values.isPrivate}
-            onChange={setIsPrivate}
-          />
+          <PrivateToggle initial={values.isPrivate} onSettled={setIsPrivate} />
         </div>
-      </fieldset>
+      </section>
 
-      <fieldset>
-        <legend className="text-[14px] font-medium text-foreground">
-          Sections on your public profile
-        </legend>
+      <section>
+        <h3 className="text-[14px] font-medium text-foreground">
+          {isPrivate ? "What is still visible" : "Sections on your public profile"}
+        </h3>
         <p className="mt-1 text-[13px] leading-relaxed text-muted">
           {isPrivate
-            ? "These do nothing while your account is private, because a private account shows no sections at all."
-            : "Your posts are always public. These four are yours to choose."}
+            ? "A private profile shows your picture, your name, your username and a Follow button. Your followers are the one thing you can also hide."
+            : "Your posts are always public, and so are your followers: hiding those is something you get by making the account private."}
         </p>
 
         <div className="mt-3 space-y-2">
-          <Toggle
-            name="showSavedTools"
-            label="Show the tools I have saved"
-            hint="The tools only, never the private notes you attached to them."
-            defaultChecked={values.showSavedTools}
-            disabled={isPrivate}
-          />
-          <Toggle
-            name="showSavedModels"
-            label="Show the models I have saved"
-            hint="The same rule as tools. The model directory arrives in Phase 5."
-            defaultChecked={values.showSavedModels}
-            disabled={isPrivate}
-          />
-          <Toggle
-            name="showReplies"
-            label="Show my replies"
-            hint="Replies you leave on other people's posts. Turning this off hides the Replies section from visitors, and the replies themselves stay where you left them."
-            defaultChecked={values.showReplies}
-            disabled={isPrivate}
-          />
-          <Toggle
-            name="showFollows"
-            label="Show who I follow and who follows me"
-            hint="Hides the follower and following counts from visitors, and stops anybody listing your connections."
-            defaultChecked={values.showFollows}
-            disabled={isPrivate}
-          />
+          {isPrivate ? (
+            <Toggle
+              flag="showFollows"
+              label="Show who I follow and who follows me"
+              initial={values.showFollows}
+              on="Visitors can see your follower and following counts."
+              off="Hidden. Nobody can see your counts or list your connections."
+            />
+          ) : (
+            <>
+              <Toggle
+                flag="showSavedTools"
+                label="Show the tools I have saved"
+                initial={values.showSavedTools}
+                on="Visitors see the tools you saved. Never the private notes on them."
+                off="Only you can see the tools you saved."
+              />
+              <Toggle
+                flag="showSavedModels"
+                label="Show the models I have saved"
+                initial={values.showSavedModels}
+                on="Visitors see the models you saved. The model directory arrives in Phase 5."
+                off="Only you can see the models you saved."
+              />
+              <Toggle
+                flag="showReplies"
+                label="Show my replies"
+                initial={values.showReplies}
+                on="Visitors see the replies you leave on other people's posts."
+                off="Your replies stay where you left them and are hidden from your profile."
+              />
+            </>
+          )}
         </div>
-      </fieldset>
+      </section>
+    </div>
+  );
+}
 
-      <div className="flex flex-wrap items-center gap-4">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving" : "Save privacy settings"}
-        </Button>
+/* The account switch, split out so it can report what the server stored back up
+   to the parent. Everything else below it depends on this one value. */
+function PrivateToggle({
+  initial,
+  onSettled,
+}: {
+  initial: boolean;
+  onSettled: (value: boolean) => void;
+}) {
+  const [state, action] = useActionState<PrivacyState, FormData>(setPrivacyFlag, {
+    status: "idle",
+    value: initial,
+    message: "",
+  });
+  const [isPending, startTransition] = useTransition();
+  const [optimistic, setOptimistic] = useState<boolean | null>(null);
 
-        {state.status !== "idle" ? (
-          <p
-            role="status"
-            aria-atomic="true"
+  const settled = state.status === "idle" ? initial : state.value;
+  const shown = isPending && optimistic !== null ? optimistic : settled;
+
+  function onChange(next: boolean) {
+    setOptimistic(next);
+    onSettled(next);
+    const data = new FormData();
+    data.set("flag", "isPrivate");
+    if (next) data.set("value", "on");
+    startTransition(() => action(data));
+  }
+
+  return (
+    <div className="rounded-xl border border-border px-4 py-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-medium">Private account</p>
+          <p className="mt-0.5 text-[13px] leading-relaxed text-muted">
+            {shown
+              ? "On. People who are not you see your picture, your name, your username and a Follow button, and are told the account is private."
+              : "Off. Your profile, posts and replies can be read by anyone, including people without an account."}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2.5">
+          <span
+            aria-hidden
             className={
-              state.status === "error"
-                ? "text-[14px] text-foreground"
-                : "text-[14px] text-muted"
+              shown
+                ? "text-[12px] font-semibold tracking-wide text-foreground"
+                : "text-[12px] font-semibold tracking-wide text-muted"
             }
           >
-            {state.message}
-          </p>
-        ) : null}
+            {shown ? "ON" : "OFF"}
+          </span>
+          <Switch
+            isSelected={shown}
+            onChange={onChange}
+            isDisabled={isPending}
+            aria-label="Private account"
+          />
+        </div>
       </div>
-    </form>
+
+      {/* Following a private account is allowed and shows the follower nothing.
+          Said here rather than discovered, because it is the one thing people
+          assume works differently. */}
+      {shown ? (
+        <p className="mt-2.5 text-[13px] leading-relaxed text-muted">
+          People can still follow you, and following you still shows them
+          nothing. There is no approval step yet.
+        </p>
+      ) : null}
+
+      {state.status === "error" ? (
+        <p role="status" aria-atomic="true" className="mt-2.5 text-[13px] text-foreground">
+          {state.message}
+        </p>
+      ) : null}
+    </div>
   );
 }

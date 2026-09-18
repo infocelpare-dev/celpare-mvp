@@ -163,32 +163,53 @@ export type PrivacyValues = {
   showSavedModels: boolean;
 };
 
+export type PrivacyState = {
+  status: "idle" | "success" | "error";
+  /* What the server believes AFTER this call, so the switch can settle on the
+     truth rather than on what it optimistically painted. */
+  value: boolean;
+  message: string;
+};
+
 /*
   Who can see what on your profile. Founder instruction 2026-09-18.
 
-  Same doctrine as saveAskSettings, and the same division of labour. This
-  writes the flags and produces a sentence. It decides nothing about who may
-  READ them: public.profile_shares() does, and every select policy on posts,
-  comments, reposts and follows calls it, as do public_saved_tools and
-  public_saved_models. Verified live against anon and against a signed in
-  stranger, both with the flags on and off, rather than read off the policy.
+  ONE FLAG PER CALL, AND IT SAVES ON THE SWITCH. The first version was five
+  checkboxes and a Save button; the founder asked for on and off switches that
+  write as you flip them, which is what Developer Mode already does. That
+  removes a whole class of bug with it: there is no longer a form whose disabled
+  inputs drop out of FormData and overwrite the fields nobody touched.
 
-  All five columns are in the authenticated UPDATE grant, and the grant is
-  column scoped, so a payload that tried to reach `plan`, `role` or
-  `account_status` is refused by the database rather than by this function.
+  The column name is chosen HERE from a fixed map, never taken from the request.
+  `flag` arrives as a short key and anything not in the map is refused, so this
+  cannot be pointed at `plan`, `role` or `account_status`. The column grant is
+  the second control and would refuse those anyway.
 */
-export async function savePrivacySettings(
-  _prev: SettingsState,
-  formData: FormData,
-): Promise<SettingsState> {
-  if (!isSupabaseConfigured()) {
-    return { status: "error", message: "Not connected. Set the Supabase keys in .env.local." };
-  }
+const PRIVACY_COLUMNS = {
+  isPrivate: "is_private",
+  showReplies: "show_replies",
+  showFollows: "show_follows",
+  showSavedTools: "show_saved_tools",
+  showSavedModels: "show_saved_models",
+} as const;
 
-  /* An unchecked box is absent from FormData, which is not the same thing as
-     false until it is written down. Every flag is read explicitly, so a box
-     somebody cleared is stored as false rather than left at its old value. */
-  const on = (name: string) => formData.get(name) === "on";
+export type PrivacyFlag = keyof typeof PRIVACY_COLUMNS;
+
+export async function setPrivacyFlag(
+  _prev: PrivacyState,
+  formData: FormData,
+): Promise<PrivacyState> {
+  const flag = String(formData.get("flag") ?? "");
+  const wanted = formData.get("value") === "on";
+
+  if (!(flag in PRIVACY_COLUMNS)) {
+    return { status: "error", value: !wanted, message: "Unknown setting." };
+  }
+  const column = PRIVACY_COLUMNS[flag as PrivacyFlag];
+
+  if (!isSupabaseConfigured()) {
+    return { status: "error", value: !wanted, message: "Not connected." };
+  }
 
   const supabase = await createClient();
   const {
@@ -196,30 +217,30 @@ export async function savePrivacySettings(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { status: "error", message: "Sign in to change your settings." };
+    return { status: "error", value: !wanted, message: "Sign in to change this." };
   }
 
   const { error } = await supabase
     .from("profiles")
-    .update({
-      is_private: on("isPrivate"),
-      show_replies: on("showReplies"),
-      show_follows: on("showFollows"),
-      show_saved_tools: on("showSavedTools"),
-      show_saved_models: on("showSavedModels"),
-    })
+    .update({ [column]: wanted })
     .eq("id", user.id);
 
   if (error) {
     console.error("[settings] privacy update failed", error.code, error.message);
-    return { status: "error", message: "Could not save that. Please try again." };
+    /* Reports the value it did NOT reach, so the switch snaps back rather than
+       sitting on a state the database never took. */
+    return {
+      status: "error",
+      value: !wanted,
+      message: "Could not save that. Try again.",
+    };
   }
 
-  /* Both profile routes render from these flags, so neither should keep
-     serving a cached page that shows what somebody just hid. */
+  /* Both profile routes render from these flags, so neither should keep serving
+     a cached page showing what somebody just hid. */
   revalidatePath("/settings");
   revalidatePath("/profile");
   revalidatePath("/u", "layout");
 
-  return { status: "success", message: "Saved." };
+  return { status: "success", value: wanted, message: "Saved." };
 }

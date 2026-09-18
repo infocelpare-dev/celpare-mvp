@@ -138,7 +138,13 @@ export function ProfileView({
     system is worse than none. Tracked as a gap.
   */
   const hidden = profile.is_private && !isOwner;
-  const showFollows = isOwner || profile.show_follows;
+  /*
+    Follows are the one thing a PRIVATE account may hide and a public one may
+    not. Founder rule 2026-09-18: the counts are part of what a public profile
+    owes, and hiding them is something you get by going private. Mirrors the
+    'follows' branch of profile_shares(), which is the control.
+  */
+  const showFollows = isOwner || !profile.is_private || profile.show_follows;
 
   const tabItems: TabItem[] = tabs.map((key) => ({
     key,
@@ -240,13 +246,13 @@ export function ProfileView({
           {/*
             Follower and following counts.
 
-            show_follows hides them from everybody but the owner. Be clear about
-            what that is worth: the counts are plain columns on `profiles`,
-            which is publicly readable, so this is a rendering decision and NOT
-            a boundary. What it does control for real is the `follows` table
-            itself, whose select policy now needs both parties to be sharing, so
-            a follower LIST cannot be enumerated. Closing the count properly
-            means moving profile reads behind a view, which is tracked as a gap
+            Offered only to a private account, per the founder's rule. Be clear
+            about what hiding them is worth: the counts are plain columns on
+            `profiles`, which is publicly readable, so this is a rendering
+            decision and NOT a boundary. What it does control for real is the
+            `follows` table itself, whose select policy needs both parties to be
+            sharing, so a follower LIST cannot be enumerated. Closing the count
+            properly means moving profile reads behind a view, tracked as G46
             rather than half done here.
           */}
           {showFollows ? (
