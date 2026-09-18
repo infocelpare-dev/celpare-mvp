@@ -19,7 +19,7 @@ export type ConversationSummary = {
   updated_at: string;
 };
 
-export async function listConversations(limit = 30): Promise<ConversationSummary[]> {
+export async function listConversations(limit = 100): Promise<ConversationSummary[]> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -241,16 +241,30 @@ export async function saveTurn(opts: {
 
 export async function deleteConversation(id: string): Promise<boolean> {
   const supabase = await createClient();
-  // Soft delete: 03-data-model.md says user generated content is never hard
-  // deleted, and the RLS policy already hides rows with deleted_at set.
-  const { error } = await supabase
-    .from("conversations")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
+
+  /*
+    Soft delete, per 03-data-model.md: user generated content is never hard
+    deleted, and the RLS policy already hides a row once `deleted_at` is set.
+
+    Through an RPC rather than an UPDATE, and not by choice. On an UPDATE
+    PostgreSQL applies the table's SELECT policy to the new row as well, so the
+    row has to stay visible to whoever changed it. `conversations_own` requires
+    `deleted_at is null` to see a row at all, which means stamping `deleted_at`
+    makes the new row fail that read check: Postgres rejects it with 42501 and
+    no policy on the write side can help. `delete_conversation` runs as the
+    table owner and carries the ownership predicate in its own body, so the
+    read policy stays exactly as strict as it was.
+
+    This is why the function returns false where it used to return true: the
+    RPC reports whether a row was actually stamped, so a chat that was already
+    deleted, or was never yours, comes back as false rather than as a silent
+    success.
+  */
+  const { data, error } = await supabase.rpc("delete_conversation", { p_id: id });
 
   if (error) {
     console.error("[ai] deleting conversation failed", error.code, error.message);
     return false;
   }
-  return true;
+  return data === true;
 }
