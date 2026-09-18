@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin/guard";
 import { getRecommendationAnalytics } from "@/lib/admin/queries";
-import { RankedBars } from "@/components/admin/charts";
+import { RankedBars } from "@/components/ui/charts";
 import { FilterTabs } from "@/components/admin/filters";
 import {
   EmptyState,

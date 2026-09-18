@@ -5,7 +5,7 @@ import { getUserDetail } from "@/lib/admin/queries";
 import { ALL_ROLES, RANK, ROLE_DESCRIPTION, ROLE_LABEL, type Role } from "@/lib/admin/capabilities";
 import { setUserPlan, setUserRole, setUserStatus, warnUser } from "@/app/actions/admin";
 import { ActionForm, ActionSelectForm } from "@/components/admin/action-form";
-import { RankedBars, TimeSeries } from "@/components/admin/charts";
+import { RankedBars, TimeSeries } from "@/components/ui/charts";
 import {
   EmptyState,
   Field,

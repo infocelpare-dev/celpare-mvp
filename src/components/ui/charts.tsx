@@ -1,7 +1,12 @@
 import { cn } from "@/lib/utils";
 
 /*
-  Two chart forms, which is all this dashboard's data actually needs.
+  Moved out of components/admin on 2026-09-18, unchanged. Nothing in here was
+  ever admin specific: they are presentational, they take numbers and render
+  them, and the developer analytics board needs the same three forms. One set
+  of charts, so the two dashboards cannot drift apart.
+
+  Three chart forms, which is all either dashboard's data actually needs.
 
   The form is chosen from the job the numbers do, not from what looks varied:
 

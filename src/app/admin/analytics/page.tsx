@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/admin/guard";
 import { getCommunityAnalytics, getOverview } from "@/lib/admin/queries";
-import { RankedBars, TimeSeries } from "@/components/admin/charts";
+import { RankedBars, TimeSeries } from "@/components/ui/charts";
 import { FilterTabs } from "@/components/admin/filters";
 import {
   EmptyState,

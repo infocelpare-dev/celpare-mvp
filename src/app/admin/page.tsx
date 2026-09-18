@@ -12,7 +12,7 @@ import {
   Status,
   When,
 } from "@/components/admin/ui";
-import { ShareBar, TimeSeries } from "@/components/admin/charts";
+import { ShareBar, TimeSeries } from "@/components/ui/charts";
 
 export const dynamic = "force-dynamic";
 

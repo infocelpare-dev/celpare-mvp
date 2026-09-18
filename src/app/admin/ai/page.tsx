@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin/guard";
 import { getAiAnalytics } from "@/lib/admin/queries";
-import { RankedBars, ShareBar, TimeSeries } from "@/components/admin/charts";
+import { RankedBars, ShareBar, TimeSeries } from "@/components/ui/charts";
 import { FilterTabs } from "@/components/admin/filters";
 import {
   EmptyState,

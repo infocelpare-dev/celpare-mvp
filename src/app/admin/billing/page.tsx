@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin/guard";
 import { getAiAnalytics, getOverview, listAudit } from "@/lib/admin/queries";
-import { ShareBar } from "@/components/admin/charts";
+import { ShareBar } from "@/components/ui/charts";
 import {
   EmptyState,
   ErrorState,

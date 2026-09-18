@@ -11,7 +11,7 @@ import {
   sentryConfigured,
   SENTRY_URL,
 } from "@/lib/admin/sentry";
-import { RankedBars, TimeSeries } from "@/components/admin/charts";
+import { RankedBars, TimeSeries } from "@/components/ui/charts";
 import { FilterTabs } from "@/components/admin/filters";
 import { AdminSkeleton } from "@/components/admin/skeleton";
 import {
