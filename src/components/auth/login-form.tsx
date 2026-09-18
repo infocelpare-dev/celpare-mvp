@@ -35,6 +35,11 @@ export function LoginForm() {
     enforces captcha protection at the project level, so signInWithPassword is
     rejected without one. A token is single use, so this widget runs its own
     challenge rather than sharing signup's.
+
+    Single use is also why resetKey is passed below. A wrong password spends
+    the token, and without a re-arm the retry would be refused by the captcha
+    rather than by the password, which is the one screen where that is most
+    likely to happen.
   */
   const [captchaToken, setCaptchaToken] = useState("");
   const emailId = useId();
@@ -52,7 +57,7 @@ export function LoginForm() {
           label="Email"
           autoComplete="email"
           required
-          placeholder="ameag@gmail.com"
+          placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           invalid={state.field === "email"}
@@ -69,7 +74,12 @@ export function LoginForm() {
       </div>
 
       <div className="mt-5">
-        <Turnstile onToken={setCaptchaToken} invalid={state.field === "captcha"} />
+        <Turnstile
+          onToken={setCaptchaToken}
+          invalid={state.field === "captcha"}
+          action="login"
+          resetKey={state.attempt}
+        />
         <input type="hidden" name="captchaToken" value={captchaToken} />
       </div>
 

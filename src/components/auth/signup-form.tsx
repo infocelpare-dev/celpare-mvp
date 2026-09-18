@@ -65,7 +65,7 @@ export function SignupForm() {
           label="Email"
           autoComplete="email"
           required
-          placeholder="ameag@gmail.com"
+          placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           invalid={state.field === "email"}
@@ -86,7 +86,12 @@ export function SignupForm() {
           <PasswordStrength value={password} />
         </div>
 
-        <Turnstile onToken={setCaptchaToken} invalid={state.field === "captcha"} />
+        <Turnstile
+          onToken={setCaptchaToken}
+          invalid={state.field === "captcha"}
+          action="signup"
+          resetKey={state.attempt}
+        />
         <input type="hidden" name="captchaToken" value={captchaToken} />
       </div>
 

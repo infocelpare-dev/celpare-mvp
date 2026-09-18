@@ -12,7 +12,45 @@ export type AuthState = {
   message: string;
   /* Which field failed, so the form can point at it. */
   field?: "fullName" | "email" | "password" | "code" | "captcha";
+  /*
+    How many times this form has come back with an error. The Turnstile widget
+    watches it and re-runs its challenge whenever it changes. See failed().
+  */
+  attempt?: number;
 };
+
+/*
+  A TURNSTILE TOKEN IS SINGLE USE, AND A FAILED ATTEMPT STILL SPENDS IT.
+
+  Supabase redeems the token at the auth endpoint before it ever looks at the
+  password, so a typo in the password burns the captcha too. Nothing re-ran the
+  challenge, so the form still held the spent token, the second attempt was
+  refused by the captcha rather than by the password, and the only way out was
+  a full page reload. The sign in copy even said "tap the box again", which the
+  visitor cannot do: Cloudflare has already cleared it and there is no box.
+
+  This was invisible in testing because Supabase captcha protection is
+  currently OFF (G36), so nothing is redeeming the tokens. It would have
+  appeared the moment that was turned back on, which has to happen before
+  launch.
+
+  So every error return increments a counter the widget watches. Doing it in
+  one wrapper rather than at each return site means a new error branch cannot
+  forget to, and there are eleven of them across these two actions.
+*/
+function failed(prev: AuthState, next: AuthState): AuthState {
+  /*
+    The count only ever goes up. A non error result carries the previous count
+    forward rather than dropping it, because the widget resets on ANY change
+    and a count falling back to undefined would reset it for no reason. Today
+    both actions redirect on success so that branch is unreachable, which is
+    exactly why it is written down: the next person to return a success state
+    here should not have to rediscover it.
+  */
+  return next.status === "error"
+    ? { ...next, attempt: (prev.attempt ?? 0) + 1 }
+    : { ...next, attempt: prev.attempt };
+}
 
 const notConfigured: AuthState = {
   status: "error",
@@ -100,9 +138,13 @@ function firstIssue(err: z.ZodError, fallback: string): AuthState {
 }
 
 export async function signUp(
-  _prev: AuthState,
+  prev: AuthState,
   formData: FormData,
 ): Promise<AuthState> {
+  return failed(prev, await signUpImpl(formData));
+}
+
+async function signUpImpl(formData: FormData): Promise<AuthState> {
   const parsed = signUpSchema.safeParse({
     fullName: formData.get("fullName") ?? "",
     email: formData.get("email") ?? "",
@@ -131,7 +173,8 @@ export async function signUp(
     return {
       status: "error",
       field: "captcha",
-      message: "Complete the bot check before continuing.",
+      message:
+        "The bot check has not passed yet. Give it a moment, and if it did not load, turn off any content blocker and reload.",
     };
   }
 
@@ -188,7 +231,7 @@ export async function signUp(
       return {
         status: "error",
         field: "captcha",
-        message: "The bot check failed. Reload the page and try again.",
+        message: "The bot check failed. It has reset itself, so try again.",
       };
     }
     /*
@@ -223,9 +266,13 @@ export async function signUp(
 }
 
 export async function signIn(
-  _prev: AuthState,
+  prev: AuthState,
   formData: FormData,
 ): Promise<AuthState> {
+  return failed(prev, await signInImpl(formData));
+}
+
+async function signInImpl(formData: FormData): Promise<AuthState> {
   const parsed = signInSchema.safeParse({
     email: formData.get("email") ?? "",
     password: formData.get("password") ?? "",
@@ -240,7 +287,8 @@ export async function signIn(
   if (captchaRequired && !captchaToken) {
     return {
       status: "error",
-      message: "Confirm you are not a robot, then sign in.",
+      message:
+        "The bot check has not passed yet. Give it a moment, and if it did not load, turn off any content blocker and reload.",
       field: "captcha",
     };
   }
@@ -278,7 +326,8 @@ export async function signIn(
       });
       return {
         status: "error",
-        message: "That check did not pass. Tap the box again, then sign in.",
+        message:
+          "That check did not pass. It has reset itself, so try signing in again.",
         field: "captcha",
       };
     }

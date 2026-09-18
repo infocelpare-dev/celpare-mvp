@@ -36,10 +36,20 @@ if (dsn) {
       sampled trace rather than running continuously, which is the cheaper of
       the two lifecycles and the one that answers "why was this request slow".
     */
-    profileSessionSampleRate: isDev ? 1.0 : 0.1,
+    profileSessionSampleRate: isDev ? 0 : 0.1,
     profileLifecycle: "trace",
 
-    integrations: [
+    /*
+      Replay and profiling are the two heavy pieces of the browser SDK. Replay
+      records DOM mutations continuously and is the single largest addition to
+      the client bundle; profiling adds its own work on top. Running both at 1.0
+      locally made every page load slow for no return, because a replay of
+      yourself building the page answers nothing.
+
+      Production only now. Errors and tracing are untouched, so a local crash
+      still reaches Sentry exactly as it did.
+    */
+    integrations: isDev ? [] : [
       /*
         Session Replay, with every default privacy control left ON.
 
@@ -59,16 +69,13 @@ if (dsn) {
     ],
 
     /*
-      Every session in development, a tenth in production, and always every
-      session that hit an error.
+      A tenth of production sessions, and always every session that hit an
+      error. Zero in development, where the integration is not loaded at all.
 
       The error rate is the one that matters: a replay is worth having precisely
-      when something went wrong. The dev rate is 1.0 so that replay is visible
-      while building rather than a feature you have to trust is wired. Local
-      traffic is one person, so the quota cost is nothing. Turn it down if that
-      stops being true.
+      when something went wrong.
     */
-    replaysSessionSampleRate: isDev ? 1.0 : 0.1,
+    replaysSessionSampleRate: isDev ? 0 : 0.1,
     replaysOnErrorSampleRate: 1.0,
 
     /*

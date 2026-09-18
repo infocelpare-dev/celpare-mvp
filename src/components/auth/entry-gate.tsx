@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Turnstile } from "./turnstile";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,28 @@ import { cn } from "@/lib/utils";
   that one is verified by Supabase server side. This gate is UI, that one is
   the boundary.
 
+  Two consequences of that, both of which were wrong here until 2026-09-17.
+
+  IT LATCHES. Passing once is the whole event, because nothing downstream ever
+  reads the token again. This used to track the token, so the five minute
+  expiry, or any transient widget error, flipped it back to false and the three
+  options vanished from under somebody still reading the page.
+
+  IT FAILS OPEN. This page is the gate and nothing else: Create an account, Log
+  in and Skip for now all live inside the revealed block. A content blocker or a
+  Cloudflare outage therefore locked a real person out of the entire site, to
+  protect a check that is decoration by its own description. That is D80's line,
+  that an operational switch fails open and authorization fails closed, and this
+  is not authorization. The signup and login forms still fail closed, because
+  they are where the boundary actually is.
+
+  THERE USED TO BE A CARD AROUND THIS. A bordered panel, a filling circle, a
+  "Quick check first" heading and a line of explanation, which then swapped to
+  "Verified, you are human". Founder instruction on 2026-09-16: the widget and
+  nothing else. Cloudflare's widget already says what it is and reports its own
+  state, so the card was Celpare narrating something the visitor could read for
+  themselves.
+
   When no site key is configured the options show immediately rather than
   trapping everyone behind a widget that can never load.
 */
@@ -25,46 +47,32 @@ export function EntryGate() {
     () => !process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   );
 
+  /* Latch, never unlatch. See the note above: an expiry or a transient error
+     must not retract options somebody is already reaching for. */
   const handleToken = useCallback((token: string) => {
-    setVerified(Boolean(token));
+    if (token) setVerified(true);
+  }, []);
+
+  /* The widget cannot load. Open the gate rather than strand the visitor on a
+     page whose only other content is the widget that just failed. */
+  const handleUnavailable = useCallback(() => {
+    setVerified(true);
   }, []);
 
   return (
     <div>
-      <div
-        className={cn(
-          "rounded-[16px] border p-6 transition-colors duration-200",
-          verified ? "border-border" : "border-border bg-surface",
-        )}
-      >
-        <div className="flex items-start gap-3">
-          <span
-            aria-hidden
-            className={cn(
-              "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full transition-colors duration-200",
-              verified ? "bg-accent text-on-accent" : "bg-border",
-            )}
-          >
-            {verified && <Check className="h-3 w-3" />}
-          </span>
-          <div className="min-w-0">
-            <h2 className="font-display text-[15px] font-semibold">
-              {verified ? "Verified, you are human" : "Quick check first"}
-            </h2>
-            <p className="mt-1 text-[13.5px] leading-relaxed text-muted">
-              {verified
-                ? "Choose how you want to continue."
-                : "Confirm you are not a robot to continue."}
-            </p>
-          </div>
-        </div>
-
-        {!verified && (
-          <div className="mt-5">
-            <Turnstile onToken={handleToken} />
-          </div>
-        )}
-      </div>
+      {/*
+        Stays mounted after it clears. Unmounting it on success made the widget
+        vanish the instant it passed, which on a visitor Cloudflare waves
+        through is almost immediately, so nobody ever saw the check happen.
+        Cloudflare's own widget reports "Success!" once it has, which is the
+        confirmation the removed card used to be imitating.
+      */}
+      <Turnstile
+        onToken={handleToken}
+        onUnavailable={handleUnavailable}
+        action="entry"
+      />
 
       {/*
         Kept mounted and hidden rather than unmounted, so the reveal does not
@@ -74,8 +82,10 @@ export function EntryGate() {
       <div
         aria-hidden={!verified}
         className={cn(
-          "mt-6 transition-opacity duration-200",
-          verified ? "opacity-100" : "pointer-events-none h-0 overflow-hidden opacity-0",
+          "transition-opacity duration-200",
+          verified
+            ? "mt-6 opacity-100"
+            : "pointer-events-none h-0 overflow-hidden opacity-0",
         )}
       >
         <div className="space-y-3">
