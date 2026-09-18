@@ -46,6 +46,12 @@ yarn-error.log*
 # Internal working documents. Kept local, never published.
 # The repo is public, so the product strategy, pricing, decisions and open
 # questions stay off it. Everything here still exists on disk.
+#
+# TRACKER.md and docs/ came out of this list on 2026-09-17 and went back in on
+# 2026-09-18, on founder instruction. They stay ignored. docs/context/09-gaps.md
+# in particular is a list of where this system is weak, and a public repository
+# is the wrong place for it. Keep them local and keep writing them: /resume and
+# /handoff read them off disk and never need git.
 .claude/
 CLAUDE.md
 AGENTS.md
