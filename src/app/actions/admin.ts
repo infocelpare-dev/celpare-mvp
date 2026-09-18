@@ -51,6 +51,10 @@ function explain(error: { code?: string; message: string }): string {
   if (m.includes("report_not_found")) return "That report no longer exists.";
   if (m.includes("content_not_found")) return "That content no longer exists.";
   if (m.includes("tool_not_found")) return "That tool no longer exists.";
+  if (m.includes("domain_not_confirmed"))
+    return "Confirm the owner email replied before approving this. A developer submission cannot be published on trust alone.";
+  if (m.includes("no_owner_email"))
+    return "This submission has no owner email, so there is nobody to confirm with.";
   if (m.includes("model_not_found")) return "That model no longer exists.";
   if (m.includes("developer_not_found")) return "That developer profile no longer exists.";
   if (m.includes("unknown_setting")) return "That setting does not exist.";
@@ -414,6 +418,49 @@ export async function setToolVerified(
     },
     ["/admin/tools", `/admin/tools/${parsed.data.id}`],
     parsed.data.verified === "yes" ? "Tool verified." : "Verification removed.",
+  );
+}
+
+/*
+  Domain ownership, confirmed by a person.
+
+  There is no verification mail: Celpare has no email provider and no sending
+  domain (D26). The reviewer emails the address on the submission themselves,
+  and presses this when somebody there replies. That makes this action the
+  entire verification mechanism, which is why admin_review_submission refuses
+  to approve a developer submission until it has been used.
+
+  It is separate from setToolVerified on purpose. This one answers "does this
+  person speak for the domain". That one is the public badge, a judgement about
+  the tool, and conflating them would let a badge imply a check nobody made.
+*/
+export async function confirmToolDomain(
+  _prev: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const parsed = z
+    .object({ id: uuid, confirmed: z.enum(["yes", "no"]), reason: optionalReason })
+    .safeParse({
+      id: formData.get("id"),
+      confirmed: formData.get("confirmed"),
+      reason: formData.get("reason") ?? undefined,
+    });
+  if (!parsed.success) {
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the form." };
+  }
+
+  return run(
+    "submissions.review",
+    "admin_confirm_tool_domain",
+    {
+      p_id: parsed.data.id,
+      p_confirmed: parsed.data.confirmed === "yes",
+      p_note: parsed.data.reason ?? null,
+    },
+    ["/admin/tools", `/admin/tools/${parsed.data.id}`, "/admin/submissions"],
+    parsed.data.confirmed === "yes"
+      ? "Domain ownership confirmed."
+      : "Confirmation withdrawn.",
   );
 }
 

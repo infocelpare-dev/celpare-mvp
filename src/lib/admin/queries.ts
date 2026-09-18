@@ -241,6 +241,56 @@ export async function getTool(db: SupabaseClient, id: string) {
   return data;
 }
 
+export type ToolVerification = {
+  tool_id: string;
+  owner_email: string | null;
+  canonical_domain: string | null;
+  email_domain: string | null;
+  domain_matches: boolean | null;
+  domain_verified_at: string | null;
+  domain_verified_by: string | null;
+  domain_verified_note: string | null;
+};
+
+/*
+  The owner email, which is deliberately hard to get at.
+
+  No client role holds SELECT on tools.owner_email, so this cannot be a column
+  in getTool above. It comes through tool_verification_state, a SECURITY
+  DEFINER function that allows the tool's own developer or a holder of
+  submissions.review and refuses everybody else at 42501.
+
+  THREE OUTCOMES, NOT TWO, and the distinction is the point.
+
+  The first version returned null for both "there is no owner email" and "the
+  read failed", so a dropped connection to Supabase rendered as the sentence
+  "No owner email on this submission". That is a page inventing a fact about a
+  record it could not read, and a reviewer would have sent a perfectly good
+  submission back over it. Seen happening in dev, with a real fetch failure.
+
+  An unreadable result never unlocks approval: the caller reads
+  domain_verified_at off the row, and there is no row.
+*/
+export type ToolVerificationResult =
+  | { state: "ok"; row: ToolVerification }
+  | { state: "none" }
+  | { state: "unreadable" };
+
+export async function getToolVerification(
+  db: SupabaseClient,
+  id: string,
+): Promise<ToolVerificationResult> {
+  const { data, error } = await db.rpc("tool_verification_state", { p_id: id });
+  if (error) {
+    warn("tool verification", error);
+    return { state: "unreadable" };
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as ToolVerification | undefined;
+  if (!row) return { state: "unreadable" };
+  if (!row.owner_email) return { state: "none" };
+  return { state: "ok", row };
+}
+
 export async function listModels(
   db: SupabaseClient,
   filters: CatalogueFilters,
@@ -286,6 +336,13 @@ export type Submission = {
   submitted_at: string;
   tagline: string | null;
   provider: string | null;
+  /*
+    This one cannot be approved until a reviewer records that the owner email
+    replied. The queue reads it so Approve can be off with a reason, rather
+    than throwing the reviewer at a refusal they have no way to act on from
+    here. See admin_review_submission, which is what actually refuses.
+  */
+  needs_domain_confirm: boolean;
 };
 
 type ToolQueueRow = {
@@ -296,6 +353,8 @@ type ToolQueueRow = {
   status: string;
   developer_id: string | null;
   submitted_at: string;
+  source: string;
+  domain_verified_at: string | null;
 };
 
 type ModelQueueRow = {
@@ -314,7 +373,9 @@ export async function listSubmissions(
 ): Promise<Submission[]> {
   const toolQuery = db
     .from("tools")
-    .select("id, slug, name, tagline, status, developer_id, submitted_at")
+    .select(
+      "id, slug, name, tagline, status, developer_id, submitted_at, source, domain_verified_at",
+    )
     .order("submitted_at", { ascending: true })
     .limit(100);
   const modelQuery = db
@@ -341,6 +402,13 @@ export async function listSubmissions(
       submitted_at: t.submitted_at,
       tagline: t.tagline,
       provider: null,
+      /*
+        Only a developer submission is gated. An admin seed or an import has no
+        owner to write to, and admin_review_submission does not ask one of those
+        for a confirmation either.
+      */
+      needs_domain_confirm:
+        t.source === "developer_submission" && t.domain_verified_at === null,
     })),
     ...((models.data ?? []) as ModelQueueRow[]).map((m) => ({
       kind: "model" as const,
@@ -352,6 +420,8 @@ export async function listSubmissions(
       submitted_at: m.submitted_at,
       tagline: null,
       provider: m.provider,
+      /* Models have no domain ownership check. 4T built it for tools only. */
+      needs_domain_confirm: false,
     })),
   ];
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
+import { Plus } from "lucide-react";
 import { Badge, Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { sendForReview, type DeveloperState } from "@/app/actions/developer";
@@ -45,11 +46,16 @@ const LABEL: Record<SubmissionStatus, string> = {
   rejected: "Rejected",
 };
 
+/* Pinned to UTC. Without a timeZone this formats in the runtime's own zone,
+   and the server and the browser are not always in the same one, which is a
+   real React hydration error and not a theoretical one: it happened on
+   /admin/security. Same fix as the admin When component. */
 function when(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: "UTC",
   });
 }
 
@@ -90,6 +96,25 @@ export function SubmissionList({
                   {EXPLAIN[row.status]}
                 </p>
 
+                {/*
+                  Where ownership stands, said only when it can still change
+                  anything. Once a tool is approved the question is settled, and
+                  repeating it on a live listing would be noise.
+
+                  There is no verification mail to resend: a reviewer writes to
+                  the address by hand. So this reports, and offers no button it
+                  cannot honour.
+                */}
+                {kind === "tool" && row.status !== "approved" && row.status !== "rejected" ? (
+                  <p className="mt-1 text-[13px] leading-relaxed text-muted">
+                    {(row as DeveloperTool).domain_verified_at
+                      ? "Ownership confirmed. Celpare heard back from the owner email."
+                      : row.status === "pending"
+                        ? "Ownership not confirmed yet. Celpare emails the owner address you gave, usually within 24 hours, and cannot publish this until somebody there replies."
+                        : "Ownership is confirmed after you send this for review, by email to the owner address you gave."}
+                  </p>
+                ) : null}
+
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted">
                   {kind === "model" && (row as DeveloperModel).provider ? (
                     <span>{(row as DeveloperModel).provider}</span>
@@ -107,6 +132,46 @@ export function SubmissionList({
                       className="text-[14px] underline underline-offset-4 hover:text-muted"
                     >
                       View in catalogue
+                    </Link>
+                  ) : null}
+
+                  {/* The Edit link every status message here has been telling
+                      people to use. Offered only where update_tool will
+                      actually allow it: a queued submission is waiting on a
+                      decision and a rejected one is closed. */}
+                  {kind === "tool" &&
+                  (row.status === "draft" ||
+                    row.status === "changes_required" ||
+                    row.status === "approved") ? (
+                    <Link
+                      href={`/developer/tools/${row.id}/edit`}
+                      className="text-[14px] underline underline-offset-4 hover:text-muted"
+                    >
+                      Edit
+                    </Link>
+                  ) : null}
+
+                  {/*
+                    Launching a feature, founder instruction 2026-09-18. It
+                    existed only on the public tool page, which meant the
+                    developer had to leave their own workspace and find their
+                    listing in the catalogue to announce anything.
+
+                    Approved only. The page itself accepts a draft, but a
+                    launch post on a tool nobody can see yet is an announcement
+                    to an empty room, and offering it there would read as a way
+                    to get the draft published.
+
+                    Plus, not Sparkles: Sparkles is the Verified badge in this
+                    same card, and one mark should not mean two things.
+                  */}
+                  {kind === "tool" && row.status === "approved" ? (
+                    <Link
+                      href={`/developer/tools/${row.id}/update`}
+                      className="inline-flex items-center gap-1.5 text-[14px] underline underline-offset-4 hover:text-muted"
+                    >
+                      <Plus className="size-4 shrink-0" aria-hidden />
+                      Launch a new feature
                     </Link>
                   ) : null}
 

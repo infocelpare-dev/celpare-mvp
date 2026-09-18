@@ -99,12 +99,18 @@ export function ActionForm({
 
   if (disabled) {
     return (
-      <span className="inline-flex flex-col gap-1">
+      /* items-start, so the button keeps its own width. Without it the flex
+         column stretches every child to the width of the widest, and a one
+         line reason turned a 90px button into a 417px one. The reason is
+         bounded too, so a long one wraps rather than widening the row. */
+      <span className="inline-flex flex-col items-start gap-1">
         <button type="button" className={button} disabled aria-disabled>
           {label}
         </button>
         {disabledReason ? (
-          <span className="text-[11px] leading-snug text-muted">{disabledReason}</span>
+          <span className="max-w-[34ch] text-[11px] leading-snug text-muted">
+            {disabledReason}
+          </span>
         ) : null}
       </span>
     );

@@ -1,4 +1,4 @@
-import { ButtonLink } from "@/components/ui/button";
+import { NoticeCard } from "@/components/developer/notice-card";
 
 /*
   A section that is coming, said plainly.
@@ -9,6 +9,9 @@ import { ButtonLink } from "@/components/ui/button";
 
   Same reasoning as defect F4, which was nav items leading nowhere: the answer
   there was pages that name themselves and say which phase fills them.
+
+  The card itself lives in notice-card.tsx, because a paused section needs the
+  same card and is not the same thing as an unbuilt one.
 */
 export function ComingSoon({
   what,
@@ -22,16 +25,11 @@ export function ComingSoon({
   backLabel: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border px-6 py-14 text-center">
-      <p className="font-display text-[19px] font-semibold">{what}</p>
-      <p className="mx-auto mt-3 max-w-[48ch] text-[15px] leading-relaxed text-muted">
-        {detail}
-      </p>
-      <div className="mt-6">
-        <ButtonLink href={backHref} variant="outline" size="sm">
-          {backLabel}
-        </ButtonLink>
-      </div>
-    </div>
+    <NoticeCard
+      title={what}
+      detail={detail}
+      backHref={backHref}
+      backLabel={backLabel}
+    />
   );
 }

@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/admin/guard";
-import { getTool, listModerationActions, profilesByIds } from "@/lib/admin/queries";
-import { reviewSubmission, setToolVerified } from "@/app/actions/admin";
+import {
+  getTool,
+  getToolVerification,
+  listModerationActions,
+  profilesByIds,
+} from "@/lib/admin/queries";
+import { confirmToolDomain, reviewSubmission, setToolVerified } from "@/app/actions/admin";
 import { ActionForm } from "@/components/admin/action-form";
 import {
   EmptyState,
@@ -66,10 +71,21 @@ export default async function AdminToolDetailPage({
   const tool = (await getTool(session.db, id)) as ToolRecord | null;
   if (!tool) notFound();
 
-  const [owners, history] = await Promise.all([
+  const [owners, history, verification] = await Promise.all([
     profilesByIds(session.db, [tool.developer_id]),
     listModerationActions(session.db, { entityType: "tool", entityId: tool.id }),
+    getToolVerification(session.db, tool.id),
   ]);
+
+  /* Only a developer submission needs an owner confirmed. A seeded row has no
+     developer claiming it, so there is nobody to write to and nothing to
+     prove. */
+  const needsOwner = tool.source === "developer_submission";
+  /* Named for the record it is, not for the person. `owner` a line below is the
+     developer's profile, which is a different thing entirely. */
+  const ownership = verification.state === "ok" ? verification.row : null;
+  const domainConfirmed = Boolean(ownership?.domain_verified_at);
+  const canApprove = !needsOwner || domainConfirmed;
   const owner = tool.developer_id ? owners.get(tool.developer_id) : null;
 
   const categories = (tool.tool_categories ?? [])
@@ -257,6 +273,99 @@ export default async function AdminToolDetailPage({
             </FieldList>
           </Section>
 
+          {needsOwner ? (
+            <Section title="Domain ownership">
+              <div className="rounded-xl border border-border p-4">
+                {ownership ? (
+                  <>
+                    <FieldList>
+                      <Field label="Owner email">
+                        {/* A mailto rather than a copy button, because the whole
+                            point is that a person writes to this address. */}
+                        <a
+                          href={`mailto:${ownership.owner_email}?subject=${encodeURIComponent(
+                            `Celpare: confirming ${tool.name}`,
+                          )}`}
+                          className="font-mono text-[13px] underline underline-offset-2"
+                        >
+                          {ownership.owner_email}
+                        </a>
+                      </Field>
+                      <Field label="Tool domain">
+                        <span className="font-mono text-[13px]">
+                          {ownership.canonical_domain ?? "None given"}
+                        </span>
+                      </Field>
+                      <Field label="Domains match">
+                        {ownership.domain_matches ? "Yes" : "No"}
+                      </Field>
+                      <Field label="Confirmed">
+                        {ownership.domain_verified_at ? (
+                          <When iso={ownership.domain_verified_at} time />
+                        ) : (
+                          "Not yet"
+                        )}
+                      </Field>
+                    </FieldList>
+
+                    {ownership.domain_verified_note ? (
+                      <p className="mt-3 text-[13px] leading-relaxed text-muted">
+                        {ownership.domain_verified_note}
+                      </p>
+                    ) : null}
+
+                    <p className="mt-3 text-[13px] leading-relaxed text-muted">
+                      Celpare sends no verification mail. Write to the address
+                      above, and press this once somebody there confirms they
+                      are authorized. A developer submission cannot be approved
+                      until you do.
+                    </p>
+
+                    <div className="mt-3">
+                      <ActionForm
+                        action={confirmToolDomain}
+                        fields={{ id: tool.id, confirmed: domainConfirmed ? "no" : "yes" }}
+                        label={domainConfirmed ? "Withdraw confirmation" : "Owner replied, confirm"}
+                        tone={domainConfirmed ? "danger" : "primary"}
+                        /* Required, and this is the only record that the reply
+                           happened. There is no verification mail and no token
+                           to point at afterwards, so if this note is not
+                           written the confirmation is one person's memory. */
+                        requireReason
+                        reasonLabel="Who replied, and what they said"
+                        reasonHint="This is the only evidence the confirmation happened. It goes in the audit log and cannot be edited later."
+                        confirm={{
+                          title: domainConfirmed
+                            ? "Withdraw the confirmation?"
+                            : `Confirm ${ownership.owner_email} replied?`,
+                          body: domainConfirmed
+                            ? "The tool can no longer be approved until it is confirmed again. An approved listing stays approved."
+                            : "This records that somebody at the tool's own domain confirmed this submission, and unlocks approval.",
+                          confirmLabel: domainConfirmed ? "Withdraw" : "Confirm ownership",
+                        }}
+                      />
+                    </div>
+                  </>
+                ) : verification.state === "none" ? (
+                  <p className="text-[13px] leading-relaxed text-muted">
+                    No owner email on this submission. It predates the
+                    requirement, so there is nobody to write to. Send it back
+                    and ask for a work address on the tool&apos;s own domain.
+                  </p>
+                ) : (
+                  /* The read failed. Saying "no owner email" here would be the
+                     page inventing a fact about a record it could not open,
+                     and a reviewer would reject a good submission over it. */
+                  <p className="text-[13px] leading-relaxed text-muted">
+                    Could not read the ownership record just now. This says
+                    nothing about the submission: reload the page. Approval
+                    stays locked until it can be read and confirmed.
+                  </p>
+                )}
+              </div>
+            </Section>
+          ) : null}
+
           <Section title="Decision">
             <div className="flex flex-col gap-3">
               {tool.status === "approved" ? (
@@ -279,6 +388,11 @@ export default async function AdminToolDetailPage({
                     fields={{ kind: "tool", id: tool.id, decision: "approve" }}
                     label="Approve and publish"
                     tone="primary"
+                    /* The database refuses this too, at admin_review_submission.
+                       Disabling it here only saves the reviewer a round trip to
+                       be told something the page already knows. */
+                    disabled={!canApprove}
+                    disabledReason="Confirm the owner email replied first. Domain ownership is above."
                     confirm={{
                       title: `Publish ${tool.name}?`,
                       body: "It becomes visible to everyone, including signed out visitors, and can be recommended by Ask Celpare.",
