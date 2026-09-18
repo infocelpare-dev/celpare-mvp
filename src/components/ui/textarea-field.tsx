@@ -67,7 +67,7 @@ export function TextareaField({
         aria-invalid={invalid || over || undefined}
         aria-describedby={hint ? `${id}-hint` : undefined}
         className={cn(
-          "min-h-[104px] w-full resize-y rounded-xl border border-border bg-background px-4 py-3 text-[15px] text-foreground placeholder:text-muted disabled:opacity-50",
+          "min-h-[104px] w-full resize-y rounded-xl border border-border bg-background px-4 py-3 text-[16px] sm:text-[15px] text-foreground placeholder:text-muted disabled:opacity-50",
           (invalid || over) && "border-foreground",
         )}
         {...props}

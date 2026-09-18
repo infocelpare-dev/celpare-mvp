@@ -4,8 +4,20 @@ import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/*
+  16px ON A PHONE, 15px FROM sm UP.
+
+  iOS Safari zooms the whole page whenever a focused input computes to less
+  than 16px, and it does not zoom back out afterwards. At 15px that fired on
+  every field of every form on the site: sign in, sign up, profile edit, the
+  fifteen field tool submission. The page ends up wider than the screen and
+  stays there, which is the "blocked on mobile" the founder asked about on
+  2026-09-18.
+
+  The desktop design is untouched: the bump applies below sm only.
+*/
 const inputBase =
-  "h-11 w-full rounded-xl border border-border bg-background px-4 text-[15px] text-foreground placeholder:text-muted disabled:opacity-50";
+  "h-11 w-full rounded-xl border border-border bg-background px-4 text-[16px] sm:text-[15px] text-foreground placeholder:text-muted disabled:opacity-50";
 
 export function Field({
   id,
@@ -108,14 +120,19 @@ export function PasswordField({
   alongside the inline aria-invalid state on the field itself.
 */
 export function FormAlert({
+  id,
   tone = "error",
   children,
 }: {
+  /* Optional, and only needed by a form long enough that focus has to be moved
+     here after a failed submit. tabIndex is already -1 for exactly that. */
+  id?: string;
   tone?: "error" | "success";
   children: React.ReactNode;
 }) {
   return (
     <div
+      id={id}
       role="alert"
       tabIndex={-1}
       className={cn(

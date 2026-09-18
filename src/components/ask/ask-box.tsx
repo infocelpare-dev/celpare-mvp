@@ -37,7 +37,8 @@ export function AskBox({ autoFocus = false }: { autoFocus?: boolean }) {
           autoFocus={autoFocus}
           onChange={(e) => setValue(e.target.value)}
           placeholder="What are you trying to do?"
-          className="min-w-0 flex-1 bg-transparent px-2 py-2 text-[15px] outline-none placeholder:text-muted"
+          /* 16px below sm, or iOS zooms the page on focus and never returns. */
+          className="min-w-0 flex-1 bg-transparent px-2 py-2 text-[16px] outline-none placeholder:text-muted sm:text-[15px]"
         />
         <Button type="submit" size="sm" aria-label="Ask Celpare" className="aspect-square shrink-0 px-0">
           <ArrowUp className="size-4" aria-hidden />
