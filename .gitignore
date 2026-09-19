@@ -57,3 +57,7 @@ CLAUDE.md
 AGENTS.md
 TRACKER.md
 docs/
+
+# Design tool scratch output. 2.9MB of generated canvas files for the tool
+# profile, referenced by nothing in src. Kept on disk, off the public repo.
+/design/
