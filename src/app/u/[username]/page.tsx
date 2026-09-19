@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Container } from "@/components/ui/container";
 import { personName } from "@/lib/format";
+import { getViewerState } from "@/lib/community/queries";
 import { BackLink } from "@/components/ui/back-link";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
@@ -94,6 +95,16 @@ export default async function PublicProfilePage({
     isFollowing(sessionClient, user?.id ?? null, profile.id),
   ]);
 
+  /* Read through the SESSION client, never the anon one: this is what the
+     viewer has liked and saved, which is nobody's business but theirs.
+     getViewerState returns an empty set for a signed out visitor rather than
+     asking at all. */
+  const viewer = await getViewerState(
+    sessionClient,
+    user?.id ?? null,
+    (rows.posts ?? []).map((p) => p.id),
+  );
+
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn={signedIn}
@@ -113,6 +124,7 @@ export default async function PublicProfilePage({
           activeTab={activeTab}
           rows={rows}
           featuredTools={featuredTools}
+          viewer={viewer}
           basePath={`/u/${profile.username}`}
         />
       </Container>

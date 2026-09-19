@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Bookmark, Heart, MessageCircle } from "lucide-react";
+import { Bookmark, Check, Heart, MessageCircle, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCount } from "@/lib/format";
 import { toggleLike, toggleSave } from "@/app/actions/community";
@@ -55,7 +55,43 @@ export function PostActions({
   const [saveOn, setSaveOn] = useState(saved);
   const [saves, setSaves] = useState(saveCount);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  /*
+    Share, founder instruction 2026-09-19. Same shape as the tool page's:
+    the native sheet where there is one, the clipboard where there is not.
+
+    THE URL IS BUILT AT PRESS TIME, not at render. NEXT_PUBLIC_SITE_URL is the
+    canonical address and is what a share should carry, so a link shared from a
+    page reached with tracking parameters still hands over the clean one. When
+    it is unset, as it is in development, window.location.origin stands in,
+    and reading that during render rather than on press would be a server and
+    client mismatch of exactly the kind 4AG.3 shipped once already.
+
+    A cancelled share sheet and a blocked clipboard both land in the catch and
+    neither is an error worth showing. A SUCCESSFUL copy says so: the ux
+    guidance rates a silent success a defect, and a copy is invisible by
+    nature, so the icon becomes a tick for two seconds.
+  */
+  async function onShare() {
+    const base =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      (typeof window === "undefined" ? "" : window.location.origin);
+    const url = `${base}${href}`;
+
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* Cancelled, or the clipboard is blocked. Neither is worth a message. */
+    }
+  }
 
   function onLike() {
     const next = !likeOn;
@@ -146,6 +182,33 @@ export function PostActions({
             <Bookmark className="size-[18px]" aria-hidden />
           </SignInAction>
         )}
+
+        {/*
+          Share is open to everybody, signed in or not. It writes nothing and
+          asks the database for nothing, so gating it behind an account would
+          be a control refusing to do something it is perfectly able to do.
+          It carries no count, because a share is not counted: counting one
+          would need tracking that does not exist, and a number nothing
+          maintains is the invented metric D13 and D30 rule out.
+        */}
+        <button
+          type="button"
+          onClick={onShare}
+          className="inline-flex h-11 min-w-11 cursor-pointer items-center justify-center gap-1.5 rounded-full px-3 text-[13px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
+        >
+          {copied ? (
+            <Check className="size-[18px]" aria-hidden />
+          ) : (
+            <Share2 className="size-[18px]" aria-hidden />
+          )}
+          <span className="sr-only">Share this post</span>
+        </button>
+
+        {/* The confirmation, announced as well as drawn. aria-live rather than
+            role=alert: a copied link is not an error. */}
+        <span role="status" aria-live="polite" className="text-[13px] text-muted">
+          {copied ? "Link copied" : ""}
+        </span>
       </div>
 
       {/* role=alert, because the ux guidance rates a visual only error High.

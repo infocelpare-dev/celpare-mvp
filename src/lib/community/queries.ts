@@ -34,7 +34,11 @@ const AUTHOR_COLUMNS = "id, username, full_name, avatar_url";
    table name. posts has two foreign keys into different tables and comments
    has two as well, so an ambiguous embed is a runtime error PostgREST reports
    and TypeScript cannot see. */
-const POST_SELECT =
+/* Exported, because the profile's Posts, Media, Reposts, Liked and Saved
+   tabs render the same PostCard the feed does and therefore need the same
+   shape. One select string, so a column added for the feed cannot quietly
+   be missing on a profile. */
+export const POST_SELECT =
   POST_COLUMNS +
   ", author:profiles!posts_author_id_fkey(" +
   AUTHOR_COLUMNS +

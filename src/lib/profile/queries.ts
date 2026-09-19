@@ -1,5 +1,6 @@
 import { createClient, createAnonClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { POST_SELECT, type FeedPost } from "@/lib/community/queries";
 
 /*
   Every profile read lives here, so there is one place that knows which columns
@@ -176,17 +177,17 @@ export async function isFollowing(
   return Boolean(data);
 }
 
-export type PostRow = {
-  id: string;
-  body: string;
-  link_url: string | null;
-  created_at: string;
-  like_count: number;
-  comment_count: number;
-  save_count: number;
-  repost_count: number;
-  status: string;
-};
+/*
+  A post on a profile IS a post in the feed. Founder instruction 2026-09-19:
+  the Posts tab was showing a stripped summary with no author, no media, no
+  attachment and no actions, because this type and its query were written in
+  4K, before the feed existed.
+
+  So PostRow is now FeedPost, and the tabs render the same PostCard. The alias
+  stays rather than being renamed across five call sites, and points at the one
+  definition so the two cannot drift again.
+*/
+export type PostRow = FeedPost;
 
 export type CommentRow = {
   id: string;
@@ -231,9 +232,6 @@ export type RecentRow = {
   detail: string | null;
 };
 
-const POST_COLUMNS =
-  "id, body, link_url, created_at, like_count, comment_count, save_count, repost_count, status";
-
 const PAGE_SIZE = 20;
 
 /*
@@ -258,7 +256,7 @@ export async function getTabRows(
     case "posts": {
       let q = db
         .from("posts")
-        .select(POST_COLUMNS)
+        .select(POST_SELECT)
         .eq("author_id", profile.id)
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
@@ -268,21 +266,33 @@ export async function getTabRows(
          owed, and there is no notification path yet to tell them otherwise. */
       if (!isOwner) q = q.eq("status", "visible");
       const { data } = await q;
-      return { posts: (data as PostRow[]) ?? [] };
+      return { posts: (data as unknown as FeedPost[]) ?? [] };
     }
 
     case "media": {
+      /*
+        MEDIA MEANS MEDIA. This filtered on `link_url is not null` until
+        2026-09-19, which was right when a post could only ever carry a link
+        and wrong the moment 4AE gave posts real images and video: a plain
+        link post was listed under an image icon, and an actual photo was not
+        listed at all.
+
+        It filters on `kind` rather than joining post_media, because kind is
+        DERIVED from the attachments by createPost and is a plain indexed
+        column. The join would ask the same question the derivation already
+        answered.
+      */
       let q = db
         .from("posts")
-        .select(POST_COLUMNS)
+        .select(POST_SELECT)
         .eq("author_id", profile.id)
         .is("deleted_at", null)
-        .not("link_url", "is", null)
+        .in("kind", ["image", "video"])
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
       if (!isOwner) q = q.eq("status", "visible");
       const { data } = await q;
-      return { posts: (data as PostRow[]) ?? [] };
+      return { posts: (data as unknown as FeedPost[]) ?? [] };
     }
 
     case "replies": {
@@ -301,37 +311,37 @@ export async function getTabRows(
     case "reposts": {
       const { data } = await db
         .from("reposts")
-        .select(`created_at, posts!inner(${POST_COLUMNS})`)
+        .select(`created_at, posts!inner(${POST_SELECT})`)
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
       /* The join is what makes a repost of a removed post disappear: the inner
          join hits `posts`, and posts RLS already hides it. That is the whole
          argument for reposts being their own table. */
-      const rows = (data ?? []) as unknown as { posts: PostRow }[];
+      const rows = (data ?? []) as unknown as { posts: FeedPost }[];
       return { posts: rows.map((r) => r.posts).filter(Boolean) };
     }
 
     case "liked": {
       const { data } = await db
         .from("likes")
-        .select(`created_at, posts!inner(${POST_COLUMNS})`)
+        .select(`created_at, posts!inner(${POST_SELECT})`)
         .eq("user_id", profile.id)
         .eq("entity_type", "post")
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
-      const rows = (data ?? []) as unknown as { posts: PostRow }[];
+      const rows = (data ?? []) as unknown as { posts: FeedPost }[];
       return { posts: rows.map((r) => r.posts).filter(Boolean) };
     }
 
     case "saved": {
       const { data } = await db
         .from("saves")
-        .select(`created_at, posts!inner(${POST_COLUMNS})`)
+        .select(`created_at, posts!inner(${POST_SELECT})`)
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
-      const rows = (data ?? []) as unknown as { posts: PostRow }[];
+      const rows = (data ?? []) as unknown as { posts: FeedPost }[];
       return { posts: rows.map((r) => r.posts).filter(Boolean) };
     }
 
@@ -437,4 +447,68 @@ export async function getFeaturedTools(
     .order("sort_order", { ascending: true });
   const rows = (data ?? []) as unknown as { tools: ToolRow }[];
   return rows.map((r) => r.tools).filter(Boolean);
+}
+
+/*
+  Who follows somebody, and who they follow. Founder instruction 2026-09-19:
+  the counts were text, and a count you cannot open is a fact with no answer
+  behind it.
+
+  RLS IS THE CONTROL AND IT IS STRICTER THAN THE LABEL, which is worth knowing
+  before reading an empty list as a bug. follows_select_all admits a row when
+  the reader is either side of it, OR when BOTH profiles share follows. So:
+
+  - Your own lists always come back in full, because you are one side of every
+    row in them.
+  - A stranger reading somebody else's list gets only the rows where the person
+    on the other end also shares. A follower who has gone private is absent
+    rather than rendered as a locked placeholder, because a placeholder would
+    republish the fact that they follow, which is the thing being hidden.
+
+  The count on the profile is a plain column on `profiles` and is not filtered
+  the same way, so a list can be shorter than the number above it. That gap is
+  real and is G46 rather than something this query should paper over by
+  inventing rows it cannot read.
+*/
+export type FollowPerson = {
+  id: string;
+  username: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+};
+
+const FOLLOW_PERSON_COLUMNS = "id, username, full_name, avatar_url, bio";
+
+export async function getFollowers(
+  db: SupabaseClient,
+  profileId: string,
+): Promise<FollowPerson[]> {
+  const { data } = await db
+    .from("follows")
+    /* Spelled with the constraint name. `follows` has two foreign keys into
+       profiles, so an unqualified embed is a runtime error PostgREST reports
+       and TypeScript cannot see, the same trap POST_SELECT documents. */
+    .select(`created_at, person:profiles!follows_follower_id_fkey(${FOLLOW_PERSON_COLUMNS})`)
+    .eq("following_id", profileId)
+    .order("created_at", { ascending: false })
+    .limit(PAGE_SIZE);
+
+  const rows = (data ?? []) as unknown as { person: FollowPerson | null }[];
+  return rows.map((r) => r.person).filter((p): p is FollowPerson => Boolean(p));
+}
+
+export async function getFollowing(
+  db: SupabaseClient,
+  profileId: string,
+): Promise<FollowPerson[]> {
+  const { data } = await db
+    .from("follows")
+    .select(`created_at, person:profiles!follows_following_id_fkey(${FOLLOW_PERSON_COLUMNS})`)
+    .eq("follower_id", profileId)
+    .order("created_at", { ascending: false })
+    .limit(PAGE_SIZE);
+
+  const rows = (data ?? []) as unknown as { person: FollowPerson | null }[];
+  return rows.map((r) => r.person).filter((p): p is FollowPerson => Boolean(p));
 }

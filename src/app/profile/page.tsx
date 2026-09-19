@@ -7,6 +7,7 @@ import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { ProfileView } from "@/components/profile/profile-view";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { getViewerState } from "@/lib/community/queries";
 import {
   getFeaturedTools,
   getProfileById,
@@ -59,6 +60,15 @@ export default async function ProfilePage({
     supabase.rpc("my_submission_count"),
   ]);
 
+  /* Second round trip on purpose: it needs the ids the first one returned.
+     A post on a profile renders liked and saved the way it does in the feed
+     rather than blank, which is what a person who just liked it expects. */
+  const viewer = await getViewerState(
+    supabase,
+    user.id,
+    (rows.posts ?? []).map((p) => p.id),
+  );
+
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn
@@ -84,6 +94,7 @@ export default async function ProfilePage({
           activeTab={activeTab}
           rows={rows}
           featuredTools={featuredTools}
+          viewer={viewer}
           basePath="/profile"
           submissionCount={Number(submissions.data ?? 0)}
         />

@@ -6,11 +6,13 @@ import { Badge, Card, ChipLink } from "@/components/ui/card";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Tabs, type TabIconName, type TabItem } from "@/components/ui/tabs";
 import { formatCount, personName } from "@/lib/format";
+import { PostCard } from "@/components/community/post-card";
 import { FollowButton } from "@/components/profile/follow-button";
 import { MessageButton } from "@/components/profile/message-button";
 import { DeveloperModeToggle } from "@/components/profile/developer-mode-toggle";
 import { ClearRecent } from "@/components/profile/clear-recent";
 import { RecentList } from "@/components/profile/recent-list";
+import type { ViewerState } from "@/lib/community/queries";
 import type {
   CollectionRow,
   CommentRow,
@@ -104,6 +106,7 @@ export function ProfileView({
   activeTab,
   rows,
   featuredTools,
+  viewer,
   basePath,
   submissionCount = 0,
 }: {
@@ -122,6 +125,11 @@ export function ProfileView({
     recent?: RecentRow[];
   };
   featuredTools: ToolRow[];
+  /* What the viewer has already liked and saved among these posts, so a post
+     on a profile arrives in the same state it has in the feed rather than
+     rendering unliked and flickering. Empty for a signed out visitor, which
+     is also what the policies would return. */
+  viewer: ViewerState;
   basePath: string;
   /* Owner only, and only used to explain why Developer Mode is locked. */
   submissionCount?: number;
@@ -311,22 +319,40 @@ export function ProfileView({
             properly means moving profile reads behind a view, tracked as G46
             rather than half done here.
           */}
+          {/*
+            THE COUNTS OPEN THE LISTS. Founder instruction 2026-09-19: they
+            were text, and a count you cannot open states a fact with no answer
+            behind it. Real URLs rather than a tab or a modal, so a list can be
+            linked to and survives a reload, which is the same call the
+            composer made in 4.12.
+
+            They are links for everybody who can see the counts at all, the
+            owner included: your own followers are the list you most want to
+            read, and RLS gives you every row of it because you are one side of
+            each.
+          */}
           {showFollows ? (
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[14px]">
-              <span>
+              <Link
+                href={`/u/${profile.username}/following`}
+                className="transition-colors duration-200 ease-out hover:text-foreground"
+              >
                 <strong className="font-medium tabular-nums">
                   {formatCount(profile.following_count)}
                 </strong>{" "}
                 <span className="text-muted">Following</span>
-              </span>
-              <span>
+              </Link>
+              <Link
+                href={`/u/${profile.username}/followers`}
+                className="transition-colors duration-200 ease-out hover:text-foreground"
+              >
                 <strong className="font-medium tabular-nums">
                   {formatCount(profile.follower_count)}
                 </strong>{" "}
                 <span className="text-muted">
                   {profile.follower_count === 1 ? "Follower" : "Followers"}
                 </span>
-              </span>
+              </Link>
             </div>
           ) : null}
         </div>
@@ -422,6 +448,8 @@ export function ProfileView({
             rows={rows}
             isOwner={isOwner}
             displayName={displayName}
+            viewer={viewer}
+            viewerSignedIn={viewerSignedIn}
           />
         </div>
       </div>
@@ -516,50 +544,39 @@ function ModelCard({ model }: { model: ModelRow }) {
   );
 }
 
-function PostList({ posts }: { posts: PostRow[] }) {
+/*
+  Posts on a profile are THE SAME CARD the feed renders. Founder instruction
+  2026-09-19.
+
+  What was here before was written in Phase 4K, months of work before the feed
+  existed, and it showed: a bordered summary with the body, a relative time and
+  three counts as words. No author, no topic, no image, no attached tool, no
+  way to like or save, and the only link was the timestamp. A person who wrote
+  a post in the feed and then opened their own profile saw something that did
+  not look like what they had written.
+
+  It also carried two defects that simply stop existing now: "1 comments", and
+  a card that could not be opened except by the one word that happened to be a
+  link.
+
+  PostCard is a server component, so nothing about this makes the profile a
+  client page. The actions inside it are the client boundary, exactly as in
+  the feed.
+*/
+function PostList({
+  posts,
+  viewer,
+  signedIn,
+}: {
+  posts: PostRow[];
+  viewer: ViewerState;
+  signedIn: boolean;
+}) {
   return (
-    <ul className="space-y-3">
+    <ul className="-mx-4 border-t border-border sm:-mx-5">
       {posts.map((post) => (
         <li key={post.id}>
-          <Card className="p-4 sm:p-5">
-            <div className="flex items-center gap-2 text-[13px] text-muted">
-              <Link href={`/community/${post.id}`} className="hover:text-foreground">
-                {relative(post.created_at)}
-              </Link>
-              {/* Only the owner ever sees this, and only because posts_select_own
-                  lets them. Being told is better than quietly disappearing. */}
-              {post.status !== "visible" ? (
-                <Badge>{post.status === "hidden" ? "Hidden, under review" : "Removed"}</Badge>
-              ) : null}
-            </div>
-
-            <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed">
-              {post.body}
-            </p>
-
-            {post.link_url ? (
-              <a
-                href={post.link_url}
-                target="_blank"
-                rel="noopener noreferrer nofollow ugc"
-                className="mt-3 inline-flex items-center gap-1.5 text-[14px] text-foreground underline underline-offset-4 hover:text-muted"
-              >
-                <Link2 className="size-4 shrink-0" aria-hidden />
-                {hostOf(post.link_url)}
-              </a>
-            ) : null}
-
-            {/* Counts are hidden at zero, per 10-community.md section 9. */}
-            <div className="mt-3 flex gap-4 text-[13px] text-muted">
-              {post.like_count > 0 ? <span>{formatCount(post.like_count)} likes</span> : null}
-              {post.comment_count > 0 ? (
-                <span>{formatCount(post.comment_count)} comments</span>
-              ) : null}
-              {post.repost_count > 0 ? (
-                <span>{formatCount(post.repost_count)} reposts</span>
-              ) : null}
-            </div>
-          </Card>
+          <PostCard post={post} viewer={viewer} signedIn={signedIn} />
         </li>
       ))}
     </ul>
@@ -582,6 +599,8 @@ function TabPanel({
   rows,
   isOwner,
   displayName,
+  viewer,
+  viewerSignedIn,
 }: {
   tab: TabKey;
   rows: {
@@ -594,6 +613,8 @@ function TabPanel({
   };
   isOwner: boolean;
   displayName: string;
+  viewer: ViewerState;
+  viewerSignedIn: boolean;
 }) {
   const who = isOwner ? "You have" : `${displayName} has`;
 
@@ -737,7 +758,7 @@ function TabPanel({
   if (posts.length === 0) {
     const detail: Record<string, string> = {
       posts: `${who} not posted anything yet.`,
-      media: `${who} not shared any links yet. Posts that carry a link show up here.`,
+      media: `${who} not posted a picture or a video yet.`,
       reposts: `${who} not reposted anything yet.`,
       liked: "Posts you like are kept here, and only you can see this list.",
       saved: "Posts you save are kept here, and only you can see this list.",
@@ -749,5 +770,5 @@ function TabPanel({
       />
     );
   }
-  return <PostList posts={posts} />;
+  return <PostList posts={posts} viewer={viewer} signedIn={viewerSignedIn} />;
 }
