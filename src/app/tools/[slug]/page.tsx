@@ -118,14 +118,22 @@ function Logo({ tool }: { tool: ToolProfile }) {
       <img
         src={tool.logo_url}
         alt=""
-        className="size-16 shrink-0 rounded-2xl border border-border bg-background object-contain p-1"
+        /*
+          A circle, founder instruction 2026-09-19. object-contain stays and
+          the padding goes up a step: a circle clips its corners, so a wide
+          wordmark inside a squared box would lose its ends. Contained and
+          inset, the whole mark sits inside the circle instead.
+        */
+        className="size-16 shrink-0 rounded-full border border-border bg-background object-contain p-2"
       />
     );
   }
   return (
     <span
       aria-hidden
-      className="flex size-16 shrink-0 items-center justify-center rounded-2xl border border-border bg-surface font-display text-[26px] font-semibold text-muted"
+      /* The fallback matches the shape, or a tool with no logo would be the
+         one square mark on a page of circles. */
+      className="flex size-16 shrink-0 items-center justify-center rounded-full border border-border bg-surface font-display text-[26px] font-semibold text-muted"
     >
       {tool.name.trim().charAt(0).toUpperCase()}
     </span>

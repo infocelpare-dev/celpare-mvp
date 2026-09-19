@@ -6,6 +6,7 @@ import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { BackLink } from "@/components/ui/back-link";
 import { Avatar } from "@/components/ui/avatar";
+import { personName } from "@/lib/format";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getMessages, getThread } from "@/lib/messages/queries";
 import { markThreadRead } from "@/app/actions/messages";
@@ -54,7 +55,8 @@ export default async function ThreadPage({ params }: PageProps<"/messages/[id]">
      request and would otherwise still show the unread dot. */
   await markThreadRead(id);
 
-  const who = thread.other?.username ? `@${thread.other.username}` : "Someone";
+  /* The name, not the handle. Founder instruction 2026-09-19. */
+  const who = thread.other ? personName(thread.other) : "Someone";
 
   return (
     <AppShell
@@ -70,6 +72,7 @@ export default async function ThreadPage({ params }: PageProps<"/messages/[id]">
           <div className="flex items-center gap-3">
             <Avatar
               size="md"
+              fullName={thread.other?.full_name}
               username={thread.other?.username}
               avatarUrl={thread.other?.avatar_url}
               className="shrink-0"

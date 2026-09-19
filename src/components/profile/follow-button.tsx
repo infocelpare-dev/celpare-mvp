@@ -52,9 +52,24 @@ export function FollowButton({
 
   return (
     <div className="flex flex-col items-end gap-1">
+      {/*
+        THE OPTIMISTIC UPDATE HAPPENS INSIDE THE ACTION, NOT IN onSubmit.
+
+        This is the bug the founder saw as an error on every follow. React runs
+        onSubmit BEFORE it starts the transition that wraps a form action, so
+        setting optimistic state there is a state update outside a transition,
+        which React 19 throws on: "An optimistic state update occurred outside
+        a transition or action". It threw before the request was ever sent.
+
+        A function passed as `action` is itself run inside that transition, so
+        the update and the dispatch are in the same one. Same family as the
+        note in RESUME section 9 about useActionState's dispatch.
+      */}
       <form
-        action={action}
-        onSubmit={() => setOptimistic(!optimistic)}
+        action={(formData: FormData) => {
+          setOptimistic(!optimistic);
+          action(formData);
+        }}
       >
         <input type="hidden" name="targetId" value={targetId} />
         <input type="hidden" name="intent" value={next} />

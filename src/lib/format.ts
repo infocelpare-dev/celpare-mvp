@@ -18,6 +18,34 @@ export function formatCount(n: number): string {
 }
 
 /*
+  What we call somebody, everywhere outside their own profile page.
+
+  Founder instruction 2026-09-19, which reverses the instruction of the same
+  morning that made the handle the only identity: THE NAME COMES BACK, and the
+  @username is seen by whoever opens the profile rather than being repeated on
+  every card in the feed.
+
+  So this is the one definition of the public name, and the only place the
+  handle is rendered beside it is the profile header itself.
+
+  It falls back to the handle rather than to "Someone", because full_name is
+  nullable: an email signup never supplies one and a person can clear it. A
+  post with no name against it would read as authorless.
+*/
+export function personName(person: {
+  full_name?: string | null;
+  username?: string | null;
+}): string {
+  const name = person.full_name?.trim();
+  if (name) return name;
+
+  const handle = person.username?.trim();
+  if (handle) return `@${handle}`;
+
+  return "Someone";
+}
+
+/*
   Bytes, for the storage panel.
 
   Binary units, because that is what a storage bucket's own size limit is

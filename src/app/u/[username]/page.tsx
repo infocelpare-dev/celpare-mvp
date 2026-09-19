@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Container } from "@/components/ui/container";
+import { BackLink } from "@/components/ui/back-link";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
@@ -94,6 +95,11 @@ export default async function PublicProfilePage({
       signedIn={signedIn}
     >
       <Container className="max-w-[720px] py-10 sm:py-14">
+        {/* The way back to the feed, founder instruction 2026-09-19. Public,
+            because the feed is (D32), so a signed out visitor who landed here
+            from a post has the same exit. */}
+        <BackLink href="/community" label="Back to the feed" className="mb-6" />
+
         <ProfileView
           profile={profile}
           isOwner={isOwner}

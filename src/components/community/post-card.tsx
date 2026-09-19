@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Link2 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/card";
-import { hostOf, relativeTime } from "@/lib/format";
+import { hostOf, personName, relativeTime } from "@/lib/format";
 import type { FeedPost, ViewerState } from "@/lib/community/queries";
 import { PostActions } from "./post-actions";
 import { PostAttachment, PostKindBadge, PostMediaGallery } from "./post-media";
@@ -38,18 +38,22 @@ export function PostCard({
   const author = post.author;
 
   /*
-    PEOPLE ARE IDENTIFIED BY @username AND NOTHING ELSE. Founder instruction
-    2026-09-19. The real name used to lead the byline and fall back to the
-    handle; now the handle is the only thing shown. `full_name` is still stored
-    and still comes from an OAuth provider, but no public surface renders it.
+    THE BYLINE IS THE NAME. Founder instruction 2026-09-19, reversing the
+    instruction of the same morning that had made the handle the only identity.
+
+    The @username is not repeated here: it is what somebody sees when they open
+    the profile. personName falls back to the handle when full_name is empty,
+    so a byline is never blank.
   */
   const handle = author?.username ?? null;
+  const name = author ? personName(author) : "Someone";
 
   return (
     <article className="border-b border-border px-4 py-4 sm:px-5 sm:py-5">
       <div className="flex gap-3">
         <Link href={author ? `/u/${author.username}` : href} className="shrink-0">
           <Avatar
+            fullName={author?.full_name}
             username={author?.username}
             avatarUrl={author?.avatar_url}
             size="md"
@@ -66,10 +70,10 @@ export function PostCard({
                 href={`/u/${handle}`}
                 className="font-medium text-foreground hover:underline hover:underline-offset-4"
               >
-                @{handle}
+                {name}
               </Link>
             ) : (
-              <span className="font-medium">Someone</span>
+              <span className="font-medium">{name}</span>
             )}
 
             <span className="text-[13px] text-muted" aria-hidden>

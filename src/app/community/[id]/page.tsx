@@ -10,7 +10,7 @@ import { Container } from "@/components/ui/container";
 import { BackLink } from "@/components/ui/back-link";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/card";
-import { hostOf, relativeTime } from "@/lib/format";
+import { hostOf, personName, relativeTime } from "@/lib/format";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import {
   getComments,
@@ -51,7 +51,7 @@ export async function generateMetadata({
     return { title: "Post", robots: { index: false, follow: false } };
   }
 
-  const who = post.author?.username ? `@${post.author.username}` : "Someone";
+  const who = post.author ? personName(post.author) : "Someone";
   /* The body is somebody else's text going into a meta tag. Trimmed to a
      single line so a description cannot carry newlines, and truncated. */
   const summary = post.body.replace(/\s+/g, " ").slice(0, 155);
@@ -105,6 +105,9 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
 
   const author = post.author;
   const handle = author?.username ?? null;
+  /* The name, not the handle. Founder instruction 2026-09-19: the @username is
+     seen by whoever opens the profile, and nowhere else. */
+  const name = author ? personName(author) : "Someone";
   const isOwner = Boolean(viewerId && viewerId === post.author_id);
 
   return (
@@ -120,6 +123,7 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
           <div className="flex items-center gap-3">
             <Link href={handle ? `/u/${handle}` : "#"} className="shrink-0">
               <Avatar
+                fullName={author?.full_name}
                 username={author?.username}
                 avatarUrl={author?.avatar_url}
                 size="md"
@@ -130,18 +134,16 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
               {/* The h1 of this page is the person, because a post has no
                   title: `posts` has no title column. Nothing skips a level
                   from here down. */}
-              {/* The handle IS the heading. Nothing renders a real name on a
-                  public surface any more (founder instruction 2026-09-19). */}
               <h1 className="truncate text-[15px] font-medium">
                 {handle ? (
                   <Link
                     href={`/u/${handle}`}
                     className="hover:underline hover:underline-offset-4"
                   >
-                    @{handle}
+                    {name}
                   </Link>
                 ) : (
-                  "Someone"
+                  name
                 )}
               </h1>
               <p className="text-[13px] text-muted" suppressHydrationWarning>
@@ -245,12 +247,14 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
               {comments.map((comment) => {
                 const cAuthor = comment.author;
                 const cHandle = cAuthor?.username ?? null;
+                const cName = cAuthor ? personName(cAuthor) : "Someone";
                 const cIsOwner = Boolean(viewerId && viewerId === comment.author_id);
 
                 return (
                   <li key={comment.id} className="border-t border-border pt-5">
                     <div className="flex gap-3">
                       <Avatar
+                        fullName={cAuthor?.full_name}
                         username={cAuthor?.username}
                         avatarUrl={cAuthor?.avatar_url}
                         size="sm"
@@ -264,10 +268,10 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
                               href={`/u/${cHandle}`}
                               className="font-medium hover:underline hover:underline-offset-4"
                             >
-                              @{cHandle}
+                              {cName}
                             </Link>
                           ) : (
-                            <span className="font-medium">Someone</span>
+                            <span className="font-medium">{cName}</span>
                           )}
                           <span className="text-[13px] text-muted" suppressHydrationWarning>
                             <time dateTime={comment.created_at}>

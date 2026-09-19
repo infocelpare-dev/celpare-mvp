@@ -8,7 +8,7 @@ import { AdminLink } from "@/components/app/admin-link";
 import { Container } from "@/components/ui/container";
 import { BackLink } from "@/components/ui/back-link";
 import { Avatar } from "@/components/ui/avatar";
-import { relativeTime } from "@/lib/format";
+import { personName, relativeTime } from "@/lib/format";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { listPeople, listThreads } from "@/lib/messages/queries";
 import { NewThread } from "@/components/messages/new-thread";
@@ -88,9 +88,9 @@ export default async function MessagesPage() {
         ) : (
           <ul className="mt-6 border-t border-border">
             {threads.map((thread) => {
-              const who = thread.other?.username
-                ? `@${thread.other.username}`
-                : "Someone";
+              /* The name. The @username belongs on the profile and nowhere
+                  else, founder instruction 2026-09-19. */
+              const who = thread.other ? personName(thread.other) : "Someone";
 
               return (
                 <li key={thread.id}>
@@ -100,6 +100,7 @@ export default async function MessagesPage() {
                   >
                     <Avatar
                       size="md"
+                      fullName={thread.other?.full_name}
                       username={thread.other?.username}
                       avatarUrl={thread.other?.avatar_url}
                       className="shrink-0"

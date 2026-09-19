@@ -5,8 +5,9 @@ import { signOut } from "@/app/actions/auth";
 import { Badge, Card, ChipLink } from "@/components/ui/card";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Tabs, type TabIconName, type TabItem } from "@/components/ui/tabs";
-import { formatCount } from "@/lib/format";
+import { formatCount, personName } from "@/lib/format";
 import { FollowButton } from "@/components/profile/follow-button";
+import { MessageButton } from "@/components/profile/message-button";
 import { DeveloperModeToggle } from "@/components/profile/developer-mode-toggle";
 import { ClearRecent } from "@/components/profile/clear-recent";
 import { RecentList } from "@/components/profile/recent-list";
@@ -126,9 +127,9 @@ export function ProfileView({
   submissionCount?: number;
 }) {
 
-  /* Every sentence on this page names the person too, so the handle is what
-     they all use. One definition, so prose and heading cannot drift apart. */
-  const displayName = `@${profile.username}`;
+  /* Every sentence on this page names the person too. One definition, so the
+     prose and the heading cannot drift apart. */
+  const displayName = personName(profile);
 
   /*
     A private account, seen by somebody else. The picture, the name, the
@@ -172,20 +173,27 @@ export function ProfileView({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               {/*
-                THE HANDLE IS THE ONLY NAME ON THIS PAGE. Founder instruction
-                2026-09-19: only the username appears on a profile.
+                THE NAME IS BACK, AND THE HANDLE IS SEEN HERE AND NOWHERE ELSE.
+                Founder instruction 2026-09-19, reversing the instruction of
+                the same morning that had made the handle the only identity.
 
-                It used to be the real name in the heading with the handle
-                underneath, which meant a profile published whatever a provider
-                had put in full_name. Now there is one line and it is the
-                handle, so nothing here identifies somebody beyond the name
-                they chose. `full_name` is still stored, still arrives from
-                OAuth and is still visible to staff in the admin account view;
-                no PUBLIC surface renders it.
+                The rule is a split rather than a swap: the name is what every
+                other surface shows, and the @username is what the person who
+                opens this profile sees. So the heading is the name and the
+                handle sits under it, where somebody who came to find out who
+                this is will look, rather than being repeated on every card in
+                a feed they scroll past.
+
+                personName falls back to the handle when full_name is empty, so
+                an email signup that never supplied one still has a heading.
+                The line below is then suppressed rather than printed twice.
               */}
               <h1 className="font-display text-[clamp(1.5rem,4vw,2rem)] font-semibold leading-tight">
-                @{profile.username}
+                {displayName}
               </h1>
+              {displayName !== `@${profile.username}` ? (
+                <p className="mt-0.5 text-[15px] text-muted">@{profile.username}</p>
+              ) : null}
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
@@ -215,12 +223,24 @@ export function ProfileView({
                   </form>
                 </>
               ) : (
-                <FollowButton
-                  targetId={profile.id}
-                  username={profile.username}
-                  initialFollowing={following}
-                  signedIn={viewerSignedIn}
-                />
+                <>
+                  <FollowButton
+                    targetId={profile.id}
+                    username={profile.username}
+                    initialFollowing={following}
+                    signedIn={viewerSignedIn}
+                  />
+
+                  {/*
+                    Message, beside Follow. Founder instruction 2026-09-19.
+                    Signed in only: the action refuses a signed out visitor
+                    anyway, and Follow beside it is already the route to the
+                    gate, so this is absent rather than a second dead end.
+                  */}
+                  {viewerSignedIn ? (
+                    <MessageButton targetId={profile.id} name={displayName} />
+                  ) : null}
+                </>
               )}
             </div>
           </div>

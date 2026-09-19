@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { PenSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { startThread } from "@/app/actions/messages";
+import { personName } from "@/lib/format";
 import type { DmPerson } from "@/lib/messages/queries";
 import { cn } from "@/lib/utils";
 
@@ -126,8 +127,9 @@ function PersonButton({ person }: { person: DmPerson }) {
         "transition-colors duration-200 ease-out hover:bg-surface disabled:opacity-60",
       )}
     >
-      {/* The handle alone. Nothing public shows a real name any more. */}
-      <span className="min-w-0 flex-1 truncate">@{person.username}</span>
+      {/* The name. The handle is what the profile shows, founder instruction
+          2026-09-19, so a picker of people reads as names. */}
+      <span className="min-w-0 flex-1 truncate">{personName(person)}</span>
     </button>
   );
 }
