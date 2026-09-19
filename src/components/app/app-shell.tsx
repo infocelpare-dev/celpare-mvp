@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Menu } from "lucide-react";
+import Link from "next/link";
+import { Menu, Search } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { SparkIcon } from "@/components/ui/spark-icon";
 import { Logo } from "@/components/ui/logo";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { AppSidebar } from "./app-sidebar";
 
 /*
@@ -25,7 +26,6 @@ import { AppSidebar } from "./app-sidebar";
 */
 export function AppShell({
   signedIn,
-  signOutAction,
   secondary,
   fullHeight = false,
   /* A column rendered before the page, inside the content row. Ask Celpare
@@ -42,7 +42,6 @@ export function AppShell({
   children,
 }: {
   signedIn: boolean;
-  signOutAction?: React.ReactNode;
   secondary?: React.ReactNode;
   fullHeight?: boolean;
   asideStart?: React.ReactNode;
@@ -83,13 +82,38 @@ export function AppShell({
             <Logo wordmarkClassName="hidden sm:inline" />
           </div>
 
-          <div className="flex shrink-0 items-center gap-1 sm:gap-3">
-            {/* Chats live in the sidebar, reachable from the one menu button,
-                rather than being repeated here and in a rail. */}
-            <ThemeToggle />
-            {signedIn ? (
-              signOutAction
-            ) : (
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            {/*
+              THE GLOBAL ACTIONS LIVE HERE NOW, founder instruction 2026-09-19.
+
+              Search and Ask Celpare were in the feed's own sticky header, which
+              made them look like feed controls. They are neither: search is
+              across the whole of Celpare and Ask is its own surface. Moving
+              them into the bar that every page carries says that, and it also
+              means they are in the same place on the directory, a tool page
+              and a profile rather than only above the feed.
+
+              Both are public, so they show signed out as well. Chats stay in
+              the sidebar behind the one menu button rather than being repeated
+              here and in a rail, which is the reversal 4O.4 recorded.
+            */}
+            <BarIcon href="/explore" label="Search Celpare">
+              <Search className="size-[18px]" aria-hidden />
+            </BarIcon>
+            <BarIcon href="/ask" label="Ask Celpare">
+              <SparkIcon className="size-[18px]" />
+            </BarIcon>
+
+            {/*
+              NO THEME TOGGLE AND NO LOG OUT, both on founder instruction the
+              same day. The theme is a preference, so it belongs with the other
+              preferences in Settings, not one tap from every page. Log out is
+              an account action and belongs on the profile.
+
+              Sign in STAYS, because a signed out visitor has no profile to
+              find it on and no settings page to reach.
+            */}
+            {signedIn ? null : (
               <ButtonLink href="/get-started" variant="outline" size="sm">
                 Sign in
               </ButtonLink>
@@ -114,5 +138,38 @@ export function AppShell({
         </div>
       </div>
     </div>
+  );
+}
+
+/*
+  An icon in the top bar with a real accessible name and a real tooltip.
+
+  The name is sr-only TEXT rather than an aria-label, so it is in the DOM,
+  survives translation and reads the same to every assistive technology, and
+  `title` gives a pointer user the same words. An icon with no accessible name
+  is the most common way a bar like this becomes unusable.
+
+  40px rather than the 44px used inside the feed: the bar is 68px tall and
+  these sit beside a 36px button, so a taller target would not line up. It
+  still clears the 24px WCAG target size for web.
+*/
+function BarIcon({
+  href,
+  label,
+  children,
+}: {
+  href: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      title={label}
+      className="inline-flex size-10 items-center justify-center rounded-lg text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
+    >
+      {children}
+      <span className="sr-only">{label}</span>
+    </Link>
   );
 }

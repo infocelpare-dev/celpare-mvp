@@ -1,11 +1,9 @@
-import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { ChatHistoryPanel } from "@/components/ask/chat-history-panel";
 import { listConversations } from "@/lib/ai/conversations";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { signOut } from "@/app/actions/auth";
 
 /* Reads the session cookie, so it must never be prerendered. */
 export const dynamic = "force-dynamic";
@@ -73,13 +71,6 @@ export default async function AskLayout({
           username={username}
           avatarUrl={avatarUrl}
         />
-      }
-      signOutAction={
-        <form action={signOut}>
-          <Button variant="outline" size="sm" type="submit">
-            Log out
-          </Button>
-        </form>
       }
     >
       {children}

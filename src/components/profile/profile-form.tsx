@@ -47,15 +47,26 @@ export function ProfileForm({ values }: { values: ProfileFormValues }) {
         </legend>
 
         <div className="mt-5 space-y-5">
+          {/*
+            RELABELLED 2026-09-19, when the profile stopped showing it.
+
+            It said "Display name" and "The name shown above your username",
+            and neither is true any more: every public surface identifies you
+            by @username alone. Leaving the old label would have made this the
+            dead control this project keeps refusing to ship, so it says what
+            the field actually does now. The field stays because OAuth still
+            supplies a name and staff still see it on an account, and because
+            deleting somebody's stored name is not a relabelling.
+          */}
           <Field
             id="fullName"
             name="fullName"
-            label="Display name"
+            label="Your name"
             defaultValue={values.fullName}
             maxLength={120}
             autoComplete="name"
             invalid={invalid("fullName")}
-            hint="The name shown above your username."
+            hint="Private. Your profile shows @username and never this."
           />
 
           <Field

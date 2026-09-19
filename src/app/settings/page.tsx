@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Container } from "@/components/ui/container";
 import { BackLink } from "@/components/ui/back-link";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { isStaffRole, ROLE_LABEL, type Role } from "@/lib/admin/capabilities";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
@@ -16,9 +16,9 @@ import { Avatar } from "@/components/ui/avatar";
 import { PLAN_LIMITS } from "@/lib/ai/config";
 import { isWebSearchConfigured } from "@/lib/ai/web-search";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { signOut } from "@/app/actions/auth";
 import { PrivacyForm } from "@/components/settings/privacy-form";
 import { ClearRecent } from "@/components/profile/clear-recent";
+import { ThemeChoice } from "@/components/ui/theme-choice";
 import type { PrivacyValues } from "@/app/actions/settings";
 import type { Plan } from "@/lib/ai/types";
 
@@ -127,13 +127,6 @@ export default async function SettingsPage() {
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn
-      signOutAction={
-        <form action={signOut}>
-          <Button variant="outline" size="sm" type="submit">
-            Log out
-          </Button>
-        </form>
-      }
     >
       <Container className="max-w-[640px] py-10 sm:py-14">
         {/*
@@ -223,6 +216,26 @@ export default async function SettingsPage() {
             enforced in the database, not just hidden on the page.
           </p>
           <PrivacyForm values={privacy} />
+        </section>
+
+        {/*
+          Appearance. Founder instruction 2026-09-19: the theme control came out
+          of the top bar of every page and lives here, with the other
+          preferences, because that is what it is.
+
+          It is the first section after the account itself on purpose: it is the
+          one setting on this page that changes something a person can see
+          immediately, so it is the cheapest one to find and confirm.
+        */}
+        <section className="mt-12 border-t border-border pt-10">
+          <h2 className="font-display text-[17px] font-semibold">Appearance</h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-muted">
+            Light, dark, or whatever your device is set to. It applies straight
+            away and is remembered on this browser.
+          </p>
+          <div className="mt-4">
+            <ThemeChoice />
+          </div>
         </section>
 
         {/*

@@ -1,39 +1,57 @@
 import type { Metadata } from "next";
-import { MessagesSquare } from "lucide-react";
-import { Container } from "@/components/ui/container";
-import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
-import { SparkIcon } from "@/components/ui/spark-icon";
-import { AskBox } from "@/components/ask/ask-box";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { signOut } from "@/app/actions/auth";
+import { defaultSort, isSort } from "@/lib/community/ranking";
+import {
+  countVisiblePosts,
+  getFeed,
+  getTopics,
+  getViewerState,
+  readerFor,
+  EMPTY_VIEWER_STATE,
+  type FeedScope,
+} from "@/lib/community/queries";
+import { FeedHeader } from "@/components/community/feed-header";
+import { unreadThreadCount } from "@/lib/messages/queries";
+import { FeedEmpty } from "@/components/community/feed-empty";
+import { DiscoverRail } from "@/components/community/feed-rails";
+import { PostCard } from "@/components/community/post-card";
+import { CreatePostFab } from "@/components/community/create-post-fab";
 
 export const metadata: Metadata = {
-  title: { absolute: "Celpare" },
+  title: { absolute: "Celpare Community" },
   description:
-    "The home for AI tools. Ask Celpare what you need, and see what the community is building.",
+    "What people are building with AI tools. Ask which tool fits, share what you found, post what you shipped.",
 };
 
 /* Reads the session cookie, so it must never be prerendered. */
 export const dynamic = "force-dynamic";
 
 /*
-  The Celpare homepage (D27).
+  The Celpare homepage for a signed in person (D27), and a public page for
+  everybody else (D32).
 
-  Community is the home, and Ask Celpare is a section of it: the founder's
-  instruction on 2026-09-13 was that the assistant belongs here and in the
-  product navigation, not on the marketing page.
+  Rebuilt on 2026-09-19 from the founder's feed brief. What used to be here was
+  an honest placeholder saying the feed was not built. It is built now, so the
+  placeholder is gone rather than being kept beside it.
 
-  The feed itself is Phase 4A and is not built. Rather than filling the space
-  with invented posts, which D30 forbids, the page says plainly what is coming
-  and gives the one thing that does work. That is also the honest answer to the
-  cold start problem in 10-community.md section 11: a feed with no posts is the
-  worst possible first screen, so the assistant leads instead.
+  THE FEED IS PUBLICLY READABLE AND A SIGNED OUT VISITOR READS IT THROUGH THE
+  ANON CLIENT. That is the same path a crawler takes, so what is verified is
+  the policy anon actually gets rather than a session that happens to be
+  around. readerFor() is the whole of that decision.
 */
-export default async function CommunityPage() {
+export default async function CommunityPage({
+  searchParams,
+}: PageProps<"/community">) {
+  const params = await searchParams;
+
+  const scope: FeedScope =
+    params?.feed === "following" ? "following" : "for-you";
+
   let signedIn = false;
+  let viewerId: string | null = null;
 
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
@@ -41,75 +59,101 @@ export default async function CommunityPage() {
       data: { user },
     } = await supabase.auth.getUser();
     signedIn = Boolean(user);
+    viewerId = user?.id ?? null;
   }
 
+  const db = await readerFor(signedIn);
+
+  /* The count decides the DEFAULT sort and whether the sort control is worth
+     showing at all. D29: New until there is enough content for ranking to mean
+     anything, as a runtime check rather than a hardcoded switch. */
+  const [topics, visiblePostCount] = await Promise.all([
+    getTopics(db),
+    countVisiblePosts(db),
+  ]);
+
+  const requested = typeof params?.sort === "string" ? params.sort : undefined;
+  const sort = isSort(requested) ? requested : defaultSort(visiblePostCount);
+
+  const posts = await getFeed(db, { sort, scope, viewerId });
+
+  /* Signed out people have no messages and no grant to read any, so this is
+     skipped entirely rather than asked and answered with zero. */
+  const unreadMessages = signedIn && viewerId
+    ? await unreadThreadCount(await createClient(), viewerId)
+    : 0;
+
+  /*
+    Likes and saves are read with the SIGNED IN client even though the feed
+    itself may have been read as anon. They are the viewer's own private rows
+    and there is no cross user select policy on either table, so this returns
+    nothing at all when signed out, which is exactly what EMPTY_VIEWER_STATE
+    already says.
+  */
+  const viewer = signedIn
+    ? await getViewerState(
+        await createClient(),
+        viewerId,
+        posts.map((p) => p.id),
+      )
+    : EMPTY_VIEWER_STATE;
+
   return (
-    <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
+    <AppShell
+      banner={<AccountNotices />}
+      adminLink={<AdminLink />}
       signedIn={signedIn}
-      signOutAction={
-        <form action={signOut}>
-          <Button variant="outline" size="sm" type="submit">
-            Log out
-          </Button>
-        </form>
-      }
     >
-      <Container className="max-w-[760px] py-10 sm:py-16">
-        <section aria-labelledby="ask-heading">
-          <div className="mb-3 flex items-center gap-2 text-[13px] font-medium text-muted">
-            <SparkIcon className="size-3.5 text-accent" />
-            Ask Celpare
-          </div>
+      {/*
+        The three column frame. It is a centred flex row rather than a grid of
+        fixed tracks, so the two rails simply are not in the layout below xl
+        instead of collapsing to zero width tracks that still take part in
+        sizing. The middle column is max-w-[640px] at every width, which is the
+        measure 10-community.md section 9 asks for and the reason the feed does
+        not stretch to 1440 on a desktop.
+      */}
+      <div className="mx-auto flex w-full max-w-[1200px] gap-8 px-4 py-4 sm:px-5 xl:justify-center">
 
-          <h1
-            id="ask-heading"
-            className="font-display text-[clamp(1.7rem,4.5vw,2.4rem)] font-semibold leading-tight"
-          >
-            What are you trying to build?
-          </h1>
+        <div className="min-w-0 flex-1 xl:max-w-[640px]">
+          <h1 className="sr-only">Celpare Community</h1>
 
-          <p className="mt-3 max-w-[54ch] text-[15px] leading-relaxed text-muted">
-            Describe the job and Celpare recommends the tools that fit, with the
-            reasons. It answers on AI tools, models, tech and SaaS, from the
-            Celpare catalogue, its own documentation and the web.
-          </p>
+          {/* The topics live INSIDE this control, opened from the chevron on
+              For you, not as a row under it. Founder instruction 2026-09-19. */}
+          <FeedHeader
+            scope={scope}
+            sort={sort}
+            visiblePostCount={visiblePostCount}
+            topics={topics}
+            unreadMessages={unreadMessages}
+          />
 
-          <div className="mt-6">
-            <AskBox />
-          </div>
+          {posts.length === 0 ? (
+            <FeedEmpty scope={scope} signedIn={signedIn} />
+          ) : (
+            /*
+              A plain list of articles with a hairline between them. No
+              wrapper card per post: a card inside a card is the oversized
+              rounded container the brief rules out, and D11 wants one
+              hairline rather than a stack of boxes.
+            */
+            <ol className="border-t border-border">
+              {posts.map((post) => (
+                <li key={post.id}>
+                  <PostCard post={post} viewer={viewer} signedIn={signedIn} />
+                </li>
+              ))}
+            </ol>
+          )}
 
-          {!signedIn ? (
-            <p className="mt-3 text-[13px] text-muted">
-              You can ask without an account. Chats are not saved unless you sign in.
-            </p>
-          ) : null}
-        </section>
+          {/* Clears the floating button, so the last post can always be
+              scrolled out from under it. */}
+          <div className="h-24" aria-hidden />
+        </div>
 
-        <section aria-labelledby="feed-heading" className="mt-14 sm:mt-20">
-          <h2
-            id="feed-heading"
-            className="font-display text-[20px] font-semibold"
-          >
-            Community
-          </h2>
+        <DiscoverRail />
+      </div>
 
-          {/*
-            The empty state, designed rather than improvised, because at
-            launch this is the state every visitor sees. It does not fake
-            activity and it does not pretend the feed exists.
-          */}
-          <div className="mt-4 rounded-2xl border border-border px-5 py-8 text-center sm:px-8 sm:py-10">
-            <MessagesSquare className="mx-auto size-6 text-muted" aria-hidden />
-            <p className="mx-auto mt-4 max-w-[46ch] text-[15px] leading-relaxed text-muted">
-              The community feed is being built. It will be where people share
-              what they found, ask which tool fits, and post what they shipped.
-            </p>
-            <p className="mx-auto mt-2 max-w-[46ch] text-[13px] text-muted">
-              Nothing here is a placeholder for posts that do not exist yet.
-            </p>
-          </div>
-        </section>
-      </Container>
+      <CreatePostFab signedIn={signedIn} />
     </AppShell>
   );
 }

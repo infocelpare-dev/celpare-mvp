@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
@@ -6,7 +5,6 @@ import { AdminLink } from "@/components/app/admin-link";
 import { DeveloperNav } from "@/components/developer/developer-nav";
 import { Badge } from "@/components/ui/card";
 import { BackLink } from "@/components/ui/back-link";
-import { signOut } from "@/app/actions/auth";
 
 /*
   One frame for every developer page: the ordinary Celpare shell, a heading,
@@ -36,13 +34,6 @@ export function DeveloperShell({
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn
-      signOutAction={
-        <form action={signOut}>
-          <Button variant="outline" size="sm" type="submit">
-            Log out
-          </Button>
-        </form>
-      }
     >
       <Container className="max-w-[880px] py-10 sm:py-14">
         <BackLink href={backHref} label={backLabel} className="mb-5" />

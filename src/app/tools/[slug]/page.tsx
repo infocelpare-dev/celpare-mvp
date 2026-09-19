@@ -14,7 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Container } from "@/components/ui/container";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
@@ -34,7 +34,6 @@ import {
   getViewerState,
   type ToolProfile,
 } from "@/lib/tools/queries";
-import { signOut } from "@/app/actions/auth";
 import { recordToolView } from "@/lib/telemetry";
 
 /*
@@ -184,13 +183,6 @@ export default async function ToolPage({
       banner={<AccountNotices />}
       adminLink={<AdminLink />}
       signedIn={viewer.signedIn}
-      signOutAction={
-        <form action={signOut}>
-          <Button variant="outline" size="sm" type="submit">
-            Log out
-          </Button>
-        </form>
-      }
     >
       <Container className="max-w-[820px] py-8 sm:py-12">
         <Link

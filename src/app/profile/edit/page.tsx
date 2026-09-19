@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { BackLink } from "@/components/ui/back-link";
 import { AppShell } from "@/components/app/app-shell";
@@ -9,7 +8,6 @@ import { AdminLink } from "@/components/app/admin-link";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { AvatarUpload } from "@/components/profile/avatar-upload";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { signOut } from "@/app/actions/auth";
 import { getProfileById } from "@/lib/profile/queries";
 
 export const metadata: Metadata = {
@@ -35,13 +33,6 @@ export default async function EditProfilePage() {
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn
-      signOutAction={
-        <form action={signOut}>
-          <Button variant="outline" size="sm" type="submit">
-            Log out
-          </Button>
-        </form>
-      }
     >
       <Container className="max-w-[640px] py-10 sm:py-14">
         <BackLink href="/profile" label="Back to your profile" className="mb-5" />

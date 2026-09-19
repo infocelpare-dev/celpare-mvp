@@ -95,6 +95,16 @@ export function sniffVideo(b: Uint8Array): VideoKind | null {
 */
 export function parseStorageUrl(
   url: string,
+  /*
+    Which buckets count as ours. Defaults to the tool pair, so every existing
+    caller behaves exactly as before. The community feed passes its own pair.
+
+    This is a parameter rather than a second copy of this function in
+    lib/community, deliberately: it is the check that decides whether a URL is
+    an upload or something somebody typed, and two implementations of that
+    would be two places for it to drift.
+  */
+  buckets: readonly string[] = [IMAGE_BUCKET, VIDEO_BUCKET],
 ): { bucket: string; path: string } | null {
   const marker = "/storage/v1/object/public/";
   const at = url.indexOf(marker);
@@ -107,7 +117,7 @@ export function parseStorageUrl(
   const bucket = rest.slice(0, slash);
   const path = rest.slice(slash + 1);
   if (!path) return null;
-  if (bucket !== IMAGE_BUCKET && bucket !== VIDEO_BUCKET) return null;
+  if (!buckets.includes(bucket)) return null;
 
   return { bucket, path };
 }
@@ -121,8 +131,12 @@ export function parseStorageUrl(
   fills in. Ownership is the first path segment, which is the same thing the
   policy checks.
 */
-export function isOwnUpload(url: string, userId: string): boolean {
-  const parsed = parseStorageUrl(url);
+export function isOwnUpload(
+  url: string,
+  userId: string,
+  buckets?: readonly string[],
+): boolean {
+  const parsed = parseStorageUrl(url, buckets);
   if (!parsed) return false;
   return parsed.path.startsWith(`${userId}/`);
 }

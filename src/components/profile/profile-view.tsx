@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { CalendarDays, Link2, Lock, MapPin } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { signOut } from "@/app/actions/auth";
 import { Badge, Card, ChipLink } from "@/components/ui/card";
-import { ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Tabs, type TabIconName, type TabItem } from "@/components/ui/tabs";
 import { formatCount } from "@/lib/format";
 import { FollowButton } from "@/components/profile/follow-button";
@@ -124,7 +125,10 @@ export function ProfileView({
   /* Owner only, and only used to explain why Developer Mode is locked. */
   submissionCount?: number;
 }) {
-  const displayName = profile.full_name?.trim() || profile.username;
+
+  /* Every sentence on this page names the person too, so the handle is what
+     they all use. One definition, so prose and heading cannot drift apart. */
+  const displayName = `@${profile.username}`;
 
   /*
     A private account, seen by somebody else. The picture, the name, the
@@ -167,17 +171,49 @@ export function ProfileView({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
+              {/*
+                THE HANDLE IS THE ONLY NAME ON THIS PAGE. Founder instruction
+                2026-09-19: only the username appears on a profile.
+
+                It used to be the real name in the heading with the handle
+                underneath, which meant a profile published whatever a provider
+                had put in full_name. Now there is one line and it is the
+                handle, so nothing here identifies somebody beyond the name
+                they chose. `full_name` is still stored, still arrives from
+                OAuth and is still visible to staff in the admin account view;
+                no PUBLIC surface renders it.
+              */}
               <h1 className="font-display text-[clamp(1.5rem,4vw,2rem)] font-semibold leading-tight">
-                {displayName}
+                @{profile.username}
               </h1>
-              <p className="mt-0.5 text-[15px] text-muted">@{profile.username}</p>
             </div>
 
-            <div className="shrink-0">
+            <div className="flex shrink-0 items-center gap-2">
               {isOwner ? (
-                <ButtonLink href="/profile/edit" variant="outline" size="sm">
-                  Edit profile
-                </ButtonLink>
+                <>
+                  <ButtonLink href="/profile/edit" variant="outline" size="sm">
+                    Edit profile
+                  </ButtonLink>
+
+                  {/*
+                    LOG OUT LIVES HERE NOW, founder instruction 2026-09-19. It
+                    used to sit in the top bar of every page, where it was one
+                    stray tap from ending a session while reading the feed.
+                    It is an account action, so it belongs on the account.
+
+                    Only the owner sees it: isOwner is what decides it, and on
+                    /u/[username] that is the same person looking at their own
+                    public profile. There is no harm in it appearing there too.
+
+                    A ghost button rather than an outline one, so it does not
+                    compete with Edit profile for the same press.
+                  */}
+                  <form action={signOut}>
+                    <Button variant="ghost" size="sm" type="submit">
+                      Log out
+                    </Button>
+                  </form>
+                </>
               ) : (
                 <FollowButton
                   targetId={profile.id}

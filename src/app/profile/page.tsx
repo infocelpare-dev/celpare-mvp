@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { ProfileView } from "@/components/profile/profile-view";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { signOut } from "@/app/actions/auth";
 import {
   getFeaturedTools,
   getProfileById,
@@ -63,13 +61,6 @@ export default async function ProfilePage({
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn
-      signOutAction={
-        <form action={signOut}>
-          <Button variant="outline" size="sm" type="submit">
-            Log out
-          </Button>
-        </form>
-      }
     >
       <Container className="max-w-[720px] py-10 sm:py-14">
         <ProfileView

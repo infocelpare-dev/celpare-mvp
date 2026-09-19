@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { ProfileView } from "@/components/profile/profile-view";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { signOut } from "@/app/actions/auth";
 import {
   getFeaturedTools,
   getProfileByUsername,
@@ -44,7 +42,7 @@ export async function generateMetadata({
 
   if (!profile) return { title: "Profile not found", robots: { index: false } };
 
-  const name = profile.full_name?.trim() || profile.username;
+  const name = `@${profile.username}`;
   return {
     title: `${name} (@${profile.username})`,
     // The bio is written by the person. It is fine as a description, and it is
@@ -94,15 +92,6 @@ export default async function PublicProfilePage({
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn={signedIn}
-      signOutAction={
-        signedIn ? (
-          <form action={signOut}>
-            <Button variant="outline" size="sm" type="submit">
-              Log out
-            </Button>
-          </form>
-        ) : undefined
-      }
     >
       <Container className="max-w-[720px] py-10 sm:py-14">
         <ProfileView

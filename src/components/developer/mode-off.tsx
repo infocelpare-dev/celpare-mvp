@@ -1,10 +1,9 @@
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { Card } from "@/components/ui/card";
-import { signOut } from "@/app/actions/auth";
 
 /*
   Developer Mode is off, so the workspace is not shown.
@@ -21,13 +20,6 @@ export function ModeOff() {
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn
-      signOutAction={
-        <form action={signOut}>
-          <Button variant="outline" size="sm" type="submit">
-            Log out
-          </Button>
-        </form>
-      }
     >
       <Container className="max-w-[640px] py-10 sm:py-14">
         <h1 className="font-display text-[clamp(1.6rem,4vw,2.1rem)] font-semibold leading-tight">

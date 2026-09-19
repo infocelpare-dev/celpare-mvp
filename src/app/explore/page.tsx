@@ -4,13 +4,11 @@ import { ArrowRight } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
-import { Button } from "@/components/ui/button";
 import { ToolsShowcase } from "@/components/landing/tools-showcase";
 import { FeaturedShelf } from "@/components/app/featured-tools";
 import { Container, Section } from "@/components/ui/container";
 import { ButtonLink } from "@/components/ui/button";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { signOut } from "@/app/actions/auth";
 
 /* Reads the session cookie, so it must never be prerendered. */
 export const dynamic = "force-dynamic";
@@ -44,13 +42,6 @@ export default async function ExplorePage() {
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn={signedIn}
-      signOutAction={
-        <form action={signOut}>
-          <Button variant="outline" size="sm" type="submit">
-            Log out
-          </Button>
-        </form>
-      }
     >
       <Section className="pb-6">
         <Container>

@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { PlaceholderPage } from "@/components/app/placeholder-page";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { signOut } from "@/app/actions/auth";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -28,13 +26,6 @@ export default async function PricingPage() {
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
       signedIn={signedIn}
-      signOutAction={
-        <form action={signOut}>
-          <Button variant="outline" size="sm" type="submit">
-            Log out
-          </Button>
-        </form>
-      }
     >
       <PlaceholderPage
         name="Pricing"
