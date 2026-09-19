@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Container } from "@/components/ui/container";
+import { personName } from "@/lib/format";
 import { BackLink } from "@/components/ui/back-link";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
@@ -43,9 +44,12 @@ export async function generateMetadata({
 
   if (!profile) return { title: "Profile not found", robots: { index: false } };
 
-  const name = `@${profile.username}`;
+  /* The name, then the handle. It read "@ameagmahad (@ameagmahad)" while the
+     handle was the only identity, which is a title that says one thing twice
+     and names the person once. */
+  const name = personName(profile);
   return {
-    title: `${name} (@${profile.username})`,
+    title: name === `@${profile.username}` ? name : `${name} (@${profile.username})`,
     // The bio is written by the person. It is fine as a description, and it is
     // never treated as instructions anywhere, here or in a prompt.
     description: profile.bio?.slice(0, 200) ?? `${name} on Celpare.`,
