@@ -5,14 +5,19 @@ import { loadAffinity } from "./personalization";
 import { loadEngagement, readerFor } from "./retrieval";
 import { NO_AFFINITY, RECOMMEND, rankRecommendations, type RankContext } from "./ranking";
 import { parseQuery } from "./query";
-import {
-  NO_BEHAVIOUR,
-  NO_ENGAGEMENT,
-  type ModelCandidate,
-  type PersonCandidate,
-  type Scored,
-  type ToolCandidate,
+import type {
+  ModelCandidate,
+  PersonCandidate,
+  Scored,
+  ToolCandidate,
 } from "./types";
+import {
+  MODEL_ROW_COLUMNS,
+  TOOL_ROW_COLUMNS,
+  modelFromRow,
+  personFromRow,
+  toolFromRow,
+} from "./rows";
 
 /*
   The empty search state: what to show somebody who has opened search and typed
@@ -34,38 +39,6 @@ import {
   than a defect in this file.
 */
 
-const TOOL_COLUMNS =
-  "id, slug, name, tagline, description, logo_url, pricing, pricing_model, tags," +
-  " features, platforms, rating, rating_count, like_count, verified, created_at," +
-  " published_at, tool_categories(categories(name))";
-
-const MODEL_COLUMNS =
-  "id, slug, name, provider, description, context_window, input_price_per_m," +
-  " output_price_per_m, modalities, tags, website_url, created_at";
-
-/* The zero match signal. A recommendation matched nothing because nothing was
-   asked, and saying otherwise would make reasonFor() lie. */
-const NO_MATCH = {
-  exact: false,
-  prefix: false,
-  nameSimilarity: 0,
-  phrase: false,
-  tsRank: 0,
-  termHits: 0,
-  termTotal: 0,
-  sources: ["recommendation"],
-};
-
-type CatJoin = { categories: { name: string } | null }[] | null;
-
-function categoriesOf(row: Record<string, unknown>): string[] {
-  const joined = row.tool_categories as CatJoin;
-  if (!Array.isArray(joined)) return [];
-  return joined
-    .map((j) => j.categories?.name)
-    .filter((n): n is string => typeof n === "string");
-}
-
 export type Recommendations = {
   tools: Scored<ToolCandidate>[];
   models: Scored<ModelCandidate>[];
@@ -84,13 +57,13 @@ export async function loadRecommendations(options: {
        the screen is decided by scoreRecommendation. */
     db
       .from("tools")
-      .select(TOOL_COLUMNS)
+      .select(TOOL_ROW_COLUMNS)
       .eq("status", "approved")
       .order("created_at", { ascending: false })
       .limit(RECOMMEND.POOL),
     db
       .from("models")
-      .select(MODEL_COLUMNS)
+      .select(MODEL_ROW_COLUMNS)
       .eq("status", "approved")
       .order("created_at", { ascending: false })
       .limit(RECOMMEND.POOL),
@@ -110,53 +83,13 @@ export async function loadRecommendations(options: {
     console.error("[search] suggested people failed", peopleRows.error.code, peopleRows.error.message);
   }
 
-  const tools: ToolCandidate[] = ((toolRows.data as Record<string, unknown>[] | null) ?? []).map(
-    (r) => ({
-      type: "tool",
-      id: String(r.id),
-      slug: String(r.slug),
-      name: String(r.name),
-      tagline: (r.tagline as string | null) ?? null,
-      description: (r.description as string | null) ?? null,
-      logoUrl: (r.logo_url as string | null) ?? null,
-      pricing: (r.pricing as string | null) ?? null,
-      pricingModel: (r.pricing_model as string | null) ?? null,
-      tags: (r.tags as string[] | null) ?? [],
-      features: (r.features as string[] | null) ?? [],
-      platforms: (r.platforms as string[] | null) ?? [],
-      categories: categoriesOf(r),
-      rating: (r.rating as number | null) ?? null,
-      ratingCount: (r.rating_count as number | null) ?? 0,
-      likeCount: (r.like_count as number | null) ?? 0,
-      verified: r.verified === true,
-      createdAt: String(r.created_at),
-      publishedAt: (r.published_at as string | null) ?? null,
-      match: { ...NO_MATCH, category: false, tag: false, feature: false, platform: false },
-      engagement: NO_ENGAGEMENT,
-      behaviour: NO_BEHAVIOUR,
-    }),
-  );
+  const tools: ToolCandidate[] = (
+    (toolRows.data as Record<string, unknown>[] | null) ?? []
+  ).map((r) => toolFromRow(r, "recommendation"));
 
-  const models: ModelCandidate[] = ((modelRows.data as Record<string, unknown>[] | null) ?? []).map(
-    (r) => ({
-      type: "model",
-      id: String(r.id),
-      slug: String(r.slug),
-      name: String(r.name),
-      provider: (r.provider as string | null) ?? null,
-      description: (r.description as string | null) ?? null,
-      contextWindow: (r.context_window as number | null) ?? null,
-      inputPrice: (r.input_price_per_m as number | null) ?? null,
-      outputPrice: (r.output_price_per_m as number | null) ?? null,
-      modalities: (r.modalities as string[] | null) ?? [],
-      tags: (r.tags as string[] | null) ?? [],
-      websiteUrl: (r.website_url as string | null) ?? null,
-      createdAt: String(r.created_at),
-      match: { ...NO_MATCH, provider: false, tag: false, modality: false },
-      engagement: NO_ENGAGEMENT,
-      behaviour: NO_BEHAVIOUR,
-    }),
-  );
+  const models: ModelCandidate[] = (
+    (modelRows.data as Record<string, unknown>[] | null) ?? []
+  ).map((r) => modelFromRow(r, "recommendation"));
 
   /* Engagement for both pools, together. Popularity is most of what decides a
      recommendation, so this is not optional here the way it nearly is for an
@@ -170,26 +103,9 @@ export async function loadRecommendations(options: {
 
   const ctx: RankContext = { parsed: parseQuery(""), affinity, now: Date.now() };
 
-  const people: PersonCandidate[] = ((peopleRows.data as Record<string, unknown>[] | null) ?? []).map(
-    (r) => ({
-      type: "person",
-      id: String(r.id),
-      username: String(r.username),
-      fullName: (r.full_name as string | null) ?? null,
-      avatarUrl: (r.avatar_url as string | null) ?? null,
-      bio: (r.bio as string | null) ?? null,
-      isDeveloper: r.is_developer === true,
-      developerVerified: r.developer_verified === true,
-      company: null,
-      expertise: [],
-      skills: [],
-      interests: [],
-      followerCount: (r.follower_count as number | null) ?? 0,
-      createdAt: String(r.created_at),
-      match: { ...NO_MATCH, skill: false, expertise: false, company: false },
-      behaviour: NO_BEHAVIOUR,
-    }),
-  );
+  const people: PersonCandidate[] = (
+    (peopleRows.data as Record<string, unknown>[] | null) ?? []
+  ).map((r) => personFromRow(r, "recommendation"));
 
   return {
     tools: capPerCategory(rankRecommendations(tools, ctx), RECOMMEND.SHOW_TOOLS),
