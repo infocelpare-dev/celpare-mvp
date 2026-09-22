@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Play } from "lucide-react";
 import { Badge } from "@/components/ui/card";
 import type { AttachedModel, AttachedTool, PostMedia } from "@/lib/community/queries";
 import { KIND_LABELS, type PostKind } from "@/lib/community/kinds";
@@ -15,9 +15,13 @@ import { KIND_LABELS, type PostKind } from "@/lib/community/kinds";
 
 export function PostMediaGallery({
   media,
+  /* Where the Watch control goes. A video belongs to a post, and the viewer
+     opens on that post, so the gallery needs the id to build the link. */
+  postId,
   className,
 }: {
   media: PostMedia[];
+  postId: string;
   className?: string;
 }) {
   if (media.length === 0) return null;
@@ -26,7 +30,7 @@ export function PostMediaGallery({
 
   if (video) {
     return (
-      <div className={className}>
+      <div className={`relative ${className ?? ""}`}>
         {/*
           preload="metadata", not "auto". Auto pulls the whole file on page
           load, and a feed with three 50 MB videos on it would cost somebody
@@ -36,6 +40,9 @@ export function PostMediaGallery({
           No autoplay and no loop. A feed that starts playing at somebody is
           the unnecessary animation the brief rules out, and it is a real
           accessibility problem for anybody who did not ask for motion.
+
+          THE VIDEO STILL PLAYS RIGHT HERE. The vertical viewer is somewhere to
+          go, not a replacement for playing a video in the post it belongs to.
         */}
         <video
           src={video.url}
@@ -44,6 +51,30 @@ export function PostMediaGallery({
           playsInline
           className="max-h-[70vh] w-full rounded-xl border border-border bg-surface"
         />
+
+        {/*
+          INTO THE VERTICAL VIEWER.
+
+          A NAMED BUTTON, NOT A TAP ANYWHERE ON THE FRAME, and the reason is the
+          native controls right underneath. A click handler over the whole video
+          would swallow play, pause, seek and the volume slider, or fire on the
+          way past them: the two cannot share one surface without one of them
+          being broken. So entering is its own control with its own name, which
+          is also what makes it reachable by keyboard and announceable, and the
+          frame keeps doing the obvious thing when tapped.
+
+          It sits top-end, clear of the control bar the browser draws along the
+          bottom, at 44px with a scrim behind it so it stays legible over a
+          bright first frame.
+        */}
+        <Link
+          href={`/community/video/${postId}`}
+          className="absolute end-2 top-2 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-black/55 px-3 text-[13px] font-medium text-white backdrop-blur-sm transition-colors duration-200 ease-out hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
+          <Play className="size-4 shrink-0 fill-current" aria-hidden />
+          Watch
+          <span className="sr-only">this and other videos full screen</span>
+        </Link>
       </div>
     );
   }

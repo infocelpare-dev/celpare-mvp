@@ -297,6 +297,18 @@ export type CommentState = {
 
 const commentSchema = z.object({
   postId: z.string().uuid(),
+  /*
+    Which comment this replies to, or nothing for a top level one.
+
+    The empty string is coerced to undefined rather than validated, because a
+    hidden field that is present but blank is what a form sends for "no parent",
+    and failing on it would make every top level comment an error.
+
+    THE DATABASE IS THE ACTUAL CONTROL. comments_parent_guard checks that the
+    parent exists, is not deleted and belongs to THIS post, so a forged parent id
+    pointing at another post's thread is refused there rather than here.
+  */
+  parentId: z.string().uuid().optional(),
   body: z
     .string()
     .trim()
@@ -320,8 +332,11 @@ export async function createComment(
 
   if (!isSupabaseConfigured()) return fail("Not connected.");
 
+  const rawParent = String(formData.get("parentId") ?? "").trim();
+
   const parsed = commentSchema.safeParse({
     postId: formData.get("postId") ?? "",
+    parentId: rawParent === "" ? undefined : rawParent,
     body,
     website: formData.get("website") ?? "",
   });
@@ -342,6 +357,7 @@ export async function createComment(
 
   const { error } = await supabase.from("comments").insert({
     post_id: parsed.data.postId,
+    parent_id: parsed.data.parentId ?? null,
     author_id: user.id,
     body: parsed.data.body,
   });
@@ -350,6 +366,14 @@ export async function createComment(
     console.error("[community] comment insert failed", error.code, error.message);
     if (error.code === "42501") {
       return fail("Your account cannot comment right now, or that post is gone.");
+    }
+    /* The parent guard speaks in codes on purpose, so the message can say which
+       of the three things went wrong instead of one shrug for all of them. */
+    if (error.message.includes("comment_parent_missing")) {
+      return fail("That comment was removed. Reply to the post instead.");
+    }
+    if (error.message.includes("comment_parent_other_post")) {
+      return fail("That did not work.");
     }
     return fail("Could not comment. Try again.");
   }
@@ -418,6 +442,76 @@ export async function toggleLike(
 
     if (error) {
       console.error("[community] unlike failed", error.code, error.message);
+      return { ok: false, on: true, message: "Could not undo that." };
+    }
+  }
+
+  return { ok: true, on: parsed.data.on, message: "" };
+}
+
+/*
+  Repost and undo a repost. D70, which overrides D28 for reposts only.
+
+  THE TABLE HAS EXISTED SINCE PHASE 4K AND NOTHING COULD WRITE IT. `reposts` is
+  (user_id, post_id, created_at) with a composite primary key, `posts.repost_count`
+  is trigger owned, the profile has a Reposts tab, and there was no action and no
+  control anywhere: the whole feature was a schema with no way in. This is the way
+  in.
+
+  IDEMPOTENT BY THE PRIMARY KEY, exactly as like is. A repeat repost raises 23505
+  and that is treated as success, because the end state is what was asked for. The
+  count is never touched here: it is trigger owned and not in the client UPDATE
+  grant, so this code could not move it even if it tried.
+
+  A PERSON CAN REPOST THEIR OWN POST. That is deliberate and matches how every
+  feed works: resurfacing your own thing to the people following you now is a real
+  use, and `reposts` carries no CHECK against it the way `follows_no_self` does.
+*/
+const repostSchema = z.object({
+  postId: z.string().uuid(),
+  on: z.boolean(),
+});
+
+export async function toggleRepost(
+  postId: string,
+  on: boolean,
+): Promise<ToggleResult> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, on: !on, message: "Not connected." };
+  }
+
+  const parsed = repostSchema.safeParse({ postId, on });
+  if (!parsed.success) {
+    return { ok: false, on: !on, message: "That did not work." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false, on: false, message: "Sign in to repost." };
+
+  if (parsed.data.on) {
+    const { error } = await supabase
+      .from("reposts")
+      .insert({ user_id: user.id, post_id: parsed.data.postId });
+
+    /* 23505 is the composite primary key saying it is already reposted, which is
+       the state the caller asked for. Not an error. */
+    if (error && error.code !== "23505") {
+      console.error("[community] repost failed", error.code, error.message);
+      return { ok: false, on: false, message: "Could not repost that." };
+    }
+  } else {
+    const { error } = await supabase
+      .from("reposts")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("post_id", parsed.data.postId);
+
+    if (error) {
+      console.error("[community] unrepost failed", error.code, error.message);
       return { ok: false, on: true, message: "Could not undo that." };
     }
   }

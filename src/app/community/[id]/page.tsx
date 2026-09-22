@@ -20,7 +20,7 @@ import {
   readerFor,
   EMPTY_VIEWER_STATE,
 } from "@/lib/community/queries";
-import { PostActions, CommentLike } from "@/components/community/post-actions";
+import { PostActions } from "@/components/community/post-actions";
 import { PostControls } from "@/components/community/post-controls";
 import {
   PostAttachment,
@@ -28,6 +28,8 @@ import {
   PostMediaGallery,
 } from "@/components/community/post-media";
 import { CommentForm } from "@/components/community/comment-form";
+import { CommentThread } from "@/components/community/comment-thread";
+import { buildThread } from "@/lib/community/thread";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +91,10 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
   if (!post) notFound();
 
   const comments = await getComments(db, post.id);
+  /* The same flat read as before, shaped into a tree. Replies are unlimited in
+     depth as of 2026-09-22, so a flat list would have shown every reply as a
+     sibling of the comment it answers. */
+  const thread = buildThread(comments);
 
   const [viewer, likedComments] = await Promise.all([
     signedIn
@@ -168,7 +174,7 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
             {post.body}
           </p>
 
-          <PostMediaGallery media={post.media} className="mt-4" />
+          <PostMediaGallery media={post.media} postId={post.id} className="mt-4" />
 
           <PostAttachment tool={post.tool} model={post.model} className="mt-4" />
 
@@ -243,71 +249,27 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
               No comments yet.
             </p>
           ) : (
-            <ol className="mt-6 space-y-5">
-              {comments.map((comment) => {
-                const cAuthor = comment.author;
-                const cHandle = cAuthor?.username ?? null;
-                const cName = cAuthor ? personName(cAuthor) : "Someone";
-                const cIsOwner = Boolean(viewerId && viewerId === comment.author_id);
+            /*
+              THE SAME COMPONENT THE VIDEO SHEET RENDERS. It was a flat <ol>
+              written inline here, which could not show a reply under the comment
+              it answers once parent_id existed. One thread renderer, two
+              surfaces, so a change to how a comment looks cannot land on one and
+              miss the other.
 
-                return (
-                  <li key={comment.id} className="border-t border-border pt-5">
-                    <div className="flex gap-3">
-                      <Avatar
-                        fullName={cAuthor?.full_name}
-                        username={cAuthor?.username}
-                        avatarUrl={cAuthor?.avatar_url}
-                        size="sm"
-                        className="shrink-0"
-                      />
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-2 text-[14px]">
-                          {cHandle ? (
-                            <Link
-                              href={`/u/${cHandle}`}
-                              className="font-medium hover:underline hover:underline-offset-4"
-                            >
-                              {cName}
-                            </Link>
-                          ) : (
-                            <span className="font-medium">{cName}</span>
-                          )}
-                          <span className="text-[13px] text-muted" suppressHydrationWarning>
-                            <time dateTime={comment.created_at}>
-                              {relativeTime(comment.created_at)}
-                            </time>
-                          </span>
-                        </div>
-
-                        <p className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed">
-                          {comment.body}
-                        </p>
-
-                        <div className="-ms-3 mt-1 flex items-center gap-2">
-                          <CommentLike
-                            commentId={comment.id}
-                            likeCount={comment.like_count}
-                            liked={likedComments.has(comment.id)}
-                            signedIn={signedIn}
-                          />
-                        </div>
-
-                        {signedIn ? (
-                          <PostControls
-                            entityType="comment"
-                            entityId={comment.id}
-                            postId={post.id}
-                            isOwner={cIsOwner}
-                            signedIn={signedIn}
-                          />
-                        ) : null}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
+              PostControls is not passed down: report and delete live on this
+              page for the reason that component already gives, and putting them
+              on every node of a deep thread is the icon soup the brief rules
+              out.
+            */
+            <div className="mt-6">
+              <CommentThread
+                nodes={thread}
+                postId={post.id}
+                likedIds={[...likedComments]}
+                signedIn={signedIn}
+                viewerId={viewerId}
+              />
+            </div>
           )}
         </section>
       </Container>

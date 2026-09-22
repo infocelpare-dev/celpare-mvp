@@ -112,7 +112,7 @@ export function PostCard({
             {post.body}
           </p>
 
-          <PostMediaGallery media={post.media} className="mt-3" />
+          <PostMediaGallery media={post.media} postId={post.id} className="mt-3" />
 
           <PostAttachment tool={post.tool} model={post.model} className="mt-3" />
 

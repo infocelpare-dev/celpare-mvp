@@ -48,7 +48,7 @@ export const POST_SELECT =
   ", media:post_media(id, media_kind, url, width, height, sort_order)";
 
 const COMMENT_SELECT =
-  "id, post_id, author_id, body, created_at, like_count, status" +
+  "id, post_id, parent_id, author_id, body, created_at, like_count, status" +
   ", author:profiles!comments_author_id_fkey(" +
   AUTHOR_COLUMNS +
   ")";
@@ -121,6 +121,9 @@ export type FeedPost = {
 export type Comment = {
   id: string;
   post_id: string;
+  /* null is a top level comment. Anything else points at another comment on the
+     same post, which comments_parent_guard enforces in the database. */
+  parent_id: string | null;
   author_id: string;
   body: string;
   created_at: string;

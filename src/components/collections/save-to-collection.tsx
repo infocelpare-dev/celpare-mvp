@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Bookmark, Check, Library, Lock, Globe, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -60,20 +61,27 @@ export function SaveToCollection({
      picker re-reads the truth when it opens. */
   initialSaved,
   signedIn,
-  /* The tool page shows a wide labelled button, a feed card a compact icon. */
+  /* The tool page shows a wide labelled button, a feed card a compact icon, and
+     the video viewer's three dot menu a full width row that matches the items
+     beside it. Three shapes, one picker: the alternative was a second save
+     control inside the menu, which is the duplicate system the brief rules out. */
   variant = "button",
   /* The public save count, for surfaces that carry one. Posts do; a tool does
      not, because tools have no save_count column and inventing one would be the
      metric D13 and D30 rule out. Hidden at zero, per the post card rule. */
   count,
+  /* Fired when a toggle lands, so a surface that records its own analytics can
+     note the save without this component knowing anything about analytics. */
+  onSaved,
   className,
 }: {
   entityType: SaveEntity;
   entityId: string;
   initialSaved: boolean;
   signedIn: boolean;
-  variant?: "button" | "icon";
+  variant?: "button" | "icon" | "menu";
   count?: number;
+  onSaved?: () => void;
   className?: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -158,6 +166,11 @@ export function SaveToCollection({
 
     startTransition(async () => {
       const result = await toggleInCollection(id, entityType, entityId);
+      if (result.status === "ok") {
+        /* Only on the way in. Un-filing is not a save and recording it as one
+           would tell a later ranker the opposite of what happened. */
+        if (!before) onSaved?.();
+      }
       if (result.status === "error") {
         setTargets((t) => ({
           ...t,
@@ -189,6 +202,23 @@ export function SaveToCollection({
   if (!signedIn) {
     /* A control that cannot work is defect F4, so a signed out visitor gets the
        way to fix that rather than a button that refuses. */
+    if (variant === "menu") {
+      return (
+        <Link
+          href="/get-started"
+          role="menuitem"
+          className={cn(
+            "flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-start text-[14px]",
+            "transition-colors duration-200 ease-out hover:bg-surface",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+            className,
+          )}
+        >
+          <Bookmark className="size-[18px] shrink-0 text-muted" aria-hidden />
+          <span className="min-w-0 flex-1 truncate">Save</span>
+        </Link>
+      );
+    }
     return variant === "icon" ? (
       <ButtonLink href="/get-started" variant="ghost" size="sm" className={className}>
         <Bookmark className="size-[18px]" aria-hidden />
@@ -213,6 +243,7 @@ export function SaveToCollection({
         onClick={openPicker}
         aria-haspopup="dialog"
         aria-expanded={open}
+        {...(variant === "menu" ? { role: "menuitem" } : null)}
         className={cn(
           "inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border px-3 text-[14px] transition-colors duration-200 ease-out",
           saved
@@ -222,19 +253,30 @@ export function SaveToCollection({
              it widens only when it is carrying a count. */
           variant === "icon" &&
             "h-11 min-w-11 justify-center rounded-full border-transparent px-3 hover:bg-surface",
+          /* In a menu it is a row like the rows around it: full width, start
+             aligned, no border of its own. */
+          variant === "menu" &&
+            "h-auto min-h-11 w-full justify-start gap-3 rounded-xl border-transparent px-3 text-start text-foreground hover:bg-surface",
           className,
         )}
       >
         <Bookmark
-          className={cn(variant === "icon" ? "size-[18px]" : "size-4", saved && "fill-current")}
+          className={cn(
+            variant === "button" ? "size-4" : "size-[18px]",
+            "shrink-0",
+            saved && "fill-current",
+            variant === "menu" && !saved && "text-muted",
+          )}
           aria-hidden
         />
         {variant === "icon" ? (
           <span className="sr-only">{saved ? "Saved. Change where" : "Save"}</span>
+        ) : variant === "menu" ? (
+          <span className="min-w-0 flex-1 truncate">{saved ? "Saved" : "Save"}</span>
         ) : (
           <span>{saved ? "Saved" : "Save"}</span>
         )}
-        {shownCount !== undefined && shownCount > 0 ? (
+        {variant !== "menu" && shownCount !== undefined && shownCount > 0 ? (
           <span className="tabular-nums text-[13px]">{shownCount}</span>
         ) : null}
       </button>
