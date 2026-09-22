@@ -43,29 +43,48 @@ function normalize(query: string): string {
   return query.trim().replace(/\s+/g, " ").toLowerCase().slice(0, 200);
 }
 
-export type SearchSource = "explore" | "ask" | "api" | "admin";
+export type SearchSource = "explore" | "ask" | "api" | "admin" | "search";
 
+/*
+  Returns the id of the row it wrote, or null.
+
+  The id is what lets an impression or a click be attributed to the search that
+  produced it, which is the query_id on search_result_events. Every existing
+  caller ignores the return value and keeps its fire and forget shape; the search
+  page awaits it, because a result list that cannot say which search it came from
+  can never be measured.
+*/
 export async function recordSearch(input: {
   query: string;
   resultCount: number;
   userId?: string | null;
   source?: SearchSource;
-}): Promise<void> {
+}): Promise<string | null> {
   const query = input.query.trim().slice(0, 200);
-  if (!query) return;
-  if (unavailable("search")) return;
+  if (!query) return null;
+  if (unavailable("search")) return null;
 
   try {
-    const { error } = await createAdminClient().from("search_events").insert({
-      user_id: input.userId ?? null,
-      query,
-      normalized: normalize(query),
-      result_count: Math.max(0, Math.trunc(input.resultCount)),
-      source: input.source ?? "explore",
-    });
-    if (error) console.error("[telemetry] search insert failed", error.code, error.message);
+    const { data, error } = await createAdminClient()
+      .from("search_events")
+      .insert({
+        user_id: input.userId ?? null,
+        query,
+        normalized: normalize(query),
+        result_count: Math.max(0, Math.trunc(input.resultCount)),
+        source: input.source ?? "explore",
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("[telemetry] search insert failed", error.code, error.message);
+      return null;
+    }
+    return (data as { id: string } | null)?.id ?? null;
   } catch (err) {
     console.error("[telemetry] search insert threw", err);
+    return null;
   }
 }
 

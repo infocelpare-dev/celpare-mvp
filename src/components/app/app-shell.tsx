@@ -96,8 +96,14 @@ export function AppShell({
               Both are public, so they show signed out as well. Chats stay in
               the sidebar behind the one menu button rather than being repeated
               here and in a rail, which is the reversal 4O.4 recorded.
+
+              THE MAGNIFIER POINTS AT /search NOW, not /explore. It pointed at
+              the browse page because there was no query surface to send it to.
+              There is one, and the two are different things: /explore is for
+              looking around, /search is for knowing what you want. A magnifier
+              means the second.
             */}
-            <BarIcon href="/explore" label="Search Celpare">
+            <BarIcon href="/search" label="Search Celpare">
               <Search className="size-[18px]" aria-hidden />
             </BarIcon>
             <BarIcon href="/ask" label="Ask Celpare">

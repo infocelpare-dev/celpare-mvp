@@ -413,7 +413,12 @@ export function ProfileView({
             <LabelledChips
               title="Interested in"
               items={profile.interests}
-              hrefFor={(v) => `/explore?q=${encodeURIComponent(v)}`}
+              /* /search now, not /explore. The parameter was DEAD here: nothing
+                 on /explore reads a q, so every interest chip on every profile
+                 opened the browse page and dropped the word that was clicked.
+                 There is a query surface now, so the chip does what it looked
+                 like it was doing all along. */
+              hrefFor={(v) => `/search?q=${encodeURIComponent(v)}`}
             />
           ) : null}
           {profile.skills.length > 0 ? (
