@@ -1,3 +1,5 @@
+import { AppShellSkeleton } from "@/components/app/app-shell-skeleton";
+
 /*
   The loading state for search.
 
@@ -17,44 +19,46 @@
 */
 export default function Loading() {
   return (
-    <div className="mx-auto w-full max-w-[760px] px-4 py-4 sm:px-5">
-      <div className="h-5 w-32 rounded bg-surface" aria-hidden />
+    <AppShellSkeleton>
+      <div className="mx-auto w-full max-w-[760px] px-4 py-4 sm:px-5">
+        <div className="h-5 w-32 rounded bg-surface" aria-hidden />
 
-      {/* The field itself is the same height as the real one, so the page does
-          not move when it is replaced. */}
-      <div className="mt-3 h-12 w-full animate-pulse rounded-xl border border-border bg-surface" aria-hidden />
+        {/* The field itself is the same height as the real one, so the page does
+            not move when it is replaced. */}
+        <div className="mt-3 h-12 w-full animate-pulse rounded-xl border border-border bg-surface" aria-hidden />
 
-      <div className="mt-5 flex gap-1 border-b border-border pb-3" aria-hidden>
-        {[64, 76, 84, 80].map((w) => (
-          <div
-            key={w}
-            style={{ width: w }}
-            className="h-10 animate-pulse rounded-full bg-surface"
-          />
-        ))}
+        <div className="mt-5 flex gap-1 border-b border-border pb-3" aria-hidden>
+          {[64, 76, 84, 80].map((w) => (
+            <div
+              key={w}
+              style={{ width: w }}
+              className="h-10 animate-pulse rounded-full bg-surface"
+            />
+          ))}
+        </div>
+
+        <ol className="mt-1" aria-hidden>
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <li
+              key={i}
+              className="flex gap-3.5 border-b border-border px-1 py-4 sm:gap-4"
+            >
+              <div className="size-12 shrink-0 animate-pulse rounded-full bg-surface sm:size-14" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="h-4 w-40 animate-pulse rounded bg-surface" />
+                <div className="h-3.5 w-full max-w-[420px] animate-pulse rounded bg-surface" />
+                <div className="h-3 w-48 animate-pulse rounded bg-surface" />
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        {/* One live region for the whole skeleton. Six of them would announce six
+            times. */}
+        <p role="status" className="sr-only">
+          Searching Celpare
+        </p>
       </div>
-
-      <ol className="mt-1" aria-hidden>
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <li
-            key={i}
-            className="flex gap-3.5 border-b border-border px-1 py-4 sm:gap-4"
-          >
-            <div className="size-12 shrink-0 animate-pulse rounded-full bg-surface sm:size-14" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="h-4 w-40 animate-pulse rounded bg-surface" />
-              <div className="h-3.5 w-full max-w-[420px] animate-pulse rounded bg-surface" />
-              <div className="h-3 w-48 animate-pulse rounded bg-surface" />
-            </div>
-          </li>
-        ))}
-      </ol>
-
-      {/* One live region for the whole skeleton. Six of them would announce six
-          times. */}
-      <p role="status" className="sr-only">
-        Searching Celpare
-      </p>
-    </div>
+    </AppShellSkeleton>
   );
 }

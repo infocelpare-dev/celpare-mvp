@@ -1,3 +1,5 @@
+import { AppShellSkeleton } from "@/components/app/app-shell-skeleton";
+
 /*
   THIS FILE LIVES IN A (feed) ROUTE GROUP, AND THAT IS NOT TIDINESS.
 
@@ -34,39 +36,41 @@
 */
 export default function Loading() {
   return (
-    <div className="mx-auto flex w-full max-w-[1200px] gap-8 px-4 py-4 sm:px-5 xl:justify-center">
-      {/* Matches the rails' widths so the middle column does not move sideways
-          when the real page replaces this. */}
-      <div className="hidden w-[200px] shrink-0 xl:block" aria-hidden />
+    <AppShellSkeleton>
+      <div className="mx-auto flex w-full max-w-[1200px] gap-8 px-4 py-4 sm:px-5 xl:justify-center">
+        {/* Matches the rails' widths so the middle column does not move sideways
+            when the real page replaces this. */}
+        <div className="hidden w-[200px] shrink-0 xl:block" aria-hidden />
 
-      <div
-        className="min-w-0 flex-1 xl:max-w-[640px]"
-        role="status"
-        aria-busy="true"
-      >
-        <span className="sr-only">Loading the feed</span>
+        <div
+          className="min-w-0 flex-1 xl:max-w-[640px]"
+          role="status"
+          aria-busy="true"
+        >
+          <span className="sr-only">Loading the feed</span>
 
-        <div className="h-14" aria-hidden />
+          <div className="h-14" aria-hidden />
 
-        <ul className="border-t border-border" aria-hidden>
-          {[0, 1, 2, 3, 4].map((i) => (
-            <li
-              key={i}
-              className="flex gap-3 border-b border-border px-4 py-4 sm:px-5 sm:py-5"
-            >
-              <div className="size-10 shrink-0 animate-pulse rounded-full bg-surface" />
-              <div className="min-w-0 flex-1 space-y-2.5">
-                <div className="h-3.5 w-40 animate-pulse rounded bg-surface" />
-                <div className="h-3.5 w-full animate-pulse rounded bg-surface" />
-                <div className="h-3.5 w-4/5 animate-pulse rounded bg-surface" />
-                <div className="h-9 w-32 animate-pulse rounded-full bg-surface" />
-              </div>
-            </li>
-          ))}
-        </ul>
+          <ul className="border-t border-border" aria-hidden>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <li
+                key={i}
+                className="flex gap-3 border-b border-border px-4 py-4 sm:px-5 sm:py-5"
+              >
+                <div className="size-10 shrink-0 animate-pulse rounded-full bg-surface" />
+                <div className="min-w-0 flex-1 space-y-2.5">
+                  <div className="h-3.5 w-40 animate-pulse rounded bg-surface" />
+                  <div className="h-3.5 w-full animate-pulse rounded bg-surface" />
+                  <div className="h-3.5 w-4/5 animate-pulse rounded bg-surface" />
+                  <div className="h-9 w-32 animate-pulse rounded-full bg-surface" />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="hidden w-[300px] shrink-0 xl:block" aria-hidden />
       </div>
-
-      <div className="hidden w-[300px] shrink-0 xl:block" aria-hidden />
-    </div>
+    </AppShellSkeleton>
   );
 }
