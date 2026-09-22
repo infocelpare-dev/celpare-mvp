@@ -19,6 +19,8 @@ import { FeedEmpty } from "@/components/community/feed-empty";
 import { DiscoverRail } from "@/components/community/feed-rails";
 import { PostCard } from "@/components/community/post-card";
 import { CreatePostFab } from "@/components/community/create-post-fab";
+import { FeedEnd } from "@/components/community/feed-end";
+import { RANKING } from "@/lib/community/ranking";
 
 export const metadata: Metadata = {
   title: { absolute: "Celpare Community" },
@@ -115,7 +117,7 @@ export default async function CommunityPage({
       <div className="mx-auto flex w-full max-w-[1200px] gap-8 px-4 py-4 sm:px-5 xl:justify-center">
 
         <div className="min-w-0 flex-1 xl:max-w-[640px]">
-          <h1 className="sr-only">Celpare Community</h1>
+          <h1 id="top" className="sr-only">Celpare Community</h1>
 
           {/* The topics live INSIDE this control, opened from the chevron on
               For you, not as a row under it. Founder instruction 2026-09-19. */}
@@ -136,13 +138,31 @@ export default async function CommunityPage({
               rounded container the brief rules out, and D11 wants one
               hairline rather than a stack of boxes.
             */
-            <ol className="border-t border-border">
-              {posts.map((post) => (
-                <li key={post.id}>
-                  <PostCard post={post} viewer={viewer} signedIn={signedIn} />
-                </li>
-              ))}
-            </ol>
+            <>
+              <ol className="border-t border-border">
+                {posts.map((post) => (
+                  <li key={post.id}>
+                    <PostCard post={post} viewer={viewer} signedIn={signedIn} />
+                  </li>
+                ))}
+              </ol>
+
+              {/*
+                The end of the feed, said out loud, with the composer at the
+                point where somebody is most likely to want it.
+
+                `complete` is the one honest test for "there is no more": the
+                query asked for PAGE_SIZE and came back with fewer. A full page
+                means there may well be more that was never fetched, and saying
+                you have reached the end then would be a claim about the whole
+                community based on a LIMIT clause.
+              */}
+              <FeedEnd
+                complete={posts.length < RANKING.PAGE_SIZE}
+                signedIn={signedIn}
+                scope={scope}
+              />
+            </>
           )}
 
           {/* Clears the floating button, so the last post can always be
