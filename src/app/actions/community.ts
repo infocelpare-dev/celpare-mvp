@@ -426,58 +426,18 @@ export async function toggleLike(
 }
 
 /*
-  Save and unsave. Posts only: saves_entity_type_ok is a CHECK for exactly
-  'post', so the entity type is not a parameter here.
+  THE DIRECT SAVE ACTIONS ARE GONE, 2026-09-21.
 
-  A save is private. There is no cross user select policy on the table at all,
-  so a save count on a post row is the only thing anybody else ever sees.
+  Saving means filing into a collection now, and the database mirrors that
+  membership into the saved tables (tg_mirror_collection_save). An endpoint that
+  writes those tables directly would put a row there that belongs to no
+  collection, which the mirror would then never correct: the two would disagree
+  and the collection, which is the source of truth, would be the one that looked
+  wrong.
+
+  Every exported server action is a public endpoint whether or not anything calls
+  it, so these were deleted rather than left unreferenced.
 */
-export async function toggleSave(
-  postId: string,
-  on: boolean,
-): Promise<ToggleResult> {
-  if (!isSupabaseConfigured()) return { ok: false, on: !on, message: "Not connected." };
-
-  const parsed = z
-    .object({ postId: z.string().uuid(), on: z.boolean() })
-    .safeParse({ postId, on });
-  if (!parsed.success) return { ok: false, on: !on, message: "That did not work." };
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return { ok: false, on: false, message: "Sign in to save." };
-
-  if (parsed.data.on) {
-    const { error } = await supabase.from("saves").insert({
-      user_id: user.id,
-      entity_type: "post",
-      entity_id: parsed.data.postId,
-    });
-    if (error && error.code !== "23505") {
-      console.error("[community] save failed", error.code, error.message);
-      return { ok: false, on: false, message: "Could not save that." };
-    }
-  } else {
-    const { error } = await supabase
-      .from("saves")
-      .delete()
-      .eq("user_id", user.id)
-      .eq("entity_type", "post")
-      .eq("entity_id", parsed.data.postId);
-
-    if (error) {
-      console.error("[community] unsave failed", error.code, error.message);
-      return { ok: false, on: true, message: "Could not undo that." };
-    }
-  }
-
-  return { ok: true, on: parsed.data.on, message: "" };
-}
-
-/* ---------------------------------------------------------------- reports */
 
 export type ReportState = { status: "idle" | "success" | "error"; message: string };
 

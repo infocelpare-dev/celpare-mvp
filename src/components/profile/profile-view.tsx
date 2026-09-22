@@ -747,9 +747,15 @@ function TabPanel({
                   {c.description}
                 </p>
               ) : null}
+              {/*
+                "items", not "tools". A collection could only hold a tool until
+                2026-09-21; it holds tools, models and posts now, and this line
+                said "2 tools" over a collection holding one tool and one post.
+                A count is only as true as its noun.
+              */}
               {c.item_count > 0 ? (
                 <p className="mt-2 text-[13px] text-muted">
-                  {formatCount(c.item_count)} {c.item_count === 1 ? "tool" : "tools"}
+                  {formatCount(c.item_count)} {c.item_count === 1 ? "item" : "items"}
                 </p>
               ) : null}
             </Card>

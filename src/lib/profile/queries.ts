@@ -98,8 +98,6 @@ export function visibleTabs(isOwner: boolean, profile: Profile): TabKey[] {
     return open;
   }
 
-  const plan = profile.plan;
-
   /*
     Recent sits last, and only ever here. It is the searches you ran and the
     tools you opened, which is the most sensitive thing on the account, so
@@ -109,7 +107,17 @@ export function visibleTabs(isOwner: boolean, profile: Profile): TabKey[] {
   const tabs: TabKey[] = [
     "posts", "tools", "models", "replies", "media", "reposts", "liked", "saved",
   ];
-  if (plan !== "free") tabs.push("collections");
+  /*
+    EVERY PLAN HAS COLLECTIONS NOW. Founder decision 2026-09-21: free went from
+    zero to one, so the tab is no longer a dead end on a free account and the gate
+    that hid it is gone with the reason for it.
+
+    The plan is not read here at all any more, and that is the point: how many
+    collections a plan allows is one number, it lives in plan_limits, and
+    uc_plan_cap enforces it in the database. A copy of that rule in a function
+    that decides what to RENDER is how the two drift.
+  */
+  tabs.push("collections");
   tabs.push("recent");
   return tabs;
 }

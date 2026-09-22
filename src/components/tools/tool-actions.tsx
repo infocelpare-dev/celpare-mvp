@@ -1,12 +1,12 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { ThumbsUp, ThumbsDown, Bookmark, Share2, Flag, Check } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Share2, Flag, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SaveToCollection } from "@/components/collections/save-to-collection";
 import { Button } from "@/components/ui/button";
 import {
   reactToTool,
-  saveTool,
   reportTool,
   type ToolState,
 } from "@/app/actions/tool";
@@ -90,11 +90,10 @@ export function ToolActions({
   shareUrl: string;
 }) {
   const [reactState, react, reactPending] = useActionState(reactToTool, IDLE);
-  const [saveState, save, savePending] = useActionState(saveTool, IDLE);
   const [copied, setCopied] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
-  const message = reactState.message || saveState.message;
+  const message = reactState.message;
 
   async function share() {
     /* The canonical public URL, not window.location, so a share from a page
@@ -145,18 +144,19 @@ export function ToolActions({
           </ActionButton>
         </form>
 
-        <form action={save} className="contents">
-          <input type="hidden" name="toolId" value={toolId} />
-          <input type="hidden" name="slug" value={slug} />
-          <ActionButton
-            label={saved ? "Saved" : "Save"}
-            active={saved}
-            pressed={saved}
-            disabled={savePending || !signedIn}
-          >
-            <Bookmark className={cn("size-4", saved && "fill-current")} aria-hidden />
-          </ActionButton>
-        </form>
+        {/*
+          SAVE OPENS THE PICKER, it does not write. Founder decision 2026-09-21:
+          tapping Save shows your collections and the tool is saved only when a
+          row is toggled. There is no separate saved list to fall back on, so a
+          tool is saved BY being filed, and the database mirrors that membership
+          into user_saved_tools rather than the other way round.
+        */}
+        <SaveToCollection
+          entityType="tool"
+          entityId={toolId}
+          initialSaved={saved}
+          signedIn={signedIn}
+        />
 
         <button
           type="button"

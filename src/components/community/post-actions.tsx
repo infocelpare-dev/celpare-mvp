@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Bookmark, Check, Heart, MessageCircle, Share2 } from "lucide-react";
+import { Check, Heart, MessageCircle, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SaveToCollection } from "@/components/collections/save-to-collection";
 import { formatCount } from "@/lib/format";
-import { toggleLike, toggleSave } from "@/app/actions/community";
+import { toggleLike } from "@/app/actions/community";
 
 /*
   The action row under a post: like, comment, save.
@@ -52,8 +53,6 @@ export function PostActions({
 }) {
   const [likeOn, setLikeOn] = useState(liked);
   const [likes, setLikes] = useState(likeCount);
-  const [saveOn, setSaveOn] = useState(saved);
-  const [saves, setSaves] = useState(saveCount);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -111,22 +110,6 @@ export function PostActions({
     });
   }
 
-  function onSave() {
-    const next = !saveOn;
-    setSaveOn(next);
-    setSaves((n) => Math.max(0, n + (next ? 1 : -1)));
-    setError("");
-
-    startTransition(async () => {
-      const result = await toggleSave(postId, next);
-      if (!result.ok) {
-        setSaveOn(!next);
-        setSaves((n) => Math.max(0, n + (next ? -1 : 1)));
-        setError(result.message);
-      }
-    });
-  }
-
   return (
     <div className={cn("mt-3", className)}>
       <div className="flex items-center gap-1">
@@ -163,25 +146,20 @@ export function PostActions({
           ) : null}
         </Link>
 
-        {signedIn ? (
-          <ActionButton
-            label={saveOn ? "Remove from saved" : "Save"}
-            count={saves}
-            on={saveOn}
-            onClick={onSave}
-            disabled={pending}
-            tone="save"
-          >
-            <Bookmark
-              className={cn("size-[18px]", saveOn && "fill-current")}
-              aria-hidden
-            />
-          </ActionButton>
-        ) : (
-          <SignInAction label="Save" count={saves} tone="save">
-            <Bookmark className="size-[18px]" aria-hidden />
-          </SignInAction>
-        )}
+        {/*
+          SAVE OPENS THE PICKER. Founder decision 2026-09-21. The component
+          carries the count itself, so the row still reads the same as the like
+          beside it, and it handles the signed out case with a link to the gate
+          rather than a control that would refuse.
+        */}
+        <SaveToCollection
+          entityType="post"
+          entityId={postId}
+          initialSaved={saved}
+          signedIn={signedIn}
+          variant="icon"
+          count={saveCount}
+        />
 
         {/*
           Share is open to everybody, signed in or not. It writes nothing and

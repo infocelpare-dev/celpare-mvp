@@ -96,29 +96,19 @@ export async function reactToTool(_prev: ToolState, formData: FormData): Promise
 
 /* -------------------------------------------------------------------- save */
 
-/* Reuses user_saved_tools, which has existed since the profile work. There is
-   no second save system here. */
-export async function saveTool(_prev: ToolState, formData: FormData): Promise<ToolState> {
-  const parsed = z.object({ toolId: uuid, slug: z.string().min(1) })
-    .safeParse({ toolId: formData.get("toolId"), slug: formData.get("slug") });
-  if (!parsed.success) return { status: "error", message: "That did not work." };
+/*
+  THE DIRECT SAVE ACTIONS ARE GONE, 2026-09-21.
 
-  const s = await session();
-  if (!s) return SIGN_IN;
+  Saving means filing into a collection now, and the database mirrors that
+  membership into the saved tables (tg_mirror_collection_save). An endpoint that
+  writes those tables directly would put a row there that belongs to no
+  collection, which the mirror would then never correct: the two would disagree
+  and the collection, which is the source of truth, would be the one that looked
+  wrong.
 
-  const { toolId, slug } = parsed.data;
-  const { data: existing } = await s.db
-    .from("user_saved_tools").select("tool_id").eq("tool_id", toolId).maybeSingle();
-
-  const { error } = existing
-    ? await s.db.from("user_saved_tools").delete().eq("tool_id", toolId)
-    : await s.db.from("user_saved_tools").insert({ user_id: s.user.id, tool_id: toolId });
-
-  if (error) return refused(error);
-  revalidatePath(`/tools/${slug}`);
-  revalidatePath("/profile");
-  return { status: "success", message: existing ? "Removed from saved." : "Saved." };
-}
+  Every exported server action is a public endpoint whether or not anything calls
+  it, so these were deleted rather than left unreferenced.
+*/
 
 /* ------------------------------------------------------------ rate + review */
 
