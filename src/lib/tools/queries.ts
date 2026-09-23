@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createAnonClient, createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { createAnonClient, createClient, getCurrentUser, isSupabaseConfigured } from "@/lib/supabase/server";
 
 /*
   Everything the public tool profile reads.
@@ -184,9 +184,9 @@ export async function getViewerState(toolId: string, developerId: string | null)
   };
   if (!isSupabaseConfigured()) return blank;
 
-  const db: SupabaseClient = await createClient();
-  const { data: { user } } = await db.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) return blank;
+  const db: SupabaseClient = await createClient();
 
   const [reaction, saved, review, report] = await Promise.all([
     db.from("tool_reactions").select("value").eq("tool_id", toolId).maybeSingle(),

@@ -17,8 +17,9 @@ import { grantsFor } from "./modes";
 import { runDeepResearch } from "./research";
 import { smallTalkReply } from "./small-talk";
 import { getProvider, models, providerName } from "./providers";
-import { checkLimits, countMessage, countTokens } from "./ratelimit";
+import { checkIdentityLimits, countIdentityMessage, countIdentityTokens } from "./ratelimit";
 import { loadToolCards, searchTools, type ToolCard } from "./tool-search";
+import { evidenceIntent, evidenceSources, loadModelEvidence } from "./model-evidence";
 import { estimateTokens, recordUsage } from "./usage";
 import { recordAiCall } from "./observability";
 import { webSearch } from "./web-search";
@@ -144,7 +145,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
   }
 
   // 3
-  const verdict = await checkLimits(identity.subject, identity.plan);
+  const verdict = await checkIdentityLimits(identity);
   if (!verdict.allowed) {
     await recordUsage({ ...baseUsage, latencyMs: Date.now() - started, status: "rate_limited" });
     return {
@@ -186,7 +187,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
     /* A refusal still costs a message. Pointing the product at off topic
        subjects repeatedly is the behaviour the allowance is there to slow
        down, and not counting it would make refusals free to spam. */
-    await countMessage(identity.subject);
+    await countIdentityMessage(identity);
     await recordUsage({ ...baseUsage, latencyMs: Date.now() - started, status: "refused_scope" });
     return {
       ok: false,
@@ -287,12 +288,25 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
 
   // Counted on acceptance, so abandoning a stream does not refund a message and
   // hand out an unlimited allowance to anyone who closes the tab.
-  await countMessage(identity.subject);
+  await countIdentityMessage(identity);
 
   // 6. Tool permissions are per feature, per plan and now per toggle (D41),
   // never global. Each of the three has to agree.
+  /*
+    Model evidence: benchmark definitions and recorded results. Read whenever the
+    question is about models or benchmarks, because it is two small reads of
+    public data and it is the only thing that lets an answer cite a benchmark
+    rather than recall one. A question about models and not about tools skips
+    the product catalogue, whose cards would be about something else.
+  */
+  const intent = conversational ? { relevant: false, modelsOnly: false, goals: [] } : evidenceIntent(cleaned.text);
+
   const doToolSearch =
-    !conversational && grants.toolSearch.allowed && wants.toolSearch && classification.needsToolSearch;
+    !conversational &&
+    !intent.modelsOnly &&
+    grants.toolSearch.allowed &&
+    wants.toolSearch &&
+    classification.needsToolSearch;
 
   const doDeepResearch = !conversational && grants.deepResearch.allowed && wants.deepResearch;
 
@@ -409,18 +423,19 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
         }
         if (doWebSearch) searchCalls += 1;
 
-        const [tools, searched] = await Promise.all([
+        const [tools, searched, evidence] = await Promise.all([
           doToolSearch
             ? searchTools(classification.topic)
             : Promise.resolve([] as ToolCitation[]),
           doWebSearch
             ? webSearch(classification.topic)
             : Promise.resolve([] as WebResult[]),
+          loadModelEvidence(cleaned.text, intent),
         ]);
 
         let web = searched;
 
-        const thin = doToolSearch && tools.length < MIN_CATALOGUE_MATCH;
+        const thin = doToolSearch && tools.length < MIN_CATALOGUE_MATCH && !(evidence && evidence.rows.length > 0);
 
         /*
           The catalogue did not answer it. Reach for the web before reaching for
@@ -466,8 +481,11 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
           emit(controller, { t: "cards", citations: tools, cards });
         }
 
-        if (research.length > 0) {
-          emit(controller, { t: "sources", v: research });
+        /* The benchmark sources go in the same strip as web sources, so a
+           number in the answer can be followed back to where it was published. */
+        const shown = [...evidenceSources(evidence), ...research];
+        if (shown.length > 0) {
+          emit(controller, { t: "sources", v: shown });
         }
 
         /*
@@ -481,6 +499,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
             ? buildResearchPrompt({
                 canary,
                 tools: citations,
+                evidence,
                 docs,
                 web: research,
                 bio: identity.bio,
@@ -492,6 +511,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
             : buildSystemPrompt({
                 canary,
                 tools: citations,
+                evidence,
                 docs,
                 web: research,
                 bio: identity.bio,
@@ -537,6 +557,17 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
         if (tail) {
           answer += tail;
           emit(controller, { t: "text", v: tail });
+        }
+
+        /*
+          The way to see the evidence, added by the server rather than asked of
+          the model: a link the model writes can be cut off by the length budget
+          or mistyped, and this one is built from the rows that were retrieved.
+        */
+        if (evidence?.compareHref && answer.trim().length > 0 && !filter.canaryTripped) {
+          const link = `\n\n[See these models side by side in Compare](${evidence.compareHref})`;
+          answer += link;
+          emit(controller, { t: "text", v: link });
         }
 
         /*
@@ -618,7 +649,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
         }
       }
 
-      await countTokens(identity.subject, inputTokens, outputTokens);
+      await countIdentityTokens(identity, inputTokens, outputTokens);
       await recordUsage({
         ...baseUsage,
         inputTokens,

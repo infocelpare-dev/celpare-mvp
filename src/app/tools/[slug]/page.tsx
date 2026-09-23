@@ -19,6 +19,7 @@ import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { ToolActions } from "@/components/tools/tool-actions";
+import { CompareLink } from "@/components/compare/compare-link";
 import {
   RatingSummary,
   ReviewComposer,
@@ -274,6 +275,9 @@ export default async function ToolPage({
               <ExternalLink className="size-4" aria-hidden />
             </ButtonLink>
           ) : null}
+
+          {/* Opens Compare with this tool already in the first column. */}
+          <CompareLink type="tool" slug={tool.slug} name={tool.name} variant="button" className="h-11 rounded-xl px-[22px] text-[15px]" />
 
           {/* Went to /developer/tools, the LIST, which is why editing looked
               broken: the control existed and its destination never did. */}

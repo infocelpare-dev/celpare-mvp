@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { DocSection } from "./celpare-docs";
+import type { ModelEvidence } from "./model-evidence";
 import type { ToolCitation, WebResult } from "./types";
 
 /* Marks a request as the classifier call, so the mock provider can honour the
@@ -89,6 +90,71 @@ function toolBlock(tools: ToolCitation[]) {
   ].join("\n");
 }
 
+/*
+  Model evidence: what benchmarks measure and the results recorded for them.
+
+  Trusted catalogue content, like the tool block, because every line of it comes
+  from Celpare's own tables with its source attached. The rules travel WITH the
+  data, so they are only in the prompt when there is evidence to apply them to.
+*/
+const EVIDENCE_RULES = `CELPARE MODEL EVIDENCE is below. When the question is which model suits a job, answer compactly in this shape:
+
+- One bullet per relevant benchmark: the benchmark name in bold, what it measures in at most twelve plain words, then the models' exact results highest first, with anything printed beside a number such as with tools. For coding use the coding benchmarks listed, not general ones. A model with no result on it: "not published".
+- One short line of caution: results are published by the company that makes the models. Name a different measurer ONLY for the exact results the evidence marks that way, never for a whole company's models. Where the gap is within the stated standard error, say it is too close to call.
+- One or two sentences to finish: the model that fits the job best on this evidence, never "best overall", and the condition that would change it, usually price, quoting the recorded price per million tokens.
+
+No headings. Use only the numbers below; never add a benchmark, a score or a date from memory. Do not write a Compare link yourself, one is added after your answer.`;
+
+function fmtScore(score: number, unit: string) {
+  const v = Number(score.toFixed(2));
+  return unit === "percent" ? `${v}%` : `${v} (${unit})`;
+}
+
+function evidenceBlock(e: ModelEvidence | null | undefined) {
+  if (!e || e.benchmarks.length === 0) return "";
+
+  const lines: string[] = [
+    "CELPARE MODEL EVIDENCE, retrieved for this question from the Celpare catalogue. Authoritative for the numbers it contains:",
+    "",
+    "What these benchmarks measure:",
+    ...e.benchmarks.map(
+      (b) => `- ${b.name} (${b.category}): ${b.measures} How to read it: ${b.howToRead} Evidence for: ${b.useCases.join(", ")}.`,
+    ),
+  ];
+
+  if (e.rows.length > 0) {
+    lines.push("", "Recorded results:");
+    const byBench = new Map<string, typeof e.rows>();
+    for (const r of e.rows) byBench.set(r.benchmark, [...(byBench.get(r.benchmark) ?? []), r]);
+    for (const [bench, rows] of byBench) {
+      lines.push(`- ${bench}:`);
+      for (const r of rows) {
+        const bits = [
+          `${r.model}: ${fmtScore(r.score, r.unit)}`,
+          r.note ? `(${r.note})` : "",
+          `measured by ${r.measuredBy}, published ${r.published} in ${r.sourceLabel} (${r.sourceUrl})`,
+        ].filter(Boolean);
+        lines.push(`  ${bits.join(" ")}`);
+      }
+    }
+
+    const models = new Map<string, (typeof e.rows)[number]>();
+    for (const r of e.rows) if (!models.has(r.model)) models.set(r.model, r);
+    lines.push("", "Recorded prices, US dollars per million tokens (Celpare catalogue):");
+    for (const m of models.values()) {
+      const price =
+        m.inputPrice !== null && m.outputPrice !== null
+          ? `$${m.inputPrice} input, $${m.outputPrice} output`
+          : "price not recorded";
+      lines.push(`- ${m.model}${m.provider ? ` by ${m.provider}` : ""}: ${price}`);
+    }
+  } else {
+    lines.push("", "No results have been recorded on these benchmarks yet. Say so rather than giving numbers.");
+  }
+
+  return [EVIDENCE_RULES, lines.join("\n")].join("\n\n");
+}
+
 function docsBlock(docs: DocSection[]) {
   if (docs.length === 0) return "";
   // Celpare's own documentation, so this is trusted content and sits with the
@@ -134,6 +200,7 @@ function profileBlock(
 export function buildSystemPrompt(opts: {
   canary: string;
   tools: ToolCitation[];
+  evidence?: ModelEvidence | null;
   docs: DocSection[];
   web: WebResult[];
   bio: string | null;
@@ -155,6 +222,7 @@ export function buildSystemPrompt(opts: {
     docsBlock(opts.docs),
     profileBlock(opts.bio, opts.interests, opts.skills),
     toolBlock(opts.tools),
+    evidenceBlock(opts.evidence),
     webBlock(opts.web),
   ]
     .filter(Boolean)
@@ -240,6 +308,7 @@ How you answer here:
 export function buildResearchPrompt(opts: {
   canary: string;
   tools: ToolCitation[];
+  evidence?: ModelEvidence | null;
   docs: DocSection[];
   web: WebResult[];
   bio: string | null;
@@ -261,6 +330,7 @@ export function buildResearchPrompt(opts: {
     docsBlock(opts.docs),
     profileBlock(opts.bio, opts.interests, opts.skills),
     toolBlock(opts.tools),
+    evidenceBlock(opts.evidence),
     webBlock(opts.web),
   ]
     .filter(Boolean)

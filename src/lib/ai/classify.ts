@@ -70,6 +70,12 @@ const IN_SCOPE = [
   "celpare", "chatgpt", "claude", "gemini", "openai", "anthropic", "cursor",
   "copilot", "midjourney", "runway", "supabase", "vercel", "notion", "figma",
   "compare", "alternative", "instead of", "best for", "which one",
+  /* Model evaluation. A question about what a benchmark measures, or how a
+     model scored on one, is squarely about AI models, and without these it
+     read as off topic: "What does Terminal-Bench measure?" was refused. */
+  "benchmark", "-bench", "bench ", "leaderboard", "eval", "osworld", "gdpval",
+  "last exam", "chartography", "frontiercode", "automationbench", "cursorbench",
+  "gpt", "opus", "fable", "grok", "deepseek", "llama", "mistral", "qwen",
 ];
 
 /*

@@ -137,7 +137,7 @@ export function ToolCards({ tools }: { tools: ToolCitation[] }) {
                       <ArrowRight className="size-3.5" aria-hidden />
                     </Link>
                     <Link
-                      href={`/compare?a=${tool.slug}`}
+                      href={`/compare?items=tool:${tool.slug}`}
                       className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] text-muted transition-colors duration-200 hover:bg-background hover:text-foreground"
                     >
                       <Scale className="size-3.5" aria-hidden />

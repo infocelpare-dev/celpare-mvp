@@ -243,3 +243,62 @@ function revalidateFor(entityType: SaveEntity) {
   revalidatePath("/profile");
   if (entityType === "post") revalidatePath("/community");
 }
+
+/* ---------------------------------------------------------------------------
+   Save a comparison
+
+   A comparison is an ordered list of tools and models, which is what a
+   collection already is, so saving one creates a collection holding them in
+   column order (D113). No comparisons table, no second saved system. The plan
+   cap, the name uniqueness and the ownership policies all apply unchanged,
+   because the RPC runs as the caller.
+   --------------------------------------------------------------------------- */
+
+const comparisonSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Give it a name.")
+    .max(80, "Keep the name under 80 characters."),
+  isPublic: z.boolean(),
+  items: z
+    .array(z.object({ type: z.enum(["tool", "model"]), id: uuid }))
+    .min(2, "A comparison needs at least two items.")
+    .max(12),
+});
+
+export async function saveComparison(input: {
+  name: string;
+  isPublic: boolean;
+  items: { type: "tool" | "model"; id: string }[];
+}): Promise<SaveResult> {
+  const parsed = comparisonSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "That did not work.",
+    };
+  }
+
+  const s = await session();
+  if (!s) return { status: "error", message: "Sign in to save a comparison." };
+
+  const { data, error } = await s.db.rpc("create_collection_from_items", {
+    p_name: parsed.data.name,
+    p_description: null,
+    p_is_public: parsed.data.isPublic,
+    p_items: parsed.data.items,
+  });
+  if (error) {
+    if (error.message.includes("compare_item_unavailable")) {
+      return {
+        status: "error",
+        message: "One of these is no longer listed. Remove it and try again.",
+      };
+    }
+    return explain(error);
+  }
+
+  revalidatePath("/profile");
+  return { status: "ok", collectionId: String(data) };
+}
