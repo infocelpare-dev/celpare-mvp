@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/card";
 import { Stars } from "@/components/tools/tool-reviews";
 import { FollowButton } from "@/components/profile/follow-button";
 import { SaveToCollection } from "@/components/collections/save-to-collection";
+import { CompareLink } from "@/components/compare/compare-link";
 import { formatCount, personName, relativeTime } from "@/lib/format";
 import type { ExploreTopic } from "@/lib/explore/types";
 import type { ModelCandidate, PersonCandidate, ToolCandidate } from "@/lib/search/types";
@@ -163,7 +164,8 @@ export function ToolCard({
 
         <div className="mt-3 flex items-center justify-between gap-2">
           {reason ? <Badge>{reason}</Badge> : <span />}
-          <span className={OVER}>
+          <span className={`${OVER} flex items-center`}>
+            <CompareLink type="tool" slug={tool.slug} name={tool.name} />
             <SaveToCollection
               entityType="tool"
               entityId={tool.id}
@@ -261,7 +263,8 @@ export function ModelCard({
           ) : (
             <span />
           )}
-          <span className={OVER}>
+          <span className={`${OVER} flex items-center`}>
+            <CompareLink type="model" slug={model.slug} name={model.name} />
             <SaveToCollection
               entityType="model"
               entityId={model.id}
@@ -283,11 +286,13 @@ export function ModelCard({
 export function PersonCard({
   person,
   following,
+  followsYou = false,
   signedIn,
   viewerId,
 }: {
   person: PersonCandidate;
   following: boolean;
+  followsYou?: boolean;
   signedIn: boolean;
   viewerId: string | null;
 }) {
@@ -372,6 +377,7 @@ export function PersonCard({
               username={person.username}
               initialFollowing={following}
               signedIn={signedIn}
+              followsYou={followsYou}
             />
           )}
         </div>

@@ -9,6 +9,7 @@ import {
   loadDiscussions,
   loadFeatured,
   loadFollowing,
+  loadFollowsMe,
   loadForYou,
   loadNewAndRecent,
   loadPeople,
@@ -84,16 +85,17 @@ async function viewerFor(
     .filter((i) => i.kind === "post" || i.kind === "video")
     .map((i) => i.id);
 
-  const [savedTools, savedModels, following, posts] = await Promise.all([
+  const [savedTools, savedModels, following, followsMe, posts] = await Promise.all([
     loadSaved(ctx.viewerId, "tool", toolIds),
     loadSaved(ctx.viewerId, "model", modelIds),
     loadFollowing(ctx.viewerId, personIds),
+    loadFollowsMe(ctx.viewerId, personIds),
     postIds.length > 0
       ? getViewerState(await createClient(), ctx.viewerId, postIds)
       : Promise.resolve(EMPTY_VIEWER_STATE),
   ]);
 
-  return { ...base, savedTools, savedModels, following, posts };
+  return { ...base, savedTools, savedModels, following, followsMe, posts };
 }
 
 /* A shelf of mixed or single kind items, which is what most sections are. */

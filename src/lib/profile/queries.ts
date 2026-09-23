@@ -169,6 +169,23 @@ export async function getProfileById(
   return (data as Profile | null) ?? null;
 }
 
+/* Does this person follow the viewer (4BA). Through my_follow_state, which
+   answers only about edges touching the caller, so a private account that
+   hides its follow list still tells you it follows YOU. */
+export async function followsViewer(
+  db: SupabaseClient,
+  viewerId: string | null,
+  targetId: string,
+): Promise<boolean> {
+  if (!viewerId || viewerId === targetId) return false;
+  const { data, error } = await db.rpc("my_follow_state", { p_ids: [targetId] });
+  if (error) {
+    console.error("[profile] follow state failed", error.code, error.message);
+    return false;
+  }
+  return Boolean((data as { follows_me: boolean }[] | null)?.[0]?.follows_me);
+}
+
 /* Is the viewer following this person. Null when signed out. */
 export async function isFollowing(
   db: SupabaseClient,

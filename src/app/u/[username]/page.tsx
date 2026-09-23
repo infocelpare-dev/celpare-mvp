@@ -14,6 +14,7 @@ import {
   getProfileByUsername,
   getTabRows,
   isFollowing,
+  followsViewer,
   isTabKey,
   readerFor,
   visibleTabs,
@@ -89,10 +90,11 @@ export default async function PublicProfilePage({
   const search = await searchParams;
   const activeTab = isTabKey(search.tab, tabs) ? search.tab : "posts";
 
-  const [rows, featuredTools, following] = await Promise.all([
+  const [rows, featuredTools, following, followsYou] = await Promise.all([
     getTabRows(db, activeTab, profile, isOwner),
     getFeaturedTools(db, profile.id),
     isFollowing(sessionClient, user?.id ?? null, profile.id),
+    followsViewer(sessionClient, user?.id ?? null, profile.id),
   ]);
 
   /* Read through the SESSION client, never the anon one: this is what the
@@ -120,6 +122,7 @@ export default async function PublicProfilePage({
           isOwner={isOwner}
           viewerSignedIn={signedIn}
           following={following}
+          followsYou={followsYou}
           tabs={tabs}
           activeTab={activeTab}
           rows={rows}

@@ -102,6 +102,7 @@ export function ProfileView({
   isOwner,
   viewerSignedIn,
   following,
+  followsYou = false,
   tabs,
   activeTab,
   rows,
@@ -114,6 +115,8 @@ export function ProfileView({
   isOwner: boolean;
   viewerSignedIn: boolean;
   following: boolean;
+  /* They follow the viewer, for Follow back and Friends (4BA). */
+  followsYou?: boolean;
   tabs: TabKey[];
   activeTab: TabKey;
   rows: {
@@ -237,6 +240,7 @@ export function ProfileView({
                     username={profile.username}
                     initialFollowing={following}
                     signedIn={viewerSignedIn}
+                    followsYou={followsYou}
                   />
 
                   {/*

@@ -34,6 +34,8 @@ export type ItemViewer = {
   savedTools: Set<string>;
   savedModels: Set<string>;
   following: Set<string>;
+  /* Who follows the viewer, for Follow back and Friends (4BA). */
+  followsMe?: Set<string>;
   /* Likes and saves for the posts on screen, in the shape PostCard expects. */
   posts: ViewerState;
 };
@@ -75,6 +77,7 @@ export function ExploreItemCard({
         <PersonCard
           person={item.person}
           following={viewer.following.has(item.person.id)}
+          followsYou={viewer.followsMe?.has(item.person.id) ?? false}
           signedIn={viewer.signedIn}
           viewerId={viewer.viewerId}
         />

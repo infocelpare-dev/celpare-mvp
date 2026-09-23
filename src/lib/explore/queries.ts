@@ -438,6 +438,34 @@ export async function loadPeople(ctx: ExploreContext): Promise<SectionState> {
 }
 
 /*
+  Which of these people follow the VIEWER (4BA), for Follow back and Friends.
+  Through my_follow_state, which answers only about edges touching the caller.
+*/
+export async function loadFollowsMe(
+  viewerId: string | null,
+  personIds: string[],
+): Promise<Set<string>> {
+  if (!viewerId || personIds.length === 0 || !isSupabaseConfigured()) {
+    return new Set<string>();
+  }
+  try {
+    const db = await createClient();
+    const { data, error } = await db.rpc("my_follow_state", { p_ids: personIds });
+    if (error) {
+      console.error("[explore] follows me failed", error.code, error.message);
+      return new Set<string>();
+    }
+    return new Set(
+      ((data ?? []) as { id: string; follows_me: boolean }[])
+        .filter((r) => r.follows_me)
+        .map((r) => r.id),
+    );
+  } catch {
+    return new Set<string>();
+  }
+}
+
+/*
   Which of these people the viewer already follows, so a Follow button renders
   the right way round on arrival rather than flickering after hydration.
 

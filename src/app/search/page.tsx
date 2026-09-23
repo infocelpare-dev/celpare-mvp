@@ -4,7 +4,7 @@ import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { BackLink } from "@/components/ui/back-link";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { createClient, getCurrentUser, isSupabaseConfigured } from "@/lib/supabase/server";
 import { SearchInput } from "@/components/search/search-input";
 import { RecentSearches } from "@/components/search/recent-searches";
 import { SearchEmptyState } from "@/components/search/empty-state";
@@ -23,6 +23,7 @@ import { readerFor } from "@/lib/search/retrieval";
 import { loadRecentSearches, RECENT_SEARCHES_SHOWN } from "@/lib/search/history";
 import { loadRecommendations, loadRelatedSearches } from "@/lib/search/recommendations";
 import { getViewerState, EMPTY_VIEWER_STATE } from "@/lib/community/queries";
+import { loadFollowsMe } from "@/lib/explore/queries";
 import { WEIGHTS } from "@/lib/search/ranking";
 import type { SearchResults, SearchTab, Scored } from "@/lib/search/types";
 
@@ -83,10 +84,7 @@ export default async function SearchPage({
   let viewerId: string | null = null;
 
   if (isSupabaseConfigured()) {
-    const db = await createClient();
-    const {
-      data: { user },
-    } = await db.auth.getUser();
+    const user = await getCurrentUser();
     signedIn = Boolean(user);
     viewerId = user?.id ?? null;
   }
@@ -242,14 +240,16 @@ async function Results({
   /* The viewer's own likes and saves for those posts, read with the SESSION
      client, never the anon one: what somebody liked is nobody's business but
      theirs. 4AK.4 made the same call for the profile. */
-  const viewer =
+  const [viewer, followsMe] = await Promise.all([
     signedIn && viewerId
-      ? await getViewerState(
-          await createClient(),
-          viewerId,
-          [...postRows.keys()],
-        )
-      : EMPTY_VIEWER_STATE;
+      ? getViewerState(await createClient(), viewerId, [...postRows.keys()])
+      : Promise.resolve(EMPTY_VIEWER_STATE),
+    /* Who among the people shown follows the viewer, for Follow back (4BA). */
+    loadFollowsMe(
+      viewerId,
+      list.filter((s) => s.candidate.type === "person").map((s) => s.candidate.id),
+    ),
+  ]);
 
   function render(item: Scored, position: number) {
     const c = item.candidate;
@@ -280,6 +280,7 @@ async function Results({
           position={position}
           signedIn={signedIn}
           following={results.following.has(c.id)}
+          followsYou={followsMe.has(c.id)}
           viewerId={viewerId}
         />
       );

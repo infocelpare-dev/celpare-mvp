@@ -7,6 +7,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Stars } from "@/components/tools/tool-reviews";
 import { FollowButton } from "@/components/profile/follow-button";
 import { PostCard } from "@/components/community/post-card";
+import { CompareLink } from "@/components/compare/compare-link";
 import { formatCount, personName } from "@/lib/format";
 import type { FeedPost, ViewerState } from "@/lib/community/queries";
 import type {
@@ -152,10 +153,14 @@ export function ToolResult({
           website is the one thing somebody might want without opening the tool
           page first, and an outbound click is a stronger ranking signal than a
           click through, which is why it is marked. */}
-      <span className="relative z-[1] hidden shrink-0 items-start sm:flex">
-        <ButtonLink href={`/tools/${t.slug}`} variant="outline" size="sm">
-          View tool
-        </ButtonLink>
+      <span className="relative z-[1] flex shrink-0 items-start gap-2">
+        <CompareLink type="tool" slug={t.slug} name={t.name} className="sm:hidden" />
+        <CompareLink type="tool" slug={t.slug} name={t.name} variant="button" className="hidden sm:inline-flex" />
+        <span className="hidden sm:flex">
+          <ButtonLink href={`/tools/${t.slug}`} variant="outline" size="sm">
+            View tool
+          </ButtonLink>
+        </span>
       </span>
     </li>
   );
@@ -229,6 +234,11 @@ export function ModelResult({
         ) : null}
       </span>
 
+      <span className="relative z-[1] flex shrink-0 items-start gap-2">
+        <CompareLink type="model" slug={m.slug} name={m.name} className="sm:hidden" />
+        <CompareLink type="model" slug={m.slug} name={m.name} variant="button" className="hidden sm:inline-flex" />
+      </span>
+
       {m.websiteUrl ? (
         <span className="relative z-[1] hidden shrink-0 items-start sm:flex">
           <a
@@ -256,12 +266,15 @@ export function PersonResult({
   position,
   signedIn,
   following,
+  followsYou = false,
   viewerId,
 }: {
   item: Scored<PersonCandidate>;
   position: number;
   signedIn: boolean;
   following: boolean;
+  /* They follow the viewer: Follow back, or Friends (4BA). */
+  followsYou?: boolean;
   /* So the row can tell whether it is describing the person reading it. */
   viewerId?: string | null;
 }) {
@@ -377,6 +390,7 @@ export function PersonResult({
             targetId={p.id}
             username={p.username}
             initialFollowing={following}
+            followsYou={followsYou}
             signedIn={signedIn}
           />
         )}

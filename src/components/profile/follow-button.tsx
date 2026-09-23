@@ -18,11 +18,15 @@ export function FollowButton({
   username,
   initialFollowing,
   signedIn,
+  followsYou = false,
 }: {
   targetId: string;
   username: string;
   initialFollowing: boolean;
   signedIn: boolean;
+  /* They follow the viewer (4BA). Turns Follow into Follow back, and Following
+     into Friends once both follow each other, as Instagram and TikTok word it. */
+  followsYou?: boolean;
 }) {
   const [state, action, pending] = useActionState<FollowState, FormData>(
     toggleFollow,
@@ -79,10 +83,20 @@ export function FollowButton({
           variant={optimistic ? "outline" : "primary"}
           disabled={pending}
           aria-label={
-            optimistic ? `Unfollow ${username}` : `Follow ${username}`
+            optimistic
+              ? `Unfollow ${username}`
+              : followsYou
+                ? `Follow ${username} back`
+                : `Follow ${username}`
           }
         >
-          {optimistic ? "Following" : "Follow"}
+          {optimistic
+            ? followsYou
+              ? "Friends"
+              : "Following"
+            : followsYou
+              ? "Follow back"
+              : "Follow"}
         </Button>
       </form>
       <span ref={liveRef} role="status" aria-atomic="true" className="text-[13px] text-muted" />
