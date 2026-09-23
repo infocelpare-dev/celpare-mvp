@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAnonClient, createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { Suggestion } from "@/lib/search/types";
+import { withinBurst } from "@/lib/security/burst";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -49,6 +50,9 @@ export async function GET(request: NextRequest) {
      a table scan with a dropdown attached. */
   if (q.length < 2 || !isSupabaseConfigured()) {
     return NextResponse.json({ suggestions: [] });
+  }
+  if (!(await withinBurst("suggest"))) {
+    return NextResponse.json({ suggestions: [] }, { status: 429 });
   }
 
   try {

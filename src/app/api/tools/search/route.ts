@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { searchTools } from "@/lib/ai/tool-search";
 import { identify } from "@/lib/ai/identity";
-import { checkLimits, countMessage } from "@/lib/ai/ratelimit";
+import { checkIdentityLimits, countIdentityMessage } from "@/lib/ai/ratelimit";
 import { recordSearch } from "@/lib/telemetry";
 
 export const dynamic = "force-dynamic";
@@ -38,14 +38,14 @@ export async function GET(request: NextRequest) {
   }
 
   const identity = await identify();
-  const verdict = await checkLimits(identity.subject, identity.plan);
+  const verdict = await checkIdentityLimits(identity);
   if (!verdict.allowed) {
     return NextResponse.json(
       { error: verdict.message, resetsAt: verdict.resetsAt },
       { status: 429 },
     );
   }
-  await countMessage(identity.subject);
+  await countIdentityMessage(identity);
 
   const tools = await searchTools(parsed.data.q, parsed.data.limit);
 

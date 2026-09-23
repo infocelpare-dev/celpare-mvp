@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { recordResultEvents } from "@/lib/search/analytics";
+import { withinBurst } from "@/lib/security/burst";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -55,6 +56,8 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   if (!isSupabaseConfigured()) return new NextResponse(null, { status: 204 });
+  /* Written with the service role, so without this one script could fill the table. */
+  if (!(await withinBurst("beacon"))) return new NextResponse(null, { status: 429 });
 
   let body: unknown;
   try {

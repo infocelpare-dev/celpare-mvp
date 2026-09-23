@@ -60,11 +60,21 @@ export function hashIp(ip: string): string {
   return createHmac("sha256", secret()).update(ip).digest("hex").slice(0, 32);
 }
 
-async function clientIp(): Promise<string> {
+/*
+  cf-connecting-ip first, because Cloudflare (D15) sets it and a client cannot. The
+  leftmost X-Forwarded-For entry is whatever the client wrote, and proxies append
+  to it rather than replacing it, so trusting it first would let a script choose a
+  new address, and a new allowance, on every request.
+*/
+export async function clientIp(): Promise<string> {
   const h = await headers();
+  const cf = h.get("cf-connecting-ip")?.trim();
+  if (cf) return cf;
+  const real = h.get("x-real-ip")?.trim();
+  if (real) return real;
   const forwarded = h.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
-  return h.get("x-real-ip") ?? "unknown";
+  return "unknown";
 }
 
 /* Per person Ask Celpare preferences. Every field optional: an account created
@@ -85,6 +95,12 @@ export type Identity = {
   settings: AskSettings;
   /* The Redis key. Never a raw IP and never an email. */
   subject: string;
+  /* Anonymous only: a second key on the hashed address alone. The cookie is minted
+     by the server for anyone who arrives without one, so a script that never sends
+     it would get a fresh `subject`, and a fresh allowance, on every request. This
+     key is the same whatever the cookie says, which is what makes the anon limit
+     a limit. Null for a signed in person, whose account id already is one. */
+  ipSubject: string | null;
   anonHash: string | null;
   /* Set when a new anonymous cookie needs writing to the response. */
   setCookie?: { name: string; value: string; maxAge: number };
@@ -114,6 +130,7 @@ export async function identify(): Promise<Identity> {
         skills: profile?.skills ?? [],
         settings: (profile?.ask_settings ?? {}) as AskSettings,
         subject: `u:${user.id}`,
+        ipSubject: null,
         anonHash: null,
       };
     }
@@ -137,6 +154,7 @@ export async function identify(): Promise<Identity> {
     // construction rather than by preference (D36).
     settings: {},
     subject: `a:${anonHash}`,
+    ipSubject: `ip:${ipHash}`,
     anonHash,
     setCookie: verified
       ? undefined

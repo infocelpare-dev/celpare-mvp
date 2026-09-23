@@ -76,7 +76,7 @@ async function readCounter(key: string): Promise<number> {
   return value ?? 0;
 }
 
-async function bump(key: string, by: number, ttlSeconds: number): Promise<number> {
+export async function bump(key: string, by: number, ttlSeconds: number): Promise<number> {
   const r = redis();
   if (!r) {
     const hit = memory.get(key);
@@ -104,8 +104,21 @@ export type LimitVerdict =
   Checked before the model is called. Whichever limit is hit first stops the
   request: messages today, tokens today, or tokens this month.
 */
-export async function checkLimits(subject: string, plan: Plan): Promise<LimitVerdict> {
-  const limits = PLAN_LIMITS[plan];
+export async function checkLimits(
+  subject: string,
+  plan: Plan,
+  scale = 1,
+): Promise<LimitVerdict> {
+  const base = PLAN_LIMITS[plan];
+  /* `scale` widens the ceilings for a key shared by several people, the per address
+     anon key below. The message still quotes the per person number. */
+  const limits = {
+    messagesPerDay: base.messagesPerDay * scale,
+    dailyInputTokens: base.dailyInputTokens * scale,
+    dailyOutputTokens: base.dailyOutputTokens * scale,
+    monthlyInputTokens: base.monthlyInputTokens * scale,
+    monthlyOutputTokens: base.monthlyOutputTokens * scale,
+  };
   const day = dayKey();
   const month = monthKey();
   const resetsAt = nextResetIso();
@@ -125,8 +138,8 @@ export async function checkLimits(subject: string, plan: Plan): Promise<LimitVer
         resetsAt,
         message:
           plan === "anon"
-            ? `You have used your ${limits.messagesPerDay} free questions for today. They reset at midnight. Create an account for ${PLAN_LIMITS.free.messagesPerDay} a day.`
-            : `You have used your ${limits.messagesPerDay} questions for today. They reset at midnight.`,
+            ? `You have used your ${base.messagesPerDay} free questions for today. They reset at midnight. Create an account for ${PLAN_LIMITS.free.messagesPerDay} a day.`
+            : `You have used your ${base.messagesPerDay} questions for today. They reset at midnight.`,
       };
     }
 
@@ -189,4 +202,39 @@ export async function countTokens(subject: string, input: number, output: number
   } catch (err) {
     console.error("[ai] failed to count tokens", err);
   }
+}
+
+/*
+  The anonymous allowance per address, as a multiple of the per visitor one. Several
+  people can share an address (an office, a phone network), so it is wider than one
+  visitor's; it exists so that a script which never keeps its cookie still hits a
+  ceiling. Somebody who needs more has an account for it.
+*/
+export const ANON_IP_SCALE = 4;
+
+type LimitSubjects = { subject: string; ipSubject: string | null; plan: Plan };
+
+/* Every key that applies to this caller, checked in turn. The first refusal wins. */
+export async function checkIdentityLimits(who: LimitSubjects): Promise<LimitVerdict> {
+  const own = await checkLimits(who.subject, who.plan);
+  if (!own.allowed || !who.ipSubject) return own;
+  return checkLimits(who.ipSubject, who.plan, ANON_IP_SCALE);
+}
+
+export async function countIdentityMessage(who: LimitSubjects): Promise<void> {
+  await Promise.all([
+    countMessage(who.subject),
+    who.ipSubject ? countMessage(who.ipSubject) : Promise.resolve(),
+  ]);
+}
+
+export async function countIdentityTokens(
+  who: LimitSubjects,
+  input: number,
+  output: number,
+): Promise<void> {
+  await Promise.all([
+    countTokens(who.subject, input, output),
+    who.ipSubject ? countTokens(who.ipSubject, input, output) : Promise.resolve(),
+  ]);
 }

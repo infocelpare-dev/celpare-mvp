@@ -218,6 +218,12 @@ export async function finishJobRun(
   something automated is at work. It is never used to authorise anything.
 */
 export function clientIp(headers: Headers): string | null {
+  /* Cloudflare (D15) sets cf-connecting-ip and a client cannot, so it wins when
+     present. The audit log records this address for every admin action. */
+  const cf = headers.get("cf-connecting-ip")?.trim();
+  if (cf) return cf;
+  const real = headers.get("x-real-ip")?.trim();
+  if (real) return real;
   const forwarded = headers.get("x-forwarded-for");
   if (forwarded) {
     const first = forwarded.split(",")[0]?.trim();

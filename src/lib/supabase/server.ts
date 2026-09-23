@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createPlainClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 const url = () => process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = () => process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -85,6 +86,27 @@ export async function createAdminScopedClient(clientIp: string | null) {
     },
   });
 }
+
+/*
+  The signed in user for THIS request, verified with the auth server once.
+
+  A page, the admin link and the notice bar each asked getUser() on their own, and
+  each ask is a network round trip to Supabase Auth, so one render paid for three or
+  four of them in a row. cache() scopes the answer to a single server render, so it
+  is shared inside one request and never between two people. It is still getUser,
+  not getSession (D21): the token is revalidated, just not four times.
+
+  For server rendering only. A server action is its own request and calls getUser
+  directly.
+*/
+export const getCurrentUser = cache(async () => {
+  if (!isSupabaseConfigured()) return null;
+  const db = await createClient();
+  const {
+    data: { user },
+  } = await db.auth.getUser();
+  return user;
+});
 
 /* Stateless client for anonymous writes that need no session, such as the
    demo request form. */

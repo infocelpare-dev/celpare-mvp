@@ -1,8 +1,43 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs/config";
 
+/*
+  Response headers on every route. None of these existed before the 2026-09-23 audit.
+
+  - HSTS: once a browser has seen the site over https it never tries http again,
+    so a network in the middle cannot downgrade a sign in. Ignored on localhost.
+  - nosniff: a file uploaded as an image is never executed as a script because a
+    browser guessed its type.
+  - frame-ancestors 'self' (and X-Frame-Options for older browsers): no other site
+    can frame Celpare to trick a click (clickjacking). Same origin stays allowed on
+    purpose, because the 390px check loads the app in an iframe of itself.
+  - object-src, base-uri, form-action: the three CSP directives that close real
+    injection routes and cannot break a Next app. A full script CSP needs per request
+    nonces through the proxy and is recorded as a follow up, not guessed at here.
+  - Permissions-Policy: the microphone is for our own origin only (DM voice notes);
+    camera, location and payment are off everywhere.
+*/
+const securityHeaders = [
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(self), geolocation=(), payment=(), usb=()",
+  },
+  {
+    key: "Content-Security-Policy",
+    value: "frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
+  },
+];
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  /* No "X-Powered-By: Next.js". It tells a scanner which exploits to try first. */
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders }];
+  },
 };
 
 /*
@@ -27,7 +62,7 @@ export default withSentryConfig(nextConfig, {
 
   /* The Sentry org is in the EU region. Without this the CLI uploads to the US
      host and the maps never arrive. */
-  sentryUrl: "https://sentry.io/",
+  sentryUrl: "https://de.sentry.io/",
 
   authToken: process.env.SENTRY_AUTH_TOKEN,
 

@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { getCurrentUser, isSupabaseConfigured } from "@/lib/supabase/server";
 import { ExploreHeader } from "@/components/explore/explore-header";
 import { ExploreTabs } from "@/components/explore/explore-tabs";
 import { SectionSkeleton } from "@/components/explore/skeletons";
@@ -108,10 +108,7 @@ export default async function ExplorePage({
   let viewerId: string | null = null;
 
   if (isSupabaseConfigured()) {
-    const db = await createClient();
-    const {
-      data: { user },
-    } = await db.auth.getUser();
+    const user = await getCurrentUser();
     signedIn = Boolean(user);
     viewerId = user?.id ?? null;
   }

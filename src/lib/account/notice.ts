@@ -1,4 +1,4 @@
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { createClient, getCurrentUser, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getAnnouncement } from "@/lib/platform/settings";
 
 /*
@@ -86,11 +86,9 @@ export async function getNotices(): Promise<Notice[]> {
 
   if (!isSupabaseConfigured()) return notices;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) return notices;
+  const supabase = await createClient();
 
   const { data } = await supabase
     .from("profiles")

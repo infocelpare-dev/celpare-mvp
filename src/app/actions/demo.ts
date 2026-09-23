@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createAnonClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { withinBurst } from "@/lib/security/burst";
 
 export type DemoState = {
   status: "idle" | "success" | "error";
@@ -46,11 +47,20 @@ export async function requestDemo(
     };
   }
 
+  if (!(await withinBurst("demo"))) {
+    return {
+      status: "error",
+      message: "Too many requests from this connection. Try again in a minute.",
+    };
+  }
+
   try {
     const supabase = createAnonClient();
+    // Only `email` is in the insert grant. `source` defaults to 'landing' in the table,
+    // so a caller holding the public key cannot label rows or backdate them.
     const { error } = await supabase
       .from("demo_requests")
-      .insert({ email: parsed.data.email, source: "landing" });
+      .insert({ email: parsed.data.email });
 
     if (error && error.code !== "23505") {
       console.error("[demo] insert failed", error.code, error.message);
