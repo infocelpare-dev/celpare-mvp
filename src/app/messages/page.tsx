@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Link2, Mic, MessagesSquare, Video } from "lucide-react";
+import { FileText, Image as ImageIcon, Link2, Mic, MessagesSquare, Video } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
@@ -40,8 +40,8 @@ export default async function MessagesPage() {
   if (!user) redirect("/get-started");
 
   const [threads, people] = await Promise.all([
-    listThreads(supabase, user.id),
-    listPeople(supabase, user.id),
+    listThreads(supabase),
+    listPeople(supabase),
   ]);
 
   return (
@@ -167,7 +167,7 @@ function Preview({
   body,
   mine,
 }: {
-  kind?: "text" | "voice" | "link" | "video";
+  kind?: "text" | "voice" | "link" | "video" | "file" | "image";
   body: string | null;
   mine: boolean;
 }) {
@@ -188,6 +188,22 @@ function Preview({
       <>
         <Video className="size-3.5 shrink-0" aria-hidden />
         <span className="truncate">{prefix}Video</span>
+      </>
+    );
+  }
+  if (kind === "image") {
+    return (
+      <>
+        <ImageIcon className="size-3.5 shrink-0" aria-hidden />
+        <span className="truncate">{prefix}Photo</span>
+      </>
+    );
+  }
+  if (kind === "file") {
+    return (
+      <>
+        <FileText className="size-3.5 shrink-0" aria-hidden />
+        <span className="truncate">{prefix}File</span>
       </>
     );
   }

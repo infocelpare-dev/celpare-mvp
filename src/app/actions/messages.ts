@@ -5,6 +5,18 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { normaliseUrl } from "@/lib/format";
+import { withinBurst } from "@/lib/security/burst";
+import {
+  cleanFileName,
+  DM_BUCKET,
+  DM_FILES_BUCKET,
+  DM_IMAGES_BUCKET,
+  MAX_DM_FILE_BYTES,
+  MAX_DM_IMAGE_BYTES,
+  MAX_DM_MEDIA_BYTES,
+  MAX_DM_VIDEO_BYTES,
+  matchesSignature,
+} from "@/lib/messages/shared";
 
 /*
   Every direct message write.
@@ -44,7 +56,7 @@ const uuid = z.string().uuid();
 const sendSchema = z
   .object({
     threadId: uuid,
-    kind: z.enum(["text", "voice", "link", "video"]),
+    kind: z.enum(["text", "voice", "link", "video", "file", "image"]),
     body: z.string().trim().max(4000, "That is over 4000 characters.").optional(),
     linkUrl: z
       .string()
@@ -54,6 +66,7 @@ const sendSchema = z
       .optional()
       .or(z.literal("")),
     mediaPath: z.string().trim().max(1024).optional().or(z.literal("")),
+    fileName: z.string().trim().max(255).optional().or(z.literal("")),
     durationSeconds: z.number().int().min(1).max(600).nullable(),
   })
   .superRefine((v, ctx) => {
@@ -63,7 +76,7 @@ const sendSchema = z
     if (v.kind === "link" && !v.linkUrl) {
       ctx.addIssue({ code: "custom", message: "Paste a link first.", path: ["linkUrl"] });
     }
-    if ((v.kind === "voice" || v.kind === "video") && !v.mediaPath) {
+    if ((v.kind === "voice" || v.kind === "video" || v.kind === "file" || v.kind === "image") && !v.mediaPath) {
       ctx.addIssue({ code: "custom", message: "That file did not attach.", path: ["mediaPath"] });
     }
   });
@@ -100,6 +113,12 @@ export async function startThread(
     if (error.code === "42501") {
       return { status: "error", message: "Your account cannot send messages right now." };
     }
+    if (error.code === "P0003") {
+      return {
+        status: "error",
+        message: "You can message friends only. Follow each other first.",
+      };
+    }
     return { status: "error", message: "Could not open that conversation." };
   }
 
@@ -132,6 +151,7 @@ export async function sendMessage(
     /* "celpare.com" becomes a link rather than a refusal. */
     linkUrl: normaliseUrl(String(formData.get("linkUrl") ?? "")),
     mediaPath: String(formData.get("mediaPath") ?? ""),
+    fileName: String(formData.get("fileName") ?? ""),
     durationSeconds: rawDuration ? Number(rawDuration) : null,
   });
 
@@ -148,6 +168,11 @@ export async function sendMessage(
 
   const { kind, threadId, mediaPath, linkUrl, durationSeconds } = parsed.data;
 
+  /* A per minute cap on sending, as well as the database's daily cap on files. */
+  if (!(await withinBurst("dm_send"))) {
+    return fail("You are sending too fast. Wait a moment and try again.");
+  }
+
   /*
     THE CONTROL ON UPLOADED MEDIA. The storage policy already stops a write
     into somebody else's folder. This stops a path being CLAIMED that the
@@ -162,14 +187,70 @@ export async function sendMessage(
     }
   }
 
+  /*
+    AN IMAGE, A VIDEO OR A VOICE NOTE (4BB). Exact path shape in this sender's
+    folder of this thread, then the object's real size against its limit and its
+    first 16 bytes against its format's signature (verifyMediaHead). A program
+    renamed photo.jpg is refused here. Nothing is decoded, resized or run.
+  */
+  if (kind === "image" || kind === "video" || kind === "voice") {
+    const rule = MEDIA_RULES[kind];
+    const folder = `${threadId}/${user.id}/`;
+    const path = mediaPath ?? "";
+    const m = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.([a-z0-9]{2,4})$/.exec(
+      path.slice(folder.length),
+    );
+    if (!path.startsWith(folder) || !m || !(rule.exts as readonly string[]).includes(m[1])) {
+      return fail(rule.wrongType);
+    }
+    const verdict = await verifyMediaHead(supabase, rule.bucket, path, m[1], rule.maxBytes);
+    if (!verdict.ok) return fail(verdict.message);
+  }
+
+  /*
+    A TXT OR CSV ATTACHMENT (4BA). Accepted only when every one of these holds,
+    and the database re-checks the name, size and path shape in
+    dm_messages_file_ok regardless:
+      - the path is <this thread>/<this sender>/<uuid>.txt|csv, nothing else;
+      - the shown name cleans to a .txt or .csv name;
+      - the bytes really are plain text (verifyPlainText below).
+    The file itself is never executed, parsed, previewed or written anywhere by
+    this server. It is read once, as bytes, to be checked, and then discarded.
+  */
+  let fileName: string | null = null;
+  let fileSize: number | null = null;
+  if (kind === "file") {
+    const cleaned = cleanFileName(parsed.data.fileName ?? "");
+    /* The folder by plain string comparison and the file part by a regex
+       literal, so no escaping inside a template string can loosen the check. */
+    const folder = `${threadId}/${user.id}/`;
+    const path = mediaPath ?? "";
+    const pathOk =
+      path.startsWith(folder) &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(txt|csv)$/.test(
+        path.slice(folder.length),
+      );
+    if (!cleaned || !pathOk) return fail("Only .txt and .csv files can be sent.");
+
+    const verdict = await verifyPlainText(supabase, mediaPath as string);
+    if (!verdict.ok) return fail(verdict.message);
+    fileName = cleaned.name;
+    fileSize = verdict.size;
+  }
+
   const { error } = await supabase.from("dm_messages").insert({
     thread_id: threadId,
     sender_id: user.id,
     kind,
     body: kind === "text" || kind === "link" ? (parsed.data.body ?? null) : null,
     link_url: kind === "link" ? linkUrl || null : null,
-    media_path: kind === "voice" || kind === "video" ? mediaPath || null : null,
+    media_path:
+      kind === "voice" || kind === "video" || kind === "file" || kind === "image"
+        ? mediaPath || null
+        : null,
     duration_seconds: kind === "voice" ? durationSeconds : null,
+    file_name: fileName,
+    file_size: fileSize,
   });
 
   if (error) {
@@ -179,6 +260,9 @@ export async function sendMessage(
     }
     if (error.code === "23514") {
       return fail("That message is missing something it needs.");
+    }
+    if (error.code === "P0004") {
+      return fail("You have sent the most files allowed today. Try again tomorrow.");
     }
     return fail("Could not send. Try again.");
   }
@@ -256,4 +340,128 @@ export async function deleteMessage(
 
   revalidatePath(`/messages/${threadId}`);
   return { ok: true, message: "" };
+}
+
+/*
+  Is the uploaded object genuinely plain text. The one place this server looks
+  at a file's contents, and it looks at them only as bytes:
+
+  - at most 1 MB, and not empty (the bucket's limit is 1 MB as well);
+  - no NUL and no control bytes other than tab, newline and carriage return,
+    which is what separates a text file from a binary renamed .txt;
+  - valid UTF-8, decoded with fatal: true so a single bad sequence refuses it.
+
+  Nothing is executed, evaluated, parsed as CSV, rendered or stored. The bytes
+  go out of scope when this returns. Not exported: a "use server" module may
+  export async functions only, and this must never be callable from a client.
+*/
+async function verifyPlainText(
+  db: Awaited<ReturnType<typeof createClient>>,
+  path: string,
+): Promise<{ ok: true; size: number } | { ok: false; message: string }> {
+  const { data, error } = await db.storage.from(DM_FILES_BUCKET).download(path);
+  if (error || !data) {
+    console.error("[dm] file check could not read the upload", error?.message);
+    return { ok: false, message: "That file did not upload. Try again." };
+  }
+  if (data.size === 0 || data.size > MAX_DM_FILE_BYTES) {
+    return { ok: false, message: "Files can be up to 1 MB." };
+  }
+
+  const bytes = new Uint8Array(await data.arrayBuffer());
+  for (const b of bytes) {
+    if ((b < 0x20 && b !== 0x09 && b !== 0x0a && b !== 0x0d) || b === 0x7f) {
+      return { ok: false, message: "That is not a plain text file." };
+    }
+  }
+  try {
+    new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return { ok: false, message: "That is not a plain text file." };
+  }
+  return { ok: true, size: bytes.length };
+}
+
+/* Where each media kind lives, what it may be, and how big (4BB). */
+const MEDIA_RULES = {
+  image: {
+    bucket: DM_IMAGES_BUCKET,
+    exts: ["jpg", "png", "webp"],
+    maxBytes: MAX_DM_IMAGE_BYTES,
+    wrongType: "Photos can be JPG, PNG or WebP.",
+  },
+  video: {
+    bucket: DM_BUCKET,
+    exts: ["mp4", "webm"],
+    maxBytes: MAX_DM_VIDEO_BYTES,
+    wrongType: "Videos can be MP4 or WebM.",
+  },
+  voice: {
+    bucket: DM_BUCKET,
+    exts: ["webm", "ogg", "m4a", "mp3"],
+    maxBytes: MAX_DM_MEDIA_BYTES,
+    wrongType: "That recording is not a format Celpare accepts.",
+  },
+} as const;
+
+/*
+  The real size and the first 16 bytes of an uploaded image, video or voice
+  note, and nothing more. A short lived signed URL is fetched with a Range
+  header, so a 25 MB video costs 16 bytes, not 25 MB; the total comes from
+  Content-Range. The bytes are compared to a fixed signature and dropped.
+  The URL is minted by our own client for our own bucket, so this cannot be
+  pointed anywhere else.
+*/
+async function verifyMediaHead(
+  db: Awaited<ReturnType<typeof createClient>>,
+  bucket: string,
+  path: string,
+  ext: string,
+  maxBytes: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { data: signed, error } = await db.storage.from(bucket).createSignedUrl(path, 60);
+  if (error || !signed?.signedUrl) {
+    console.error("[dm] media check could not sign", error?.message);
+    return { ok: false, message: "That did not upload. Try again." };
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(signed.signedUrl, {
+      headers: { Range: "bytes=0-15" },
+      cache: "no-store",
+    });
+  } catch (err) {
+    console.error("[dm] media check fetch failed", err);
+    return { ok: false, message: "That did not upload. Try again." };
+  }
+  if (!res.ok || !res.body) {
+    return { ok: false, message: "That did not upload. Try again." };
+  }
+
+  /* 206 carries "bytes 0-15/<total>"; a 200 means no range support, where the
+     length header is the total. Either way only the first chunk is read. */
+  const range = res.headers.get("content-range");
+  const total = range
+    ? Number(range.split("/")[1])
+    : Number(res.headers.get("content-length") ?? NaN);
+
+  const reader = res.body.getReader();
+  const first = await reader.read();
+  await reader.cancel().catch(() => {});
+  const head = (first.value ?? new Uint8Array()).slice(0, 16);
+
+  if (!Number.isFinite(total) || total <= 0) {
+    return { ok: false, message: "That did not upload. Try again." };
+  }
+  if (total > maxBytes) {
+    return {
+      ok: false,
+      message: `That is over the ${Math.round(maxBytes / (1024 * 1024))} MB limit.`,
+    };
+  }
+  if (!matchesSignature(ext, head)) {
+    return { ok: false, message: "That file is not what its name says, so it was not sent." };
+  }
+  return { ok: true };
 }

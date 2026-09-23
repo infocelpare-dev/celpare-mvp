@@ -82,7 +82,7 @@ export default async function CommunityPage({
   /* Signed out people have no messages and no grant to read any, so this is
      skipped entirely rather than asked and answered with zero. */
   const unreadMessages = signedIn && viewerId
-    ? await unreadThreadCount(await createClient(), viewerId)
+    ? await unreadThreadCount(await createClient())
     : 0;
 
   /*

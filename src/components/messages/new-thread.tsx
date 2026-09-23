@@ -55,12 +55,12 @@ export function NewThread({ people }: { people: DmPerson[] }) {
   }, [open]);
 
   if (people.length === 0) {
-    /* Nobody else has an account yet. A button that opens an empty list is a
-       dead end, so it is absent rather than disabled, which is the same call
-       FeaturedShelf makes when nothing is featured. */
+    /* No friends yet: the list is people who follow you and whom you follow
+       back (4BA). A button that opens an empty list is a dead end, so it is
+       absent rather than disabled, and the line says how to get somebody on it. */
     return (
-      <p className="text-[13px] text-muted">
-        Nobody else has joined yet.
+      <p className="max-w-[260px] text-end text-[13px] text-muted">
+        You can message friends. Follow someone and when they follow you back, they appear here.
       </p>
     );
   }

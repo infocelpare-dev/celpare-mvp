@@ -9,7 +9,6 @@ import { Avatar } from "@/components/ui/avatar";
 import { personName } from "@/lib/format";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getMessages, getThread } from "@/lib/messages/queries";
-import { markThreadRead } from "@/app/actions/messages";
 import { DmComposer } from "@/components/messages/dm-composer";
 import { DmMessageRow } from "@/components/messages/dm-message-row";
 
@@ -39,21 +38,40 @@ export default async function ThreadPage({ params }: PageProps<"/messages/[id]">
 
   if (!user) redirect("/get-started");
 
-  const thread = await getThread(supabase, id, user.id);
+  /*
+    THREE READS AT ONCE, not one after another (4AZ). They do not depend on each
+    other: the policies decide what each returns, so reading the messages before
+    knowing the thread is yours returns nothing when it is not, and the read
+    marker only ever touches the caller's own participant row.
+
+    Opening the thread is what marks it read, done here with the user already in
+    hand rather than through markThreadRead, which would ask the auth server who
+    this is a second time. Awaited, because the list this returns to is rendered
+    from the same request and would otherwise still show the unread dot.
+  */
+  const [thread, messages] = await Promise.all([
+    getThread(supabase, id, user.id),
+    getMessages(supabase, id),
+    supabase
+      .from("dm_participants")
+      .update({ last_read_at: new Date().toISOString() })
+      .eq("thread_id", id)
+      .eq("user_id", user.id)
+      .then(({ error }) => {
+        if (error) console.error("[dm] mark read failed", error.code, error.message);
+      }),
+  ]);
 
   /*
     Null covers "no such thread" and "not yours" with the same answer, so
-    neither can be told from the other. dm_threads_select_own is what actually
-    returns nothing; this only decides what to render.
+    neither can be told from the other. dm_participants_select_own is what
+    actually returns nothing; this only decides what to render.
   */
   if (!thread) notFound();
 
-  const messages = await getMessages(supabase, id);
-
-  /* Opening the thread is what marks it read. Awaited rather than fired and
-     forgotten, because the list this returns to is rendered from the same
-     request and would otherwise still show the unread dot. */
-  await markThreadRead(id);
+  /* The viewer's most recent message, which carries "Delivered". */
+  const lastMineId =
+    [...messages].reverse().find((m) => m.sender_id === user.id)?.id ?? null;
 
   /* The name, not the handle. Founder instruction 2026-09-19. */
   const who = thread.other ? personName(thread.other) : "Someone";
@@ -99,13 +117,26 @@ export default async function ThreadPage({ params }: PageProps<"/messages/[id]">
             </p>
           ) : (
             <ol className="mx-auto flex max-w-[640px] flex-col gap-2">
-              {messages.map((message) => (
-                <DmMessageRow
-                  key={message.id}
-                  message={message}
-                  mine={message.sender_id === user.id}
-                />
-              ))}
+              {messages.map((message, i) => {
+                const mine = message.sender_id === user.id;
+                /* A run is consecutive messages from one person: the name goes
+                   above its first bubble and the photo beside its last. */
+                const prev = messages[i - 1];
+                const next = messages[i + 1];
+                const firstOfRun = !prev || prev.sender_id !== message.sender_id;
+                const lastOfRun = !next || next.sender_id !== message.sender_id;
+                return (
+                  <DmMessageRow
+                    key={message.id}
+                    message={message}
+                    mine={mine}
+                    sender={mine ? null : thread.other}
+                    showAvatar={!mine && lastOfRun}
+                    showName={!mine && firstOfRun}
+                    delivered={mine && message.id === lastMineId}
+                  />
+                );
+              })}
             </ol>
           )}
         </div>
