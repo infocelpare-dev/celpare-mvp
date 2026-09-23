@@ -52,21 +52,19 @@ export function Navbar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
-      <Container className="flex h-[68px] items-center justify-between gap-4">
+    <header className="sticky top-0 z-50 bg-background/85 backdrop-blur-md">
+      <Container className="flex h-[72px] items-center justify-between gap-4">
         <Logo />
 
-        <nav aria-label="Main" className="hidden items-center gap-6 lg:flex">
+        <nav aria-label="Main" className="hidden flex-1 items-center gap-8 ps-10 lg:flex">
           {links.map((l) => (
             <Link
               key={l.href}
               href={l.href}
               aria-current={active === l.id ? "true" : undefined}
               className={cn(
-                "border-b-2 py-1 text-[15px] transition-colors duration-200 ease-out",
-                active === l.id
-                  ? "border-accent text-foreground"
-                  : "border-transparent text-muted hover:text-foreground",
+                "border-b-2 py-1 text-[16px] text-foreground transition-colors duration-200 ease-out hover:text-muted",
+                active === l.id ? "border-accent" : "border-transparent",
               )}
             >
               {l.label}
@@ -76,10 +74,10 @@ export function Navbar() {
 
         <div className="hidden items-center gap-3 lg:flex">
           <ThemeToggle />
-          <ButtonLink href="/login" variant="outline" size="sm">
+          <ButtonLink href="/login" variant="outline" className="h-10 px-5 text-[15px]">
             Log in
           </ButtonLink>
-          <ButtonLink href="/get-started" size="sm">
+          <ButtonLink href="/get-started" className="h-10 px-5 text-[15px]">
             Sign up
           </ButtonLink>
         </div>

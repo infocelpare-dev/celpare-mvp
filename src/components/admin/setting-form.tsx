@@ -125,7 +125,7 @@ export function SettingForm({
           type="submit"
           disabled={!dirty || pending}
           className={cn(
-            "inline-flex h-9 cursor-pointer items-center rounded-lg border border-transparent bg-accent px-4 text-[13px] font-medium text-on-accent transition-colors duration-200 ease-out hover:bg-[var(--celpare-lime-dim)]",
+            "inline-flex h-9 cursor-pointer items-center rounded-full border border-transparent bg-primary px-4 text-[13px] font-medium text-on-primary transition-colors duration-200 ease-out hover:bg-primary-hover",
             "disabled:pointer-events-none disabled:opacity-50",
           )}
         >

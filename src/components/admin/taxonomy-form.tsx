@@ -139,7 +139,7 @@ export function TaxonomyForm({
         <button
           type="submit"
           disabled={pending}
-          className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-transparent bg-accent px-3 text-[13px] font-medium text-on-accent transition-opacity duration-200 ease-out hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
+          className="inline-flex h-9 cursor-pointer items-center rounded-full border border-transparent bg-primary px-3 text-[13px] font-medium text-on-primary transition-opacity duration-200 ease-out hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
         >
           {pending ? "Saving..." : editing ? "Save" : `Add ${kind}`}
         </button>

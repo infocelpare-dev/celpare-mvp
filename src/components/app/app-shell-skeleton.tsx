@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Menu, Search } from "lucide-react";
+import { PanelLeft, Search } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { SparkIcon } from "@/components/ui/spark-icon";
 
@@ -40,7 +40,7 @@ export function AppShellSkeleton({ children }: { children: React.ReactNode }) {
             {/* The drawer button's exact footprint, so the real one does not
                 shift the logo sideways when it arrives. */}
             <div className="flex size-9 items-center justify-center" aria-hidden>
-              <Menu className="size-4 text-muted" />
+              <PanelLeft className="size-[18px] text-muted" />
             </div>
             <Logo wordmarkClassName="hidden sm:inline" />
           </div>

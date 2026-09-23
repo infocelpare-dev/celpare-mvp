@@ -1,20 +1,18 @@
 import type { Metadata } from "next";
-import { DM_Sans, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
-/* D10: Space Grotesk headings, DM Sans body, JetBrains Mono for model ids. */
-const dmSans = DM_Sans({
-  variable: "--font-dm-sans",
+/*
+  D122 supersedes D10: one neo grotesk, Inter, for headings and body, in the
+  ElevenLabs manner the founder asked for. Headings are set lighter and tighter
+  than before (see globals.css), which is most of what makes that style read.
+  JetBrains Mono stays for model ids.
+*/
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  display: "swap",
-});
-
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -71,7 +69,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         section. This is the documented opt in, not a style.
       */
       data-scroll-behavior="smooth"
-      className={`${dmSans.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider>{children}</ThemeProvider>

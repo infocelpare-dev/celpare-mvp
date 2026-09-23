@@ -20,7 +20,7 @@ export function Card({
 }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn("rounded-2xl border border-border p-5 sm:p-6", className)}
+      className={cn("rounded-3xl border border-border bg-elevated p-5 sm:p-6", className)}
       {...props}
     />
   );

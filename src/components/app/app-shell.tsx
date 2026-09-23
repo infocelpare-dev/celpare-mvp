@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, Search } from "lucide-react";
+import { PanelLeft, Search } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { SparkIcon } from "@/components/ui/spark-icon";
 import { Logo } from "@/components/ui/logo";
@@ -75,7 +75,7 @@ export function AppShell({
               aria-expanded={open}
               aria-controls="app-sidebar"
             >
-              <Menu className="size-4" aria-hidden />
+              <PanelLeft className="size-[18px]" aria-hidden />
             </Button>
             {/* The bar carries the logo at every width now, because the sidebar
                 that used to carry it is closed by default. */}

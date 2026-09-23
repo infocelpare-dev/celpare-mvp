@@ -89,7 +89,7 @@ export function FilterBar({
 
       <button
         type="submit"
-        className="h-9 rounded-lg border border-transparent bg-accent px-4 text-[13px] font-medium text-on-accent transition-colors duration-200 ease-out hover:bg-[var(--celpare-lime-dim)]"
+        className="h-9 rounded-full border border-transparent bg-primary px-4 text-[13px] font-medium text-on-primary transition-colors duration-200 ease-out hover:bg-primary-hover"
       >
         Apply
       </button>

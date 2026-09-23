@@ -186,6 +186,9 @@ export function Composer({
             // Enter sends, shift and enter makes a new line.
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
+              /* A held key repeats, and Enter that confirms an IME composition is
+                 not a send. Either used to fire a second request. */
+              if (e.repeat || e.nativeEvent.isComposing) return;
               onSend();
             }
           }}
@@ -302,7 +305,7 @@ export function Composer({
               onClick={onSend}
               disabled={!value.trim()}
               aria-label="Send"
-              className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-accent text-on-accent transition-colors duration-200 hover:bg-[var(--celpare-lime-dim)] disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-primary text-on-primary transition-colors duration-200 hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ArrowUp className="size-4" aria-hidden />
             </button>

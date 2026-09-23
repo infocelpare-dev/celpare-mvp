@@ -30,7 +30,7 @@ export function CreatePostFab({ signedIn }: { signedIn: boolean }) {
     <Link
       href={href}
       title={label}
-      className="fixed end-4 z-30 inline-flex size-14 items-center justify-center rounded-full bg-accent text-on-accent transition-colors duration-200 ease-out hover:bg-[var(--celpare-lime-dim)] sm:end-6"
+      className="fixed end-4 z-30 inline-flex size-14 items-center justify-center rounded-full bg-primary text-on-primary transition-colors duration-200 ease-out hover:bg-primary-hover sm:end-6"
       style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
     >
       <Plus className="size-6" aria-hidden strokeWidth={2.25} />

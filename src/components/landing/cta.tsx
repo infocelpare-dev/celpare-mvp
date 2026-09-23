@@ -17,6 +17,14 @@ const inkPanel = {
   "--muted": "#a3a3a3",
   "--border": "#3a3a3a",
   "--ring": "var(--celpare-lime)",
+  /* The D122 tokens too. Without these the outline button kept the page's light
+     value for --elevated (white) under this panel's light text, so Request a demo
+     drew white on white in light mode. Every role a nested control reads must be
+     re-pointed here, not only the ones that existed when the panel was written. */
+  "--elevated": "#232323",
+  "--primary": "#f2f2f1",
+  "--primary-hover": "#d6d6d4",
+  "--on-primary": "#0c0c0c",
 } as React.CSSProperties;
 
 export function CTA() {
@@ -25,7 +33,7 @@ export function CTA() {
       <Container>
         <div
           style={inkPanel}
-          className="rounded-[16px] bg-background px-6 py-14 text-center sm:px-10"
+          className="rounded-[28px] bg-background px-6 py-14 text-center sm:px-10"
         >
           <h2 className="mx-auto max-w-[20ch] font-display text-[clamp(1.7rem,3.5vw,2.5rem)] font-bold leading-tight text-foreground">
             Ready to stop guessing?

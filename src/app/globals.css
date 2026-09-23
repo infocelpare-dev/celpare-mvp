@@ -20,12 +20,21 @@
   --celpare-lime: #d1fe03;
   --celpare-lime-dim: #b8e002;
 
-  /* light mode roles */
-  --background: var(--celpare-paper);
-  --surface: #fafafa;
-  --foreground: var(--celpare-ink);
-  --muted: #6b6b6b;
-  --border: #e5e5e5;
+  /*
+    Light mode roles, in the ElevenLabs manner (D122): an off white canvas, warm
+    grey surfaces for trays and hovers, white for anything raised (cards, the
+    secondary button, the selected tab), near black for text and the primary
+    button. Lime is an accent only: dots, badges, switches, active states.
+  */
+  --background: #fafaf9;
+  --surface: #f2f1ef;
+  --elevated: #ffffff;
+  --foreground: #0c0c0c;
+  --muted: #5f5e5b;
+  --border: #e4e2df;
+  --primary: #0c0c0c;
+  --primary-hover: #2e2e2d;
+  --on-primary: #ffffff;
   --accent: var(--celpare-lime);
   --on-accent: var(--celpare-ink);
   --ring: var(--celpare-ink);
@@ -33,11 +42,15 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --background: var(--celpare-ink);
-    --surface: #232323;
-    --foreground: #f2f2f2;
-    --muted: #a3a3a3;
-    --border: #2e2e2e;
+    --background: #0e0e0e;
+    --surface: #1b1b1a;
+    --elevated: #161616;
+    --foreground: #f2f2f1;
+    --muted: #a3a29f;
+    --border: #2a2a29;
+    --primary: #f2f2f1;
+    --primary-hover: #d6d6d4;
+    --on-primary: #0c0c0c;
     --accent: var(--celpare-lime);
     --on-accent: var(--celpare-ink);
     --ring: var(--celpare-lime);
@@ -45,11 +58,15 @@
 }
 
 :root[data-theme="dark"] {
-  --background: var(--celpare-ink);
-  --surface: #232323;
-  --foreground: #f2f2f2;
-  --muted: #a3a3a3;
-  --border: #2e2e2e;
+  --background: #0e0e0e;
+  --surface: #1b1b1a;
+  --elevated: #161616;
+  --foreground: #f2f2f1;
+  --muted: #a3a29f;
+  --border: #2a2a29;
+  --primary: #f2f2f1;
+  --primary-hover: #d6d6d4;
+  --on-primary: #0c0c0c;
   --accent: var(--celpare-lime);
   --on-accent: var(--celpare-ink);
   --ring: var(--celpare-lime);
@@ -61,12 +78,16 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
+  --color-elevated: var(--elevated);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);
   --color-ring: var(--ring);
 
-  --font-sans: var(--font-dm-sans);
-  --font-display: var(--font-space-grotesk);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-inter);
   --font-mono: var(--font-jetbrains-mono);
 
   /* structural scale carried over from the Notion landing spec */
@@ -78,9 +99,26 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system,
+  font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.006em;
+}
+
+/*
+  Headings, the ElevenLabs way (D122): lighter and tighter. Across the app a
+  heading is written `font-display font-semibold` (104 places) or `font-bold`
+  (10). Rather than edit every one, the pair is re-weighted here, once. Unlayered
+  on purpose: Tailwind utilities live in @layer utilities and lose to it, which is
+  exactly the override wanted. A heading that genuinely needs weight can say
+  font-extrabold, which this does not touch.
+*/
+.font-display {
+  letter-spacing: -0.022em;
+}
+.font-display.font-semibold,
+.font-display.font-bold {
+  font-weight: 500;
 }
 
 /* Flat Design per D11: no gradients, no drop shadows. Hairlines separate surfaces. */
@@ -251,4 +289,46 @@ html {
 .tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
+}
+
+/*
+  Landing page motion (4AY). CSS only, on purpose.
+
+  A JavaScript reveal renders its content at opacity 0 on the server and relies on
+  a script to bring it back, so a slow or failed bundle leaves a blank page. These
+  rules start from the finished state and only animate where the browser can:
+
+  .reveal-load  fades a hero element up once on load. --reveal-delay staggers it.
+  .reveal       fades a section up as it scrolls into view, driven by the scroll
+                position itself (animation-timeline: view()), with no observer and
+                no scroll hijacking. A browser without scroll timelines skips the
+                @supports block and simply shows the section.
+
+  Both sit inside prefers-reduced-motion: no-preference, so a person who asked for
+  less motion gets none, as ui-ux-pro-max requires.
+*/
+@keyframes celpare-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .reveal-load {
+    animation: celpare-fade-up 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: var(--reveal-delay, 0ms);
+  }
+
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: celpare-fade-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 22%;
+    }
+  }
 }

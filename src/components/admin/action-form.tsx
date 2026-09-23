@@ -25,7 +25,7 @@ const TONE: Record<ActionTone, string> = {
   default:
     "border-border bg-transparent text-foreground hover:bg-surface",
   primary:
-    "border-transparent bg-accent text-on-accent hover:bg-[var(--celpare-lime-dim)]",
+    "border-transparent bg-primary text-on-primary hover:bg-primary-hover",
   /* Ink on a red surface rather than white on red: the brand's contrast rule is
      that a colour never carries white text, and it applies to the state colours
      for the same reason it applies to lime. */

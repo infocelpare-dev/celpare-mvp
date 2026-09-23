@@ -3,24 +3,30 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /*
-  Flat Design per D11: no gradients, no shadows, color or opacity shift on hover,
-  150 to 200ms ease. Lime never carries white text, so the primary variant is
-  always ink on lime. See docs/context/04-brand.md
+  Pills, in the ElevenLabs manner (D122). Flat per D11: no gradients, no shadows,
+  a colour shift on hover, 200ms ease.
+
+  primary  near black on light, near white on dark. The one filled action.
+  outline  a raised white pill with a hairline, the secondary action.
+  ghost    text only.
+
+  Lime left the primary button with D122 and stays an accent (dots, badges,
+  switches, active states). It still never carries white text.
 */
 const button = cva(
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border font-medium transition-colors duration-200 ease-out disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border font-medium tracking-[-0.01em] transition-colors duration-200 ease-out disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         primary:
-          "border-transparent bg-accent text-on-accent hover:bg-[var(--celpare-lime-dim)]",
+          "border-transparent bg-primary text-on-primary hover:bg-primary-hover",
         outline:
-          "border-border bg-transparent text-foreground hover:bg-surface",
+          "border-border bg-elevated text-foreground hover:bg-surface",
         ghost:
           "border-transparent bg-transparent text-muted hover:text-foreground",
       },
       size: {
-        md: "h-11 px-[22px] text-[15px]",
+        md: "h-11 px-6 text-[15px]",
         sm: "h-9 px-4 text-sm",
       },
     },
