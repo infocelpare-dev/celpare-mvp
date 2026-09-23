@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Check, Heart, MessageCircle, Share2 } from "lucide-react";
+import { Check, Flag, Heart, MessageCircle, Repeat2, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SaveToCollection } from "@/components/collections/save-to-collection";
 import { formatCount } from "@/lib/format";
-import { toggleLike } from "@/app/actions/community";
+import { toggleLike, toggleRepost } from "@/app/actions/community";
+import { ReportForm } from "./post-controls";
 
 /*
   The action row under a post: like, comment, save.
@@ -38,6 +39,10 @@ export function PostActions({
   liked,
   saved,
   signedIn,
+  repostCount = 0,
+  reposted = false,
+  showReport = false,
+  isOwner = false,
   className,
 }: {
   postId: string;
@@ -49,9 +54,20 @@ export function PostActions({
   liked: boolean;
   saved: boolean;
   signedIn: boolean;
+  /* Repost is on every post of every kind, founder instruction 2026-09-23. */
+  repostCount?: number;
+  reposted?: boolean;
+  /* The flag icon. The feed card turns it on; the post page has its own
+     Report and Delete row (PostControls) and leaves it off. */
+  showReport?: boolean;
+  /* Nobody reports their own post. */
+  isOwner?: boolean;
   className?: string;
 }) {
   const [likeOn, setLikeOn] = useState(liked);
+  const [repostOn, setRepostOn] = useState(reposted);
+  const [reposts, setReposts] = useState(repostCount);
+  const [reporting, setReporting] = useState(false);
   const [likes, setLikes] = useState(likeCount);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -110,6 +126,23 @@ export function PostActions({
     });
   }
 
+  /* Same optimistic shape as the like, rolled back exactly if refused. */
+  function onRepost() {
+    const next = !repostOn;
+    setRepostOn(next);
+    setReposts((n) => Math.max(0, n + (next ? 1 : -1)));
+    setError("");
+
+    startTransition(async () => {
+      const result = await toggleRepost(postId, next);
+      if (!result.ok) {
+        setRepostOn(!next);
+        setReposts((n) => Math.max(0, n + (next ? -1 : 1)));
+        setError(result.message);
+      }
+    });
+  }
+
   return (
     <div className={cn("mt-3", className)}>
       <div className="flex items-center gap-1">
@@ -145,6 +178,26 @@ export function PostActions({
             <span className="tabular-nums">{formatCount(commentCount)}</span>
           ) : null}
         </Link>
+
+        {signedIn ? (
+          <ActionButton
+            label={repostOn ? "Undo repost" : "Repost"}
+            count={reposts}
+            on={repostOn}
+            onClick={onRepost}
+            disabled={pending}
+            tone="repost"
+          >
+            <Repeat2
+              className={cn("size-[18px]", repostOn && "stroke-[2.5]")}
+              aria-hidden
+            />
+          </ActionButton>
+        ) : (
+          <SignInAction label="Repost" count={reposts} tone="repost">
+            <Repeat2 className="size-[18px]" aria-hidden />
+          </SignInAction>
+        )}
 
         {/*
           SAVE OPENS THE PICKER. Founder decision 2026-09-21. The component
@@ -187,7 +240,32 @@ export function PostActions({
         <span role="status" aria-live="polite" className="text-[13px] text-muted">
           {copied ? "Link copied" : ""}
         </span>
+
+        {/* Report, on every post and not only videos. Pushed to the far end so
+            it is never pressed by mistake on the way to Share. */}
+        {showReport && signedIn && !isOwner ? (
+          <button
+            type="button"
+            onClick={() => setReporting((v) => !v)}
+            aria-expanded={reporting}
+            className={cn(
+              "ms-auto inline-flex h-11 min-w-11 cursor-pointer items-center justify-center rounded-full px-3 text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground",
+              reporting && "text-foreground",
+            )}
+          >
+            <Flag className="size-[18px]" aria-hidden />
+            <span className="sr-only">Report this post</span>
+          </button>
+        ) : null}
       </div>
+
+      {reporting ? (
+        <ReportForm
+          entityType="post"
+          entityId={postId}
+          onDone={() => setReporting(false)}
+        />
+      ) : null}
 
       {/* role=alert, because the ux guidance rates a visual only error High.
           Rendered only when there is one, so nothing is announced on load. */}
@@ -219,7 +297,7 @@ function ActionButton({
   on: boolean;
   onClick: () => void;
   disabled: boolean;
-  tone: "like" | "save";
+  tone: "like" | "save" | "repost";
   children: React.ReactNode;
 }) {
   return (
@@ -248,7 +326,7 @@ function ActionButton({
           action of every post is noise, and on an empty feed it is three of
           them per row. */}
       {count > 0 ? <span className="tabular-nums">{formatCount(count)}</span> : null}
-      <span className="sr-only">{tone === "like" ? "likes" : "saves"}</span>
+      <span className="sr-only">{tone === "like" ? "likes" : tone === "repost" ? "reposts" : "saves"}</span>
     </button>
   );
 }
@@ -265,7 +343,7 @@ function SignInAction({
 }: {
   label: string;
   count: number;
-  tone: "like" | "save";
+  tone: "like" | "save" | "repost";
   children: React.ReactNode;
 }) {
   return (
@@ -276,7 +354,7 @@ function SignInAction({
       {children}
       <span className="sr-only">{label}, sign in first</span>
       {count > 0 ? <span className="tabular-nums">{formatCount(count)}</span> : null}
-      <span className="sr-only">{tone === "like" ? "likes" : "saves"}</span>
+      <span className="sr-only">{tone === "like" ? "likes" : tone === "repost" ? "reposts" : "saves"}</span>
     </Link>
   );
 }

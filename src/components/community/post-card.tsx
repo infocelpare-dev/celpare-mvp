@@ -108,9 +108,17 @@ export function PostCard({
             stops one unbroken 200 character string from pushing the whole feed
             sideways at 390px. Rendered as text, never as markup.
           */}
-          <p className="mt-1.5 whitespace-pre-wrap break-words text-[15px] leading-relaxed">
+          {/*
+            Tapping the text opens the post, founder instruction 2026-09-23, as on
+            every social feed. The body is plain text with no links of its own, so
+            making it the link nests nothing interactive.
+          */}
+          <Link
+            href={href}
+            className="mt-1.5 block whitespace-pre-wrap break-words text-[15px] leading-relaxed text-foreground"
+          >
             {post.body}
-          </p>
+          </Link>
 
           <PostMediaGallery media={post.media} postId={post.id} className="mt-3" />
 
@@ -151,6 +159,10 @@ export function PostCard({
             liked={viewer.liked.has(post.id)}
             saved={viewer.saved.has(post.id)}
             signedIn={signedIn}
+            repostCount={post.repost_count}
+            reposted={viewer.reposted.has(post.id)}
+            showReport
+            isOwner={viewer.viewerId === post.author_id}
             /* Pulled left so the icons line up under the body rather than
                under the avatar gutter. */
             className="-ms-3"

@@ -138,11 +138,18 @@ export type Comment = {
 export type ViewerState = {
   liked: Set<string>;
   saved: Set<string>;
+  /* Which of these posts the viewer has reposted, so the feed's repost control
+     arrives in its real state instead of flipping after hydration. */
+  reposted: Set<string>;
+  /* Who is looking, so a card can tell its own author's posts apart. */
+  viewerId: string | null;
 };
 
 export const EMPTY_VIEWER_STATE: ViewerState = {
   liked: new Set<string>(),
   saved: new Set<string>(),
+  reposted: new Set<string>(),
+  viewerId: null,
 };
 
 /*
@@ -339,9 +346,10 @@ export async function getViewerState(
   viewerId: string | null,
   postIds: string[],
 ): Promise<ViewerState> {
-  if (!viewerId || postIds.length === 0) return EMPTY_VIEWER_STATE;
+  if (!viewerId) return EMPTY_VIEWER_STATE;
+  if (postIds.length === 0) return { ...EMPTY_VIEWER_STATE, viewerId };
 
-  const [likes, saves] = await Promise.all([
+  const [likes, saves, reposts] = await Promise.all([
     db
       .from("likes")
       .select("entity_id")
@@ -354,6 +362,11 @@ export async function getViewerState(
       .eq("user_id", viewerId)
       .eq("entity_type", "post")
       .in("entity_id", postIds),
+    db
+      .from("reposts")
+      .select("post_id")
+      .eq("user_id", viewerId)
+      .in("post_id", postIds),
   ]);
 
   if (likes.error) {
@@ -361,6 +374,9 @@ export async function getViewerState(
   }
   if (saves.error) {
     console.error("[community] saves failed", saves.error.code, saves.error.message);
+  }
+  if (reposts.error) {
+    console.error("[community] reposts failed", reposts.error.code, reposts.error.message);
   }
 
   return {
@@ -370,6 +386,10 @@ export async function getViewerState(
     saved: new Set(
       (saves.data ?? []).map((r) => (r as { entity_id: string }).entity_id),
     ),
+    reposted: new Set(
+      (reposts.data ?? []).map((r) => (r as { post_id: string }).post_id),
+    ),
+    viewerId,
   };
 }
 

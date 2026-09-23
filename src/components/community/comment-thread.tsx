@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, CornerDownRight } from "lucide-react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronDown, ChevronRight, CornerDownRight, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { personName, relativeTime } from "@/lib/format";
-import { createComment, type CommentState } from "@/app/actions/community";
+import { createComment, deleteComment, type CommentState } from "@/app/actions/community";
 import type { CommentNode } from "@/lib/community/thread";
 import { CommentLike } from "./post-actions";
 
@@ -105,6 +106,33 @@ function CommentRow({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [replying, setReplying] = useState(false);
+  /* Deleting your own reply, founder instruction 2026-09-23. Asks once, in place,
+     the pattern PostControls uses: ui-ux-pro-max rates delete without
+     confirmation High, and a modal would cover the reply being reconsidered. */
+  const [confirming, setConfirming] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, startDelete] = useTransition();
+  const router = useRouter();
+
+  function confirmDelete() {
+    setDeleteError("");
+    startDelete(async () => {
+      const result = await deleteComment(node.id, postId);
+      if (!result.ok) {
+        setDeleteError(result.message);
+        setConfirming(false);
+        return;
+      }
+      /* Gone here at once, then the page (or the video sheet, through
+         onReplied) re-reads the thread, where replies under it are promoted
+         rather than lost (thread.ts). */
+      setDeleted(true);
+      setConfirming(false);
+      router.refresh();
+      onReplied?.();
+    });
+  }
 
   const author = node.author;
   const handle = author?.username ?? null;
@@ -174,15 +202,25 @@ function CommentRow({
               </span>
             </div>
 
-            <p
-              className={cn(
-                "mt-0.5 whitespace-pre-wrap break-words text-[14px] leading-relaxed",
-                dark && "text-white/90",
-              )}
-            >
-              {node.body}
-            </p>
+            {deleted ? (
+              <p
+                role="status"
+                className={cn("mt-0.5 text-[14px] italic", dark ? "text-white/50" : "text-muted")}
+              >
+                You deleted this reply.
+              </p>
+            ) : (
+              <p
+                className={cn(
+                  "mt-0.5 whitespace-pre-wrap break-words text-[14px] leading-relaxed",
+                  dark && "text-white/90",
+                )}
+              >
+                {node.body}
+              </p>
+            )}
 
+            {deleted ? null : (
             <div className="-ms-3 flex flex-wrap items-center gap-1">
               <CommentLike
                 commentId={node.id}
@@ -231,7 +269,64 @@ function CommentRow({
                     : "Hide"}
                 </button>
               ) : null}
+
+              {isMine ? (
+                confirming ? (
+                  <span className="inline-flex flex-wrap items-center gap-1">
+                    <span className={cn("px-1 text-[13px]", dark ? "text-white/70" : "text-muted")}>
+                      Delete this reply?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={confirmDelete}
+                      disabled={deleting}
+                      className={cn(
+                        "inline-flex min-h-11 cursor-pointer items-center rounded-full px-3 text-[13px] font-medium",
+                        "transition-colors duration-200 ease-out disabled:opacity-60",
+                        dark ? "text-white hover:bg-white/10" : "text-foreground hover:bg-surface",
+                      )}
+                    >
+                      {deleting ? "Deleting" : "Yes, delete"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirming(false)}
+                      disabled={deleting}
+                      className={cn(
+                        "inline-flex min-h-11 cursor-pointer items-center rounded-full px-3 text-[13px]",
+                        "transition-colors duration-200 ease-out",
+                        dark ? "text-white/70 hover:bg-white/10" : "text-muted hover:bg-surface",
+                      )}
+                    >
+                      Keep it
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(true)}
+                    className={cn(
+                      "inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-full px-2 text-[13px]",
+                      "transition-colors duration-200 ease-out",
+                      dark
+                        ? "text-white/70 hover:bg-white/10 hover:text-white"
+                        : "text-muted hover:bg-surface hover:text-foreground",
+                    )}
+                  >
+                    <Trash2 className="size-3.5" aria-hidden />
+                    Delete
+                    <span className="sr-only"> your reply</span>
+                  </button>
+                )
+              ) : null}
             </div>
+            )}
+
+            {deleteError ? (
+              <p role="alert" className={cn("mt-1 text-[13px]", dark ? "text-white" : "text-foreground")}>
+                {deleteError}
+              </p>
+            ) : null}
 
             {replying ? (
               <ReplyForm

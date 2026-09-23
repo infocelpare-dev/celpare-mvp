@@ -76,6 +76,14 @@ export function AskChat({
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const seeded = useRef(false);
+  /*
+    The lock that stops one question becoming two chats. `busy` is state, so a
+    second call in the same tick (a held Enter repeating, a double tap on a
+    suggestion) reads the old `false` and sends again, and each send created its
+    own conversation: chat history showed every such question twice. A ref flips
+    synchronously, so the second call sees it.
+  */
+  const inFlight = useRef(false);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -103,7 +111,8 @@ export function AskChat({
   const send = useCallback(
     async (raw: string) => {
       const question = raw.trim();
-      if (!question || busy) return;
+      if (!question || busy || inFlight.current) return;
+      inFlight.current = true;
 
       const userTurn: Turn = { id: uid(), role: "user", content: question };
       const replyId = uid();
@@ -262,6 +271,7 @@ export function AskChat({
           fail("Ask Celpare could not reach the model. Try again in a moment.", "error");
         }
       } finally {
+        inFlight.current = false;
         setBusy(false);
         abortRef.current = null;
       }

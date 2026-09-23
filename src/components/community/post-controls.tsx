@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Flag, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -179,7 +179,7 @@ function SmallAction({
   );
 }
 
-function ReportForm({
+export function ReportForm({
   entityType,
   entityId,
   onDone,
@@ -195,6 +195,12 @@ function ReportForm({
     message: "",
   });
   const firstField = useRef<HTMLSelectElement>(null);
+  /* Unique per form: the feed can have several open at once, and fixed ids would
+     point every label at the first form's fields. */
+  const uid = useId();
+  const reasonId = `${uid}-reason`;
+  const noteId = `${uid}-note`;
+  const hintId = `${uid}-hint`;
 
   /* Focus moves into the form when it opens, so a keyboard user is not left
      behind the control they just pressed. */
@@ -225,14 +231,14 @@ function ReportForm({
       <input type="hidden" name="entityId" value={entityId} />
 
       <label
-        htmlFor="report-reason"
+        htmlFor={reasonId}
         className="mb-1.5 block text-[14px] font-medium"
       >
         Why are you reporting this?
       </label>
       <select
         ref={firstField}
-        id="report-reason"
+        id={reasonId}
         name="reason"
         required
         defaultValue=""
@@ -248,17 +254,17 @@ function ReportForm({
         ))}
       </select>
 
-      <label htmlFor="report-note" className="mt-3 mb-1.5 block text-[14px] font-medium">
+      <label htmlFor={noteId} className="mt-3 mb-1.5 block text-[14px] font-medium">
         Anything to add
       </label>
       <textarea
-        id="report-note"
+        id={noteId}
         name="note"
         rows={2}
-        aria-describedby="report-note-hint"
+        aria-describedby={hintId}
         className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-[16px] text-foreground sm:text-[15px]"
       />
-      <p id="report-note-hint" className="mt-1.5 text-[13px] text-muted">
+      <p id={hintId} className="mt-1.5 text-[13px] text-muted">
         Optional, 500 characters at most. Only moderators see reports.
       </p>
 

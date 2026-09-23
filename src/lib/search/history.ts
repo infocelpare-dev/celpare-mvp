@@ -24,7 +24,8 @@ import type { RecentSearch } from "./types";
   function's default and any future surface that lists them have to agree on what
   "recent" means.
 */
-export const RECENT_SEARCHES_SHOWN = 10;
+/* Loaded, not shown: RecentSearches shows 5 and puts the rest behind See more. */
+export const RECENT_SEARCHES_SHOWN = 20;
 
 export async function loadRecentSearches(
   viewerId: string | null,
