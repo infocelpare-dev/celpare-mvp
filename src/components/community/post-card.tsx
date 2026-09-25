@@ -1,11 +1,17 @@
 import Link from "next/link";
-import { Link2 } from "lucide-react";
+import { Link2, MessageCircle, Repeat2 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/card";
 import { hostOf, personName, relativeTime } from "@/lib/format";
 import type { FeedPost, ViewerState } from "@/lib/community/queries";
 import { PostActions } from "./post-actions";
 import { PostAttachment, PostKindBadge, PostMediaGallery } from "./post-media";
+import { FeedbackMenu } from "./feed-intelligence";
+import { explainReason } from "@/lib/community/intelligence/explain";
+
+/* feed_v3 social proof: why a post from somebody you do not follow is here.
+   Counts only, never who, and only when it is the reason the ranker used. */
+export type SocialProof = { reason: "commented_by_following" | "reposted_by_following"; count: number };
 
 /*
   One post in the feed.
@@ -29,10 +35,16 @@ export function PostCard({
   post,
   viewer,
   signedIn,
+  feedback = false,
+  socialProof = null,
 }: {
   post: FeedPost;
   viewer: ViewerState;
   signedIn: boolean;
+  /* Show the "show less like this" menu. Only in a ranked feed, where the card
+     sits inside a FeedItem that can collapse it. */
+  feedback?: boolean;
+  socialProof?: SocialProof | null;
 }) {
   const href = `/community/${post.id}`;
   const author = post.author;
@@ -50,6 +62,20 @@ export function PostCard({
 
   return (
     <article className="border-b border-border px-4 py-4 sm:px-5 sm:py-5">
+      {/* The context line sits above the byline with its icon in the avatar
+          column, the way X and LinkedIn mark a post from outside your follows. */}
+      {socialProof ? (
+        <p className="mb-2 flex items-center gap-3 text-[13px] leading-5 text-muted">
+          <span className="flex w-10 shrink-0 justify-end" aria-hidden>
+            {socialProof.reason === "reposted_by_following" ? (
+              <Repeat2 className="size-3.5" />
+            ) : (
+              <MessageCircle className="size-3.5" />
+            )}
+          </span>
+          <span>{explainReason(socialProof.reason, null, socialProof.count)}</span>
+        </p>
+      ) : null}
       <div className="flex gap-3">
         <Link href={author ? `/u/${author.username}` : href} className="shrink-0">
           <Avatar
@@ -100,6 +126,15 @@ export function PostCard({
 
             {post.topic ? (
               <Badge className="text-[11px]">{post.topic.name}</Badge>
+            ) : null}
+
+            {feedback && signedIn && viewer.viewerId && viewer.viewerId !== post.author_id ? (
+              <FeedbackMenu
+                postId={post.id}
+                authorId={post.author_id}
+                authorName={name}
+                topic={post.topic ? { id: post.topic.id, name: post.topic.name } : null}
+              />
             ) : null}
           </div>
 
@@ -160,6 +195,7 @@ export function PostCard({
             saved={viewer.saved.has(post.id)}
             signedIn={signedIn}
             repostCount={post.repost_count}
+            viewCount={post.view_count}
             reposted={viewer.reposted.has(post.id)}
             showReport
             isOwner={viewer.viewerId === post.author_id}

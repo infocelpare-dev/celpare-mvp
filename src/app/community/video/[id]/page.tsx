@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getViewerState, readerFor } from "@/lib/community/queries";
-import { getVideoPostsStartingAt, getVideoViewerState } from "@/lib/community/video";
+import { getVideoViewerState, toVideoPosts } from "@/lib/community/video";
+import { getReelsFeed } from "@/lib/community/intelligence/server/engine";
+import { SEEN_COOKIE } from "@/lib/community/intelligence/seen";
+import { cookies } from "next/headers";
 import { VideoFeed } from "@/components/community/video/video-feed";
 
 /* Reads the session cookie, so it must never be prerendered. */
@@ -51,7 +54,12 @@ export default async function VideoViewerPage({ params }: PageProps<"/community/
   viewerId = user?.id ?? null;
 
   const db = await readerFor(signedIn);
-  const posts = await getVideoPostsStartingAt(db, id);
+  /* reels_v1 (src/lib/community/intelligence/reels.ts): the requested video
+     first, then a session sequence ranked by watching. The player below is
+     unchanged; it receives the same VideoPost[] it always did. */
+  const seenCookie = (await cookies()).get(SEEN_COOKIE)?.value ?? null;
+  const reels = await getReelsFeed({ db, viewerId, pages: 1, firstId: id, seenCookie });
+  const posts = toVideoPosts(reels.posts);
 
   /* The requested video is put first by the query, so an empty list here means
      it does not exist, is not visible, or carries no video. All three are the

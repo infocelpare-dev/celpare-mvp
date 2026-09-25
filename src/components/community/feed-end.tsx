@@ -1,4 +1,4 @@
-import { ArrowUp, CheckCheck, PenLine } from "lucide-react";
+import { ArrowDown, ArrowUp, CheckCheck, PenLine } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { EndOfList } from "@/components/ui/end-of-list";
 import type { FeedScope } from "@/lib/community/queries";
@@ -6,9 +6,9 @@ import type { FeedScope } from "@/lib/community/queries";
 /*
   The bottom of the feed.
 
-  TWO DIFFERENT SENTENCES, AND THE DIFFERENCE IS NOT COSMETIC. The feed query is
-  capped at one page and there is no pagination yet, so a full page of results
-  means there may well be more posts that simply were not fetched. Telling
+  DIFFERENT SENTENCES, AND THE DIFFERENCE IS NOT COSMETIC. The feed query is
+  capped at the pages asked for (Show more adds one, up to five), so a full set
+  of results means there may well be more posts that simply were not fetched. Telling
   somebody they have reached the end at that moment is a claim about the whole
   community made on the strength of a LIMIT clause, and it is the same family of
   mistake as D99: stating a fact about the platform when all you know is what one
@@ -32,11 +32,16 @@ export function FeedEnd({
   signedIn,
   scope,
   topicName,
+  moreHref,
 }: {
   complete: boolean;
   signedIn: boolean;
   scope: FeedScope;
   topicName?: string;
+  /* The next page, when there is one and the page limit is not reached. Pages
+     accumulate on the server (?more=2 renders the first two), so "Show more"
+     is a plain link with no client side list to keep in sync. */
+  moreHref?: string | null;
 }) {
   const where = topicName
     ? topicName
@@ -53,13 +58,22 @@ export function FeedEnd({
           <PenLine className="size-5" aria-hidden />
         )
       }
-      title={complete ? "You are all caught up" : "That is the first page"}
+      title={complete ? "You are all caught up" : moreHref ? "There is more" : "That is as far as the feed goes"}
       body={
         complete
           ? `You have reached the end of ${where}. Anything posted from now on turns up here.`
-          : `There is more below this in ${where}, and the feed does not load it yet. Newest and Top both show one page for now.`
+          : moreHref
+            ? `There are more posts in ${where} below this.`
+            : `There are older posts in ${where} than this page shows.`
       }
     >
+      {!complete && moreHref ? (
+        <ButtonLink href={moreHref} scroll>
+          <ArrowDown className="size-4" aria-hidden />
+          Show more
+        </ButtonLink>
+      ) : null}
+
       <ButtonLink href={signedIn ? "/community/new" : "/get-started"}>
         <PenLine className="size-4" aria-hidden />
         {signedIn ? "Write a post" : "Sign in to post"}

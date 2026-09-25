@@ -208,6 +208,7 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
             saved={viewer.saved.has(post.id)}
             signedIn={signedIn}
             repostCount={post.repost_count}
+            viewCount={post.view_count}
             reposted={viewer.reposted.has(post.id)}
             className="-ms-3"
           />

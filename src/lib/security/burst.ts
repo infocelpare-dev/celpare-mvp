@@ -22,7 +22,8 @@ export type BurstName =
   | "suggest"
   | "compare_options"
   | "demo"
-  | "dm_send";
+  | "dm_send"
+  | "trending";
 
 const PER_MINUTE: Record<BurstName, number> = {
   /* A beacon carries up to 60 events; a busy tab sends a few a minute. */
@@ -34,6 +35,8 @@ const PER_MINUTE: Record<BurstName, number> = {
   demo: 5,
   /* Faster than anybody types, slower than a script flooding a friend (4BA). */
   dm_send: 30,
+  /* A read, cached for a minute server side; this only stops a scraper. */
+  trending: 60,
 };
 
 export async function withinBurst(name: BurstName): Promise<boolean> {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Check, Flag, Heart, MessageCircle, Repeat2, Share2 } from "lucide-react";
+import { ChartNoAxesColumn, Check, Flag, Heart, MessageCircle, Repeat2, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SaveToCollection } from "@/components/collections/save-to-collection";
 import { formatCount } from "@/lib/format";
@@ -41,6 +41,7 @@ export function PostActions({
   signedIn,
   repostCount = 0,
   reposted = false,
+  viewCount,
   showReport = false,
   isOwner = false,
   className,
@@ -57,6 +58,9 @@ export function PostActions({
   /* Repost is on every post of every kind, founder instruction 2026-09-23. */
   repostCount?: number;
   reposted?: boolean;
+  /* Distinct people who saw the post, first in the row (founder, 2026-09-24).
+     Omitted, nothing renders: a surface without the number shows no number. */
+  viewCount?: number;
   /* The flag icon. The feed card turns it on; the post page has its own
      Report and Delete row (PostControls) and leaves it off. */
   showReport?: boolean;
@@ -146,6 +150,25 @@ export function PostActions({
   return (
     <div className={cn("mt-3", className)}>
       <div className="flex items-center gap-1">
+        {/*
+          Views: a fact, not a control, so it is plain text with no hover and no
+          button role. The number is real (D13, D30): distinct accounts or signed
+          out sessions that had the post on screen, the author excluded, kept by
+          database triggers on the impression events. Read aloud as "12 views",
+          never as a bare number.
+        */}
+        {viewCount !== undefined ? (
+          <span className="inline-flex h-11 min-w-11 items-center justify-center gap-1.5 px-3 text-[13px] text-muted">
+            <ChartNoAxesColumn className="size-[18px]" aria-hidden />
+            <span className="tabular-nums" aria-hidden>
+              {formatCount(viewCount)}
+            </span>
+            <span className="sr-only">
+              {viewCount === 1 ? "1 view" : `${viewCount} views`}
+            </span>
+          </span>
+        ) : null}
+
         {signedIn ? (
           <ActionButton
             label={likeOn ? "Unlike" : "Like"}

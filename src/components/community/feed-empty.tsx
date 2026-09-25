@@ -15,6 +15,8 @@ import type { FeedScope } from "@/lib/community/queries";
   - Following, with nobody followed. Not the same as nothing existing. The feed
     is empty by construction and the fix is to follow somebody, so the button
     goes to the feed rather than to the composer.
+  - Following, where the people followed have not posted recently. Telling
+    that person they follow nobody would be false, so it says what is true.
   - A topic with nothing in it. The other topics still have things in them.
 
   No fallback to "popular posts" and no borrowed content. An empty feed that
@@ -25,10 +27,13 @@ export function FeedEmpty({
   scope,
   signedIn,
   topicName,
+  followsAnyone,
 }: {
   scope: FeedScope;
   signedIn: boolean;
   topicName?: string;
+  /* Following only: whether the reader follows at least one account. */
+  followsAnyone?: boolean;
 }) {
   if (topicName) {
     return (
@@ -43,6 +48,19 @@ export function FeedEmpty({
         ) : (
           <Action href="/get-started" label="Create an account" />
         )}
+      </Shell>
+    );
+  }
+
+  if (scope === "following" && followsAnyone) {
+    return (
+      <Shell icon={<UserPlus className="size-6 text-muted" aria-hidden />}>
+        <Title>Nothing new from the people you follow</Title>
+        <Body>
+          The people you follow have not posted in the last month. Follow a few
+          more from the main feed to see more here.
+        </Body>
+        <Action href="/community" label="Back to For you" />
       </Shell>
     );
   }

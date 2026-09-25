@@ -1,20 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { POST_SELECT, normalisePost, type FeedPost, type PostMedia } from "./queries";
-import { RANKING } from "./ranking";
 
 /*
-  The video posts behind the vertical viewer.
+  The video posts behind the vertical viewer: the shape, not the order.
 
-  THERE IS NO RANKING IN HERE, DELIBERATELY. The brief is explicit that the
-  recommendation algorithm is not being built yet, so this reuses the feed's
-  existing ordering and nothing else: newest first, exactly what `New` gives,
-  with the same visibility filters every other feed query applies.
-
-  WHAT THIS FILE IS FOR IS THE SHAPE, NOT THE ORDER. The viewer takes a
-  VideoPost[] and does not care where the list came from, so the later work of
-  ranking, personalising or scoping to Following replaces this one function and
-  touches nothing in the player. That separation is the point of the file
-  existing at all rather than the query living in the page.
+  THE ORDER NOW COMES FROM reels_v1 (src/lib/community/intelligence/reels.ts,
+  served by getReelsFeed). The viewer takes a VideoPost[] and does not care
+  where the list came from, which is why ranking could be added without touching
+  the player. The newest first queries that used to live here were removed with
+  that change rather than kept beside it.
 */
 
 /* A post that is known to have a video, with the video hoisted out of the media
@@ -47,65 +41,6 @@ export function toVideoPosts(posts: FeedPost[]): VideoPost[] {
     if (video) out.push({ ...post, video });
   }
   return out;
-}
-
-/*
-  Video posts straight from the database, for arriving at the viewer directly by
-  URL rather than through the feed.
-
-  AN INNER JOIN ON post_media, NOT A FILTER AFTERWARDS. `media:post_media!inner(...)`
-  makes the database return only posts that have a media row, and the media_kind
-  filter applies to the joined rows, so a post with four images never crosses the
-  wire to be discarded here. Fetching PAGE_SIZE posts and finding two of them
-  have video would be the N+1 of pagination: a page that is mostly empty.
-
-  It reads through whichever client the caller hands it, so a signed out visitor
-  gets exactly what anon's policies allow and nothing is widened for this surface.
-*/
-export async function getVideoPosts(
-  db: SupabaseClient,
-  options: { limit?: number } = {},
-): Promise<VideoPost[]> {
-  const limit = Math.max(1, Math.min(options.limit ?? RANKING.PAGE_SIZE, 50));
-
-  const { data, error } = await db
-    .from("posts")
-    .select(POST_SELECT.replace("media:post_media(", "media:post_media!inner("))
-    .eq("status", "visible")
-    .is("deleted_at", null)
-    .eq("post_media.media_kind", "video")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    console.error("[community] video feed failed", error.code, error.message);
-    return [];
-  }
-
-  return toVideoPosts(((data as unknown as FeedPost[]) ?? []).map(normalisePost));
-}
-
-/*
-  The list, with one post guaranteed to be in it and first.
-
-  Opening /community/video/<id> has to show THAT video, even when it is old
-  enough to have fallen outside the window, or the link somebody shared lands on
-  somebody else's video. So the requested post is fetched on its own and put at
-  the front, and the rest follow in feed order with it removed from its natural
-  place rather than appearing twice.
-*/
-export async function getVideoPostsStartingAt(
-  db: SupabaseClient,
-  postId: string,
-  options: { limit?: number } = {},
-): Promise<VideoPost[]> {
-  const [list, first] = await Promise.all([
-    getVideoPosts(db, options),
-    getVideoPost(db, postId),
-  ]);
-
-  if (!first) return list;
-  return [first, ...list.filter((p) => p.id !== first.id)];
 }
 
 /*

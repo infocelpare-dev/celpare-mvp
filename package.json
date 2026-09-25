@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "scan": "node scripts/security-scan.mjs",
-    "scan:history": "node scripts/security-scan.mjs --history"
+    "scan:history": "node scripts/security-scan.mjs --history",
+    "test:algorithms": "node --import ./scripts/test-loader.mjs --test \"src/lib/community/intelligence/__tests__/*.test.ts\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

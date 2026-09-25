@@ -26,7 +26,7 @@ import type { PostKind } from "./kinds";
 /* Matches the client SELECT grant on posts. Do not add a column to this
    string without adding it to the grant first. */
 const POST_COLUMNS =
-  "id, author_id, body, link_url, topic_id, created_at, like_count, comment_count, save_count, repost_count, status, kind, tool_id, model_id";
+  "id, author_id, body, link_url, topic_id, created_at, like_count, comment_count, save_count, repost_count, view_count, status, kind, tool_id, model_id";
 
 const AUTHOR_COLUMNS = "id, username, full_name, avatar_url";
 
@@ -107,6 +107,9 @@ export type FeedPost = {
   comment_count: number;
   save_count: number;
   repost_count: number;
+  /* Distinct viewers, the author excluded. Maintained by triggers on the
+     impression events (migration post_view_counts); never written by the app. */
+  view_count: number;
   status: string;
   kind: PostKind;
   tool_id: string | null;
@@ -233,9 +236,12 @@ export async function getFeed(
     scope: FeedScope;
     viewerId: string | null;
     topicId?: string | null;
+    /* Pages of Latest to return, accumulated, for "Show more". */
+    pages?: number;
   },
 ): Promise<FeedPost[]> {
   const { sort, scope, viewerId, topicId } = options;
+  const pages = Math.max(1, Math.min(options.pages ?? 1, 5));
 
   let authorIds: string[] | null = null;
 
@@ -266,7 +272,7 @@ export async function getFeed(
     .eq("status", "visible")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(sort === "new" ? RANKING.PAGE_SIZE : RANKING.CANDIDATE_WINDOW);
+    .limit(sort === "new" ? RANKING.PAGE_SIZE * pages : RANKING.CANDIDATE_WINDOW);
 
   if (authorIds) q = q.in("author_id", authorIds);
   if (topicId) q = q.eq("topic_id", topicId);

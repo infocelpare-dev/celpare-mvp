@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { FeedTabs } from "./feed-tabs";
-import { RANKING, type Sort } from "@/lib/community/ranking";
+import type { Sort } from "@/lib/community/ranking";
 import type { FeedScope, Topic } from "@/lib/community/queries";
 
 /*
@@ -43,14 +43,14 @@ import type { FeedScope, Topic } from "@/lib/community/queries";
 export function FeedHeader({
   scope,
   sort,
-  visiblePostCount,
   topics,
   unreadMessages,
   topicSlug,
 }: {
   scope: FeedScope;
   sort: Sort;
-  visiblePostCount: number;
+  /* Kept for callers; the sort control no longer depends on it (D133). */
+  visiblePostCount?: number;
   /* Rendered inside the For you control, never as a row beside it. */
   topics: Topic[];
   unreadMessages?: number;
@@ -59,16 +59,12 @@ export function FeedHeader({
   topicSlug?: string;
 }) {
   /*
-    The sort control appears only once ranking can differ from recency.
-
-    Below the threshold, Top and New return the same posts in nearly the same
-    order, because the gravity term dominates when everything has a handful of
-    likes at most. Offering the choice then is a control that does nothing,
-    which is worse than no control. It arrives on its own once there is enough
-    content, which is the runtime check D29 asked for rather than a switch
-    somebody has to remember to flip.
+    The sort control is always there (D133). The feed opens ranked (Top), and
+    Latest is the choice for newest first. It used to appear only at 20 posts,
+    which with the feed defaulting to Latest meant the ranked feed could not
+    be reached at all without typing a URL.
   */
-  const showSort = visiblePostCount >= RANKING.TOP_NEEDS_POSTS;
+  const showSort = true;
 
   return (
     /*

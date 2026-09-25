@@ -3,7 +3,7 @@ import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { defaultSort, isSort } from "@/lib/community/ranking";
+import { isSort } from "@/lib/community/ranking";
 import {
   countVisiblePosts,
   getFeed,
@@ -21,6 +21,46 @@ import { PostCard } from "@/components/community/post-card";
 import { CreatePostFab } from "@/components/community/create-post-fab";
 import { FeedEnd } from "@/components/community/feed-end";
 import { RANKING } from "@/lib/community/ranking";
+import type { FeedPost } from "@/lib/community/queries";
+import { FeedItem, FeedTelemetry } from "@/components/community/feed-intelligence";
+import {
+  getAlgorithmEvaluation,
+  getFollowingFeed,
+  getForYouFeed,
+  type RankedFeed,
+} from "@/lib/community/intelligence/server/engine";
+import { FEED } from "@/lib/community/intelligence/feed";
+import { SEEN_COOKIE, expectedReadMs } from "@/lib/community/intelligence/seen";
+import { getAdminSession } from "@/lib/admin/guard";
+import { FeedDebugItem, FeedDebugSummary } from "@/components/community/feed-debug";
+import { cookies } from "next/headers";
+
+/* feed_v3 dwell cap input: how long this card takes to read. */
+function readMsOf(post: FeedPost): number {
+  const words = (post.body ?? "").split(/\s+/).filter(Boolean).length;
+  const media = post.media.some((m) => m.media_kind === "video")
+    ? "video"
+    : post.media.some((m) => m.media_kind === "image")
+      ? "image"
+      : "text";
+  return expectedReadMs(words, media);
+}
+
+/* ?more=N renders the first N pages. Bounded, so a URL cannot ask for a
+   thousand posts. */
+function pagesFrom(value: unknown): number {
+  const n = typeof value === "string" ? Number.parseInt(value, 10) : 1;
+  return Number.isFinite(n) ? Math.min(Math.max(1, n), FEED.MAX_PAGES) : 1;
+}
+
+/* The ranking clock, frozen by the first page and carried by Show more so the
+   order of what is already on screen does not shift under the reader. Only
+   honoured within two hours; anything else is a stale or edited link. */
+function frozenNow(value: unknown): number {
+  const now = Date.now();
+  const at = typeof value === "string" ? Number.parseInt(value, 10) : NaN;
+  return Number.isFinite(at) && at <= now && now - at < 2 * 3_600_000 ? at : now;
+}
 
 export const metadata: Metadata = {
   title: { absolute: "Celpare Community" },
@@ -75,9 +115,59 @@ export default async function CommunityPage({
   ]);
 
   const requested = typeof params?.sort === "string" ? params.sort : undefined;
-  const sort = isSort(requested) ? requested : defaultSort(visiblePostCount);
+  /* Ranked by default (founder, 2026-09-24, D133, superseding D29's "New until
+     20 posts"): For you and Following open on the algorithm. Latest stays one
+     tap away for anybody who wants newest first. */
+  const sort = isSort(requested) ? requested : "top";
 
-  const posts = await getFeed(db, { sort, scope, viewerId });
+  const pages = pagesFrom(params?.more);
+
+  /*
+    TOP IS COMMUNITY INTELLIGENCE: feed_v1 for For you, following_v1 for
+    Following (src/lib/community/intelligence). LATEST stays exactly what it
+    says, newest first with no ranking, and remains the default until there is
+    enough content for ranking to mean anything (D29).
+  */
+  let posts: FeedPost[];
+  let ranked: RankedFeed | null = null;
+  const now = frozenNow(params?.at);
+  /* Admins can append ?debug=1 to see why each post ranked where it did. Both
+     conditions are checked here, on the server; nobody else ever gets the data. */
+  const debug = params?.debug === "1" && signedIn && (await getAdminSession()) !== null;
+
+  if (sort === "top") {
+    /* What this browser just had on screen (seen.ts). Read here so a refresh
+       knows at once, without waiting for the impression beacon to land. */
+    const seenCookie = (await cookies()).get(SEEN_COOKIE)?.value ?? null;
+    const request = { db, viewerId, pages, now, seenCookie, debug };
+    ranked = scope === "following" ? await getFollowingFeed(request) : await getForYouFeed(request);
+    posts = ranked.posts;
+  } else {
+    posts = await getFeed(db, { sort, scope, viewerId, pages });
+  }
+
+  const complete = ranked ? ranked.complete : posts.length < RANKING.PAGE_SIZE * pages;
+
+  /* Only asked when Following came back empty, so the empty state can tell
+     "you follow nobody" from "the people you follow have not posted". */
+  let followsAnyone = false;
+  if (scope === "following" && posts.length === 0 && viewerId) {
+    const { count } = await db
+      .from("follows")
+      .select("following_id", { count: "exact", head: true })
+      .eq("follower_id", viewerId);
+    followsAnyone = (count ?? 0) > 0;
+  }
+  const moreHref =
+    !complete && pages < FEED.MAX_PAGES
+      ? `/community?${new URLSearchParams({
+          ...(scope === "following" ? { feed: "following" } : {}),
+          sort,
+          more: String(pages + 1),
+          ...(ranked ? { at: String(now) } : {}),
+          ...(debug ? { debug: "1" } : {}),
+        }).toString()}#p-${pages * RANKING.PAGE_SIZE}`
+      : null;
 
   /* Signed out people have no messages and no grant to read any, so this is
      skipped entirely rather than asked and answered with zero. */
@@ -130,7 +220,7 @@ export default async function CommunityPage({
           />
 
           {posts.length === 0 ? (
-            <FeedEmpty scope={scope} signedIn={signedIn} />
+            <FeedEmpty scope={scope} signedIn={signedIn} followsAnyone={followsAnyone} />
           ) : (
             /*
               A plain list of articles with a hairline between them. No
@@ -139,13 +229,49 @@ export default async function CommunityPage({
               hairline rather than a stack of boxes.
             */
             <>
-              <ol className="border-t border-border">
-                {posts.map((post) => (
-                  <li key={post.id}>
-                    <PostCard post={post} viewer={viewer} signedIn={signedIn} />
-                  </li>
-                ))}
-              </ol>
+              {/*
+                FeedTelemetry and FeedItem record what was shown, opened and
+                read, with the algorithm and reason that placed it, so the next
+                ranking learns from this one. They render no chrome of their
+                own; a post collapses only when its reader says not interested.
+              */}
+              <FeedTelemetry
+                surface={scope === "following" ? "following" : "for_you"}
+                algorithm={ranked?.algorithm ?? null}
+                variant={ranked?.variant ?? null}
+                servedKey={String(now)}
+              >
+                {ranked?.debug ? (
+                  <FeedDebugSummary
+                    debug={ranked.debug}
+                    algorithm={ranked.algorithm}
+                    variant={ranked.variant}
+                    evaluation={await getAlgorithmEvaluation(7)}
+                    why={typeof params?.why === "string" && /^[0-9a-f-]{36}$/.test(params.why) ? params.why : null}
+                  />
+                ) : null}
+                <ol className="border-t border-border">
+                  {posts.map((post, index) => (
+                    <li key={post.id} id={`p-${index}`}>
+                      <FeedItem
+                        postId={post.id}
+                        position={index}
+                        reason={ranked?.reasons[post.id] ?? null}
+                        expectedReadMs={readMsOf(post)}
+                      >
+                        <PostCard
+                          post={post}
+                          viewer={viewer}
+                          signedIn={signedIn}
+                          feedback={Boolean(ranked)}
+                          socialProof={ranked?.socialProof[post.id] ?? null}
+                        />
+                      </FeedItem>
+                      {ranked?.debug ? <FeedDebugItem entry={ranked.debug.items[post.id]} now={now} /> : null}
+                    </li>
+                  ))}
+                </ol>
+              </FeedTelemetry>
 
               {/*
                 The end of the feed, said out loud, with the composer at the
@@ -158,9 +284,10 @@ export default async function CommunityPage({
                 community based on a LIMIT clause.
               */}
               <FeedEnd
-                complete={posts.length < RANKING.PAGE_SIZE}
+                complete={complete}
                 signedIn={signedIn}
                 scope={scope}
+                moreHref={moreHref}
               />
             </>
           )}
