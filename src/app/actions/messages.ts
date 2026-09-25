@@ -14,6 +14,7 @@ import {
   MAX_DM_FILE_BYTES,
   MAX_DM_IMAGE_BYTES,
   MAX_DM_MEDIA_BYTES,
+  MAX_DM_TEXT_CHARS,
   MAX_DM_VIDEO_BYTES,
   matchesSignature,
 } from "@/lib/messages/shared";
@@ -57,7 +58,11 @@ const sendSchema = z
   .object({
     threadId: uuid,
     kind: z.enum(["text", "voice", "link", "video", "file", "image"]),
-    body: z.string().trim().max(4000, "That is over 4000 characters.").optional(),
+    body: z
+      .string()
+      .trim()
+      .max(MAX_DM_TEXT_CHARS, `That is over ${MAX_DM_TEXT_CHARS.toLocaleString("en")} characters. Send it as a .txt file instead.`)
+      .optional(),
     linkUrl: z
       .string()
       .trim()
@@ -160,16 +165,21 @@ export async function sendMessage(
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  /* Who is sending and the per minute cap on sending (as well as the
+     database's daily cap on files), asked at the same time: they do not
+     depend on each other, and each is a round trip. */
+  const [
+    {
+      data: { user },
+    },
+    withinLimit,
+  ] = await Promise.all([supabase.auth.getUser(), withinBurst("dm_send")]);
 
   if (!user) return fail("Sign in first.");
 
   const { kind, threadId, mediaPath, linkUrl, durationSeconds } = parsed.data;
 
-  /* A per minute cap on sending, as well as the database's daily cap on files. */
-  if (!(await withinBurst("dm_send"))) {
+  if (!withinLimit) {
     return fail("You are sending too fast. Wait a moment and try again.");
   }
 
@@ -425,11 +435,21 @@ async function verifyMediaHead(
     return { ok: false, message: "That did not upload. Try again." };
   }
 
+  /*
+    BOUNDED, AND NEVER WAITING ON A CANCEL (2026-09-25). A voice note hung the
+    send forever with no error: this check awaited reader.cancel(), and a
+    cancelled branch of a teed body (Next's patched fetch tees responses) only
+    settles when the other branch does. Now the fetch and the first read share
+    a 10 second limit, and the rest of the body is cancelled without waiting,
+    so a stall becomes a readable error instead of a spinner.
+  */
+  const signal = AbortSignal.timeout(10_000);
   let res: Response;
   try {
     res = await fetch(signed.signedUrl, {
       headers: { Range: "bytes=0-15" },
       cache: "no-store",
+      signal,
     });
   } catch (err) {
     console.error("[dm] media check fetch failed", err);
@@ -447,8 +467,14 @@ async function verifyMediaHead(
     : Number(res.headers.get("content-length") ?? NaN);
 
   const reader = res.body.getReader();
-  const first = await reader.read();
-  await reader.cancel().catch(() => {});
+  let first: ReadableStreamReadResult<Uint8Array>;
+  try {
+    first = await reader.read();
+  } catch (err) {
+    console.error("[dm] media check read failed", err);
+    return { ok: false, message: "That did not upload. Try again." };
+  }
+  void reader.cancel().catch(() => {});
   const head = (first.value ?? new Uint8Array()).slice(0, 16);
 
   if (!Number.isFinite(total) || total <= 0) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { Download, FileText, Link2, Trash2 } from "lucide-react";
@@ -286,9 +286,9 @@ function Body({ message, mine }: { message: DmMessage; mine: boolean }) {
     return (
       <div>
         {message.body ? (
-          <p className="mb-1.5 whitespace-pre-wrap break-words text-[15px] leading-relaxed">
-            {message.body}
-          </p>
+          <div className="mb-1.5">
+            <ClampedText>{message.body}</ClampedText>
+          </div>
         ) : null}
         <a
           href={message.link_url ?? "#"}
@@ -311,9 +311,58 @@ function Body({ message, mine }: { message: DmMessage; mine: boolean }) {
     /* whitespace-pre-wrap keeps the sender's line breaks, break-words stops one
        unbroken 200 character string pushing the thread sideways at 390px.
        Rendered as text, never as markup. */
-    <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">
+    <ClampedText>
       <Linkified text={message.body ?? ""} />
-    </p>
+    </ClampedText>
+  );
+}
+
+/*
+  Long text, folded to 20 lines (founder, 2026-09-25; D141 allows 20,000
+  characters). The 20 is written in the class itself, line-clamp-[20],
+  because Tailwind only generates classes it can read literally. CSS line-clamp, so the 20
+  lines are the lines the reader SEES, wrapping included, and nothing is cut by
+  code mid word. See more appears only when the text really overflows, which is
+  measured in the browser; a ResizeObserver re-measures when the bubble width
+  changes (a rotated phone). The whole text is always in the DOM, so find in
+  page and screen readers still reach it.
+*/
+function ClampedText({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  const [open, setOpen] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || open) return;
+    const measure = () => setOverflows(node.scrollHeight > node.clientHeight + 1);
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [open]);
+
+  return (
+    <>
+      <p
+        ref={ref}
+        className={cn(
+          "whitespace-pre-wrap break-words text-[15px] leading-relaxed",
+          !open && "line-clamp-[20]",
+        )}
+      >
+        {children}
+      </p>
+      {overflows || open ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="mt-1 inline-flex min-h-8 cursor-pointer items-center text-[14px] font-medium underline underline-offset-4"
+        >
+          {open ? "See less" : "See more"}
+        </button>
+      ) : null}
+    </>
   );
 }
 

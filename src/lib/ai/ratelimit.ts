@@ -89,10 +89,12 @@ export async function bump(key: string, by: number, ttlSeconds: number): Promise
     return next;
   }
 
-  const next = await r.incrby(key, by);
-  // Only set the TTL when the counter is newly created, otherwise every request
-  // pushes the reset time further away and the window never closes.
-  if (next === by) await r.expire(key, ttlSeconds);
+  // One round trip, not two (2026-09-25): the first send of every window used
+  // to wait on INCRBY and then on a separate EXPIRE, 1.5 to 3 seconds each from
+  // a distant client. EXPIRE ... NX sets the TTL only when the counter has none,
+  // which is the old rule: otherwise every request pushes the reset time further
+  // away and the window never closes.
+  const [next] = await r.pipeline().incrby(key, by).expire(key, ttlSeconds, "NX").exec<[number, 0 | 1]>();
   return next;
 }
 

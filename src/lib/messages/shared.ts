@@ -57,6 +57,10 @@ export function cleanFileName(raw: string): { name: string; ext: "txt" | "csv" }
    speaks into a message and short enough to bound the file. */
 export const MAX_VOICE_SECONDS = 600;
 
+/* Mirrors dm_messages_body_len. Raised from 4000 on 2026-09-25 (founder):
+   about 300 lines, a long email. Anything longer goes as a .txt file. */
+export const MAX_DM_TEXT_CHARS = 20_000;
+
 /*
   What MediaRecorder is asked for, in order of preference.
 

@@ -25,6 +25,7 @@ import {
   matchesSignature,
   maxBytesFor,
   MAX_DM_MEDIA_BYTES,
+  MAX_DM_TEXT_CHARS,
   MAX_VOICE_SECONDS,
   VOICE_TYPES,
   voiceExtension,
@@ -297,7 +298,25 @@ export function DmComposer({ threadId }: { threadId: string }) {
         </div>
       ) : null}
 
-      <form ref={formRef} action={submit} key={state.attempt} className="flex items-end gap-2">
+      <form
+        ref={formRef}
+        action={submit}
+        key={state.attempt}
+        /* Too long is said at once, before the action runs: React 19 resets a
+           form once its action completes, so refusing inside the action would
+           throw away what was pasted. The server and dm_messages_body_len
+           hold the same limit. */
+        onSubmit={(e) => {
+          const length = (bodyRef.current?.value ?? "").trim().length;
+          if (length > MAX_DM_TEXT_CHARS) {
+            e.preventDefault();
+            setError(
+              `That is ${length.toLocaleString("en")} characters. The limit is ${MAX_DM_TEXT_CHARS.toLocaleString("en")}. Send it as a .txt file with the paperclip instead.`,
+            );
+          }
+        }}
+        className="flex items-end gap-2"
+      >
         <input type="hidden" name="threadId" value={threadId} />
         <input type="hidden" name="kind" value={kind} />
         <input type="hidden" name="mediaPath" value={attachment?.path ?? ""} />
