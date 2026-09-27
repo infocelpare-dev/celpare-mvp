@@ -1,6 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import { Container, Section } from "@/components/ui/container";
-import { ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 
 /*
   The ElevenLabs hero shape (D122): a large, light headline on the left, the
@@ -15,7 +15,10 @@ export function Hero() {
   return (
     <Section className="pb-12 pt-16 sm:pt-24 lg:pb-16 lg:pt-32">
       <Container>
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-end lg:gap-16">
+        {/* Centred, not bottom aligned: with the founder block the right column
+            is as tall as the left, and bottom alignment pushed its text up and
+            the headline down (founder, 2026-09-25). */}
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-center lg:gap-16">
           <div>
             <p className="reveal-load inline-flex items-center gap-2 text-[14px] text-muted">
               <span aria-hidden className="size-1.5 rounded-full bg-accent" />
@@ -50,16 +53,37 @@ export function Hero() {
 
           <div
             style={{ "--reveal-delay": "180ms" } as React.CSSProperties}
-            className="reveal-load lg:pb-[88px]"
+            className="reveal-load"
           >
             <p className="max-w-[46ch] text-[18px] leading-[1.55] text-foreground sm:text-[19px]">
-              Stop guessing which AI tool to use. Describe what you are trying
-              to accomplish, and Celpare finds, compares and explains the tools
-              that can actually do it.
+              Celpare is an AI-powered platform for finding, comparing,
+              researching and recommending AI tools, models and software, with
+              community features in one ecosystem for AI users, developers and
+              startups.
             </p>
             <p className="mt-4 text-[14px] text-muted">
               Free to start. No card required.
             </p>
+
+            {/*
+              For founders (founder instruction 2026-09-25). More details is a
+              placeholder until the Celpare documents exist: it goes nowhere yet,
+              so it is aria-disabled rather than a link to an empty page. When
+              the documents ship, make it a ButtonLink to them.
+            */}
+            <div className="mt-10">
+              <p className="text-[13px] font-medium uppercase tracking-[0.08em] text-foreground">
+                As a founder: grow your startup with Celpare
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                aria-disabled="true"
+                className="mt-4 h-11 cursor-not-allowed px-6 text-[15px]"
+              >
+                More details
+              </Button>
+            </div>
           </div>
         </div>
       </Container>

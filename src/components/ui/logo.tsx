@@ -3,9 +3,13 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /*
-  The mark is the founder's orca on lime, used as a rounded square. The source
-  is a square JPEG with the lime baked in, which is exactly right for an app
-  icon shape and needs no transparency. Generated sizes live in public/brand.
+  The mark is the founder's orca, lime on a dark tile, as a rounded square, in
+  both themes (founder, 2026-09-25). It replaced the ink orca on a lime tile,
+  which is kept in design/brand-previous and no longer served. The orca is the
+  same drawing in the same place in the frame, so nothing moved. The dark tile
+  reads on the light canvas and blends into the dark one, and the lime orca
+  never changes colour. Generated sizes live in public/brand; the favicon in
+  src/app/favicon.ico is the same mark.
 */
 export function LogoMark({
   size = 32,
@@ -16,12 +20,12 @@ export function LogoMark({
 }) {
   return (
     <Image
-      src="/brand/celpare-mark-256.png"
+      src="/brand/celpare-mark-dark-256.png"
       alt=""
       width={size}
       height={size}
       priority
-      className={cn("rounded-[9px]", className)}
+      className={cn("shrink-0 rounded-[9px]", className)}
       style={{ width: size, height: size }}
     />
   );
