@@ -7,6 +7,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { SparkIcon } from "@/components/ui/spark-icon";
 import { Logo } from "@/components/ui/logo";
 import { AppSidebar } from "./app-sidebar";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 /*
   The frame every page inside Celpare sits in: a thin bar across the top, the
@@ -103,6 +104,8 @@ export function AppShell({
               looking around, /search is for knowing what you want. A magnifier
               means the second.
             */}
+            {/* Signed in only: a visitor has nobody to be notified about (4BH). */}
+            {signedIn ? <NotificationBell /> : null}
             <BarIcon href="/search" label="Search Celpare">
               <Search className="size-[18px]" aria-hidden />
             </BarIcon>

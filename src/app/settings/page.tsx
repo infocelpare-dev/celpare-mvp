@@ -17,6 +17,8 @@ import { PLAN_LIMITS } from "@/lib/ai/config";
 import { isWebSearchConfigured } from "@/lib/ai/web-search";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { PrivacyForm } from "@/components/settings/privacy-form";
+import { NotificationForm } from "@/components/settings/notification-form";
+import type { NotificationPreferences } from "@/lib/notifications/shared";
 import { ClearRecent } from "@/components/profile/clear-recent";
 import { ThemeChoice } from "@/components/ui/theme-choice";
 import type { PrivacyValues } from "@/app/actions/settings";
@@ -115,6 +117,12 @@ export default async function SettingsPage() {
     on the session is the same value and is already the caller's own.
   */
   const email = user.email ?? null;
+
+  /* A failed read throws to the error page rather than showing every switch
+     as on, which would misstate what the database holds (rule 13). */
+  const { data: prefData, error: prefError } = await supabase.rpc("my_notification_preferences");
+  if (prefError) throw new Error(`Notification settings could not be read: ${prefError.message}`);
+  const notificationPrefs = prefData as NotificationPreferences;
 
   const privacy: PrivacyValues = {
     isPrivate: profile?.is_private ?? false,
@@ -216,6 +224,15 @@ export default async function SettingsPage() {
             enforced in the database, not just hidden on the page.
           </p>
           <PrivacyForm values={privacy} />
+        </section>
+
+        {/* Notifications (4BH): one switch per kind, each saving itself. */}
+        <section className="mt-12 border-t border-border pt-10">
+          <h2 className="font-display text-[17px] font-semibold">Notifications</h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-muted">
+            What appears under the bell. Nobody is told what you switch off.
+          </p>
+          <NotificationForm values={notificationPrefs} />
         </section>
 
         {/*
