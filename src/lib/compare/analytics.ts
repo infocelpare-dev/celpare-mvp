@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import type { CompareEvent, CompareGoal } from "@/lib/compare/types";
+import { COMPARE_ALGORITHM } from "@/lib/compare/intelligence/versions";
 
 /*
   Compare analytics.
@@ -63,6 +64,8 @@ export async function recordCompareEvents(input: {
     section: e.section ?? null,
     goal: input.goal,
     signature: input.signature ? input.signature.slice(0, 400) : null,
+    /* D171: set here, on the server, never taken from the client. */
+    algorithm: COMPARE_ALGORITHM,
   }));
 
   try {

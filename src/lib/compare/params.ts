@@ -107,10 +107,16 @@ export function compareHref(
   refs: CompareRef[],
   goal: CompareGoal | null = null,
   view: CompareView | null = null,
+  /* compare_v1 (4BJ): preference weights and a usage scenario, already formatted
+     by formatWeights and formatScenario. They ride along so a shared link shows
+     the same fit and the same estimate (D169, D165). */
+  extra: { w?: string | null; scenario?: string | null } = {},
 ): string {
   const parts: string[] = [];
   if (view) parts.push(`view=${view}`);
   if (refs.length > 0) parts.push(`items=${refs.map(refKey).join(",")}`);
   if (goal) parts.push(`goal=${goal}`);
+  if (extra.w) parts.push(`w=${extra.w}`);
+  if (extra.scenario) parts.push(`scenario=${extra.scenario}`);
   return parts.length > 0 ? `/compare?${parts.join("&")}` : "/compare";
 }

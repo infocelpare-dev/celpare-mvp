@@ -42,6 +42,12 @@ function redis(): Redis | null {
   return client;
 }
 
+/* The same client, for other server code that caches in Upstash (Compare, D170),
+   so a second connection is never opened. Null when Upstash is not configured. */
+export function sharedRedis(): Redis | null {
+  return redis();
+}
+
 function secondsUntilUtcMidnight(now = new Date()): number {
   const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
   return Math.max(60, Math.ceil((next - now.getTime()) / 1000));

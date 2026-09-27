@@ -30,12 +30,12 @@ import { GOALS, type CompareItemType } from "@/lib/compare/types";
 type Item = { type: CompareItemType; id: string; name: string };
 
 export function CompareActions({ items, signedIn }: { items: Item[]; signedIn: boolean }) {
-  const { refs, goal, view, track } = useCompare();
+  const { refs, goal, view, weights, scenario, track } = useCompare();
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
 
   async function share() {
-    const url = `${window.location.origin}${compareHref(refs, goal, view)}`;
+    const url = `${window.location.origin}${compareHref(refs, goal, view, { w: weights, scenario })}`;
     track({ event: "share_comparison" });
     try {
       if (navigator.share) {

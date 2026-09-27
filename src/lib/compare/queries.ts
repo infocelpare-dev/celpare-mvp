@@ -17,6 +17,7 @@ import type {
   Provenance,
   ToolItem,
 } from "@/lib/compare/types";
+import type { PerformanceRow } from "@/lib/compare/intelligence/types";
 
 /*
   Everything a comparison reads.
@@ -64,7 +65,7 @@ const PLAN_COLUMNS =
 const EVAL_COLUMNS =
   "id, model_id, kind, domain, name, metric, score, unit, higher_is_better, ci_low, ci_high," +
   " model_version, harness, evaluator, dataset_version, evaluated_at, note, benchmark_slug," +
-  " source_label, source_url, verified_at";
+  " source_label, source_url, verified_at, reporter_relation, methodology_url, published_at";
 
 /* PostgREST returns numeric as a number, a string or null depending on the
    column's scale. One conversion, so no cell ever renders "NaN". */
@@ -137,6 +138,9 @@ function toEvaluation(r: Row): Evaluation {
     evaluatedAt: String(r.evaluated_at),
     note: str(r.note),
     benchmarkSlug: str(r.benchmark_slug),
+    reporterRelation: (str(r.reporter_relation) as Evaluation["reporterRelation"]) ?? null,
+    methodologyUrl: str(r.methodology_url),
+    publishedAt: str(r.published_at),
     provenance: provenance(r),
   };
 }
@@ -425,4 +429,37 @@ export async function loadComparison(refs: CompareRef[]): Promise<Comparison> {
     },
     readAt: Date.now(),
   };
+}
+
+/*
+  Performance measurements (4BJ, D167). model_performance is empty in v1, so this
+  returns no rows and every cell reads Not measured. Public columns only, approved
+  models only (the select policy), through the anon client like everything else.
+*/
+const PERF_COLUMNS =
+  "id, model_id, metric, value, unit, provider_endpoint, environment, methodology_url," +
+  " source_label, source_url, measured_at, verified_at";
+
+export async function loadPerformance(
+  modelIds: string[],
+  db: SupabaseClient = createAnonClient(),
+): Promise<{ rows: PerformanceRow[]; ok: boolean }> {
+  if (modelIds.length === 0 || !isSupabaseConfigured()) return { rows: [], ok: true };
+  return read(
+    "performance",
+    () => db.from("model_performance").select(PERF_COLUMNS).in("model_id", modelIds).order("measured_at", { ascending: false }),
+    (r): PerformanceRow => ({
+      id: String(r.id),
+      modelId: String(r.model_id),
+      metric: r.metric as PerformanceRow["metric"],
+      /* NOT NULL in the schema; NaN rather than 0 if that ever changes, and the engine drops it. */
+      value: num(r.value) ?? Number.NaN,
+      unit: r.unit as PerformanceRow["unit"],
+      providerEndpoint: str(r.provider_endpoint),
+      environment: str(r.environment),
+      methodologyUrl: str(r.methodology_url),
+      measuredAt: String(r.measured_at),
+      provenance: provenance(r),
+    }),
+  );
 }

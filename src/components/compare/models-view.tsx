@@ -348,7 +348,13 @@ function Parameters({ models }: { models: ModelItem[] }) {
 
 export const MODEL_SECTIONS = ["glance", "pricing", "capabilities", "parameters", "benchmarks", "sources"] as const;
 
-export function ModelsView(props: SectionProps) {
+/* compare_v1 (4BJ) sections are rendered by the page and slotted in here, so
+   this view keeps its OpenRouter shaped order (D116) with the engine's sections
+   beside the facts they are about. */
+export function ModelsView({
+  after,
+  ...props
+}: SectionProps & { after?: { glance?: React.ReactNode; pricing?: React.ReactNode } }) {
   const models = props.items.filter((i): i is ModelItem => i.type === "model");
   return (
     <>
@@ -356,7 +362,9 @@ export function ModelsView(props: SectionProps) {
         <ModelHeads models={models} />
       </div>
       <Glance models={models} />
+      {after?.glance}
       <Pricing models={models} now={props.now} />
+      {after?.pricing}
       <Capabilities models={models} props={props} />
       <Parameters models={models} />
       <BenchmarksSection {...props} />

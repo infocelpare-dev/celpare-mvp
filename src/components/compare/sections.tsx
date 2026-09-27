@@ -39,7 +39,6 @@ import type {
   ModelItem,
   Plan,
   Provenance,
-  Recommendation,
   ToolItem,
 } from "@/lib/compare/types";
 import { GOALS } from "@/lib/compare/types";
@@ -81,7 +80,13 @@ export type SectionId =
   | "reviews"
   | "tradeoffs"
   | "privacy"
-  | "sources";
+  | "sources"
+  /* compare_v1 (4BJ). */
+  | "fit"
+  | "mixed"
+  | "performance"
+  | "cost"
+  | "tradeoff-chart";
 
 export const SECTION_LABELS: Record<SectionId, string> = {
   glance: "At a glance",
@@ -97,6 +102,11 @@ export const SECTION_LABELS: Record<SectionId, string> = {
   tradeoffs: "Strengths and limits",
   privacy: "Privacy",
   sources: "Sources",
+  fit: "Fit",
+  mixed: "Tools and models",
+  performance: "Performance",
+  cost: "Cost estimate",
+  "tradeoff-chart": "Tradeoffs",
 };
 
 export type SectionProps = {
@@ -269,18 +279,13 @@ function ItemMark({ item, size = 40 }: { item: CompareItem; size?: number }) {
    Summary
    --------------------------------------------------------------------------- */
 
-export function SummarySection({
-  items,
-  recommendation,
-}: SectionProps & { recommendation?: Recommendation | null }) {
-  const chosen = recommendation ? items.find((i) => i.id === recommendation.itemId) : null;
-  const goalLabel = recommendation ? GOALS.find((g) => g.key === recommendation.goal)?.label : null;
+export function SummarySection({ items }: SectionProps) {
 
   return (
     <CompareSection
       id="summary"
       title="Summary"
-      lead="What each one is, in its own listing's words. Celpare does not name a winner: which one is right depends on what you need it for."
+      lead="What each one is, in its own listing's words. Celpare does not name a winner: pick a goal above to see how each one fits it."
     >
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => (
@@ -305,172 +310,12 @@ export function SummarySection({
         ))}
       </ul>
 
-      {/*
-        The recommendation slot. Rendered ONLY when a later analysis step supplies
-        one, which today nothing does. It is always framed by the goal it answers,
-        never as an objective best (brief section 30).
-      */}
-      {recommendation && chosen && goalLabel ? (
-        <div className="mt-5 rounded-2xl border border-foreground p-4">
-          <p className="text-[12px] font-medium uppercase tracking-wide text-muted">
-            Based on your goal: {goalLabel}
-          </p>
-          <p className="mt-1 font-medium">{chosen.name}</p>
-          <p className="mt-1 text-[14px] leading-relaxed">{recommendation.reason}</p>
-          <p className="mt-2 text-[12px] text-muted">
-            A recommendation for this goal, not a verdict on which is better overall.
-          </p>
-        </div>
-      ) : null}
     </CompareSection>
   );
-}
-
-/* ---------------------------------------------------------------------------
-   Differences
-   --------------------------------------------------------------------------- */
-
-type Difference = { key: string; label: string; values: { name: string; value: string }[] };
-
-/*
-  Where the RECORDED data differs, stated as data.
-
-  This is set difference, not judgement: a row appears when two items hold
-  different recorded values for the same thing, and it lists what each holds.
-  It never says which difference matters or which side is better. Absence is
-  handled carefully: a platform a listing does not mention is "not listed", never
-  "not supported", and an unrecorded flag is never counted as a no.
-*/
-function differences(items: CompareItem[]): Difference[] {
-  const out: Difference[] = [];
-  const ts = tools(items);
-  const ms = models(items);
-
-  if (ts.length >= 2) {
-    const pm = ts.map((t) => ({ name: t.name, value: t.pricingModel ?? "" }));
-    const known = pm.filter((p) => p.value);
-    if (new Set(known.map((p) => p.value)).size > 1) {
-      out.push({
-        key: "pricing-model",
-        label: "Pricing model",
-        values: pm.map((p) => ({ ...p, value: p.value ? cap(p.value) : "Not recorded" })),
-      });
-    }
-
-    const folded = ts.map((t) => ({ tool: t, ...foldPlatforms(t.platforms) }));
-    for (const p of PLATFORMS) {
-      const listed = folded.filter((f) => f.known.has(p));
-      if (listed.length > 0 && listed.length < folded.length && folded.every((f) => f.tool.platforms.length > 0)) {
-        out.push({
-          key: `platform-${p}`,
-          label: p,
-          values: folded.map((f) => ({ name: f.tool.name, value: f.known.has(p) ? "Listed" : "Not listed" })),
-        });
-      }
-    }
-  }
-
-  if (ms.length >= 2) {
-    const ctx = ms.filter((m) => m.contextWindow);
-    if (new Set(ctx.map((m) => m.contextWindow)).size > 1) {
-      out.push({
-        key: "context",
-        label: "Context window",
-        values: ms.map((m) => ({ name: m.name, value: m.contextWindow ? `${tokens(m.contextWindow)} tokens` : "Not recorded" })),
-      });
-    }
-    for (const [k, label] of [["input", "Input price"], ["output", "Output price"]] as const) {
-      const priced = ms.filter((m) => m.prices[k] !== null);
-      if (new Set(priced.map((m) => m.prices[k])).size > 1) {
-        out.push({
-          key: `price-${k}`,
-          label: `${label}, per 1M tokens`,
-          values: ms.map((m) => ({ name: m.name, value: m.prices[k] !== null ? money(m.prices[k]!, "USD") : "Not recorded" })),
-        });
-      }
-    }
-    const mods = ms.map((m) => m.modalities.slice().sort().join(", "));
-    if (new Set(mods.filter(Boolean)).size > 1) {
-      out.push({
-        key: "modalities",
-        label: "Modalities",
-        values: ms.map((m, i) => ({ name: m.name, value: mods[i] || "Not recorded" })),
-      });
-    }
-  }
-
-  /* Flags recorded yes for some and recorded no for others. Unrecorded is left
-     out of the test entirely, because it is not a value. */
-  const flagKeys = new Set(items.flatMap((i) => i.facts.filter((f) => f.flag !== null).map((f) => f.attribute)));
-  for (const key of flagKeys) {
-    const values = items.map((i) => ({ item: i, fact: factsOf(i, key)[0] }));
-    const recorded = values.filter((v) => v.fact && v.fact.flag !== null);
-    if (new Set(recorded.map((v) => v.fact!.flag)).size > 1) {
-      out.push({
-        key: `fact-${key}`,
-        label: key,
-        values: values.map((v) => ({
-          name: v.item.name,
-          value: !v.fact || v.fact.flag === null ? "Not recorded" : v.fact.flag ? "Yes" : "No",
-        })),
-      });
-    }
-  }
-
-  return out;
 }
 
 function cap(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-export function DifferencesSection({ items, attributes }: SectionProps) {
-  const labels = new Map(attributes.map((a) => [a.key, a.label]));
-  const list = differences(items).map((d) =>
-    d.key.startsWith("fact-") ? { ...d, label: labels.get(d.label) ?? d.label } : d,
-  );
-  const mixed = tools(items).length > 0 && models(items).length > 0;
-
-  return (
-    <CompareSection
-      id="differences"
-      title="Key differences"
-      lead="Where the recorded data for these differs. This lists what each one has on record. It does not decide which difference matters to you."
-    >
-      {mixed ? (
-        <p className="mb-4 rounded-xl border border-border px-4 py-3 text-[14px] leading-relaxed">
-          You are comparing tools with models. A tool is a product you subscribe to and a model is
-          priced per token through an API, so their pricing and specifications are shown in separate
-          tables below rather than side by side.
-        </p>
-      ) : null}
-
-      {list.length === 0 ? (
-        <Nothing>
-          The recorded data does not separate these yet. The sections below show everything that is on
-          record for each.
-        </Nothing>
-      ) : (
-        <ul className="divide-y divide-border rounded-2xl border border-border">
-          {list.slice(0, 10).map((d) => (
-            <li key={d.key} className="px-4 py-3">
-              <p className="text-[13px] font-medium">{d.label}</p>
-              <ul className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-[14px]">
-                {d.values.map((v) => (
-                  <li key={v.name}>
-                    <span className="text-muted">{v.name}: </span>
-                    <span className={v.value === "Not recorded" || v.value === "Not listed" ? "italic text-muted" : ""}>
-                      {v.value}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      )}
-    </CompareSection>
-  );
 }
 
 /* ---------------------------------------------------------------------------

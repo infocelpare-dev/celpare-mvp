@@ -84,6 +84,10 @@ export const GOAL_ROWS: Record<CompareGoal, { fit: string; related: string[] }> 
   agents: { fit: "fit_agents", related: ["agents", "agentic", "tool_calling", "structured_outputs", "automation"] },
   api: { fit: "fit_api", related: ["deploy_api", "sdks", "streaming", "batch_processing", "structured_outputs", "tool_calling", "rate_limits"] },
   personal: { fit: "fit_personal", related: [] },
+  /* compare_v1 goals with no fit_* attribute of their own. "" matches no row. */
+  support: { fit: "", related: ["text_generation", "multilingual", "integration_slack", "structured_outputs"] },
+  long_context: { fit: "", related: ["file_analysis"] },
+  private: { fit: "", related: ["deploy_self_hosted", "deploy_on_prem", "deploy_private", "open_source", "enterprise_controls"] },
 };
 
 /* ---------------------------------------------------------------------------

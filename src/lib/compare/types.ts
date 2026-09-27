@@ -41,7 +41,11 @@ export type CompareGoal =
   | "business"
   | "agents"
   | "api"
-  | "personal";
+  | "personal"
+  /* compare_v1 (4BJ). Goals are presets of requirements, see intelligence/goals.ts. */
+  | "support"
+  | "long_context"
+  | "private";
 
 export const GOALS: { key: CompareGoal; label: string }[] = [
   { key: "coding", label: "Coding" },
@@ -53,6 +57,9 @@ export const GOALS: { key: CompareGoal; label: string }[] = [
   { key: "agents", label: "Agents" },
   { key: "api", label: "API development" },
   { key: "personal", label: "Personal use" },
+  { key: "support", label: "Customer support" },
+  { key: "long_context", label: "Long documents" },
+  { key: "private", label: "Private or self hosted" },
 ];
 
 export function isGoal(value: string | null | undefined): value is CompareGoal {
@@ -143,6 +150,12 @@ export type Evaluation = {
      source printed beside the number, because the number means less without it. */
   note: string | null;
   benchmarkSlug: string | null;
+  /* Who reported the number (D166): the model's provider, a competing provider,
+     an independent party, or the provider's number relayed by somebody else.
+     Null is "not recorded", never guessed. */
+  reporterRelation: "provider" | "competitor" | "independent" | "third_party_cited" | null;
+  methodologyUrl: string | null;
+  publishedAt: string | null;
   provenance: Provenance;
 };
 
@@ -322,6 +335,14 @@ export const COMPARE_EVENTS = [
   "add_to_collection",
   "ask_celpare_from_comparison",
   "goal_selected",
+  /* compare_v1 (4BJ, D171). */
+  "preference_changed",
+  "dimension_expanded",
+  "scenario_changed",
+  "recommendation_viewed",
+  "recommendation_clicked",
+  "recommendation_saved",
+  "recommendation_dismissed",
 ] as const;
 
 export type CompareEventKind = (typeof COMPARE_EVENTS)[number];

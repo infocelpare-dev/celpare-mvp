@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { SaveToCollection } from "@/components/collections/save-to-collection";
 import { AddDialog } from "@/components/compare/add-dialog";
 import { useCompare } from "@/components/compare/compare-provider";
+import { PreferencesPanel } from "@/components/compare/preferences";
 import { refKey } from "@/lib/compare/params";
 import { GOALS, MAX_ITEMS, MIN_ITEMS, type CompareItemType, type OptionRow } from "@/lib/compare/types";
 
@@ -228,7 +229,7 @@ export function CompareBuilder({ slots, signedIn }: { slots: BuilderSlot[]; sign
         <fieldset className="mt-6">
           <legend className="text-[14px] font-medium">What are you comparing them for?</legend>
           <p className="mt-1 text-[13px] text-muted">
-            Optional. It marks the rows that matter for that job. It does not rank anything.
+            Optional. It marks the rows that matter for that job and shows how each option fits it. Nothing is ranked and no winner is named.
           </p>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {GOALS.map((g) => {
@@ -252,6 +253,8 @@ export function CompareBuilder({ slots, signedIn }: { slots: BuilderSlot[]; sign
           </div>
         </fieldset>
       ) : null}
+
+      {okCount >= MIN_ITEMS ? <PreferencesPanel /> : null}
 
       <AddDialog
         type={noun}

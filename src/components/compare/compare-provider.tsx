@@ -40,9 +40,15 @@ type Ctx = {
   refs: CompareRef[];
   view: CompareView;
   goal: CompareGoal | null;
+  /* compare_v1: ?w= and ?scenario= as the URL holds them, already formatted. */
+  weights: string | null;
+  scenario: string | null;
   pending: boolean;
-  /* Replaces this tab's items. The other tab's items ride along unchanged. */
+  /* Replaces this tab's items. The other tab's items ride along unchanged, and so
+     do the weights and the scenario. */
   navigate: (refs: CompareRef[], goal: CompareGoal | null) => void;
+  /* Replaces the weights and the scenario, keeping everything else. */
+  setPreferences: (next: { weights?: string | null; scenario?: string | null }) => void;
   track: (e: CompareEvent) => void;
 };
 
@@ -60,12 +66,16 @@ export function CompareProvider({
   allRefs,
   view,
   goal,
+  weights = null,
+  scenario = null,
   itemCount,
   children,
 }: {
   allRefs: CompareRef[];
   view: CompareView;
   goal: CompareGoal | null;
+  weights?: string | null;
+  scenario?: string | null;
   /* Items that actually rendered, which can be fewer than refs when one is gone. */
   itemCount: number;
   children: React.ReactNode;
@@ -140,6 +150,8 @@ export function CompareProvider({
           seen.add(id);
           observer.unobserve(entry.target);
           track(id === "end" ? { event: "comparison_completed" } : { event: "section_viewed", section: id.replace(/-/g, "_") });
+          /* The fit section is compare_v1's recommendation layer (D161). */
+          if (id === "fit") track({ event: "recommendation_viewed" });
         }
       },
       /* A quarter of a section in view counts as seen. A whole section rarely
@@ -182,14 +194,25 @@ export function CompareProvider({
     (next: CompareRef[], nextGoal: CompareGoal | null) => {
       const others = allRefs.filter((r) => r.type !== type);
       startTransition(() => {
-        router.push(compareHref([...next, ...others], nextGoal, view), { scroll: false });
+        router.push(compareHref([...next, ...others], nextGoal, view, { w: weights, scenario }), { scroll: false });
       });
     },
-    [router, allRefs, type, view],
+    [router, allRefs, type, view, weights, scenario],
+  );
+
+  const setPreferences = useCallback(
+    (next: { weights?: string | null; scenario?: string | null }) => {
+      const w = next.weights === undefined ? weights : next.weights;
+      const s = next.scenario === undefined ? scenario : next.scenario;
+      startTransition(() => {
+        router.push(compareHref(allRefs, goal, view, { w, scenario: s }), { scroll: false });
+      });
+    },
+    [router, allRefs, goal, view, weights, scenario],
   );
 
   return (
-    <CompareCtx.Provider value={{ refs, view, goal, pending, navigate, track }}>
+    <CompareCtx.Provider value={{ refs, view, goal, weights, scenario, pending, navigate, setPreferences, track }}>
       <div aria-busy={pending} className={cn("transition-opacity duration-200", pending && "opacity-60")}>
         {children}
       </div>

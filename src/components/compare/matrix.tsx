@@ -45,77 +45,103 @@ export function Matrix({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "overflow-x-auto rounded-2xl border border-border",
-        /* Momentum scrolling and no page bounce when the table hits its end. */
-        "overscroll-x-contain",
-        className,
-      )}
-      /* A scroll region has to be reachable by keyboard, or its right hand
-         columns are mouse only. */
-      tabIndex={0}
-      role="region"
-      aria-label={caption}
-    >
-      {/* Fixed layout: the label column is fixed and the item columns share
-          the rest evenly, so three items fill the width and six still fit a
-          desktop. Below 170px a column would be unreadable, so the minimum
-          width is set from the column count and the region scrolls past it. */}
-      <table
-        className="w-full table-fixed border-collapse text-left text-[14px]"
-        style={{ minWidth: 176 + columns.length * 170 }}
-      >
-        <caption className="sr-only">{caption}</caption>
-        <thead>
-          <tr className="border-b border-border">
-            <th
-              scope="col"
-              className="sticky left-0 z-[1] w-44 bg-background px-4 py-3 text-[12px] font-medium text-muted"
-            >
-              <span className="sr-only">Attribute</span>
-            </th>
-            {columns.map((c) => (
-              <th
-                key={`${c.type}:${c.id}`}
-                scope="col"
-                className="px-4 py-3 align-bottom text-[13px] font-semibold"
-              >
-                <span className="line-clamp-2">{c.name}</span>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
+    <>
+      {/*
+        Below sm the table stacks: each row becomes its label followed by one line
+        per item (compare_v1, 4BJ). A phone reads a comparison down, not across, and
+        nothing scrolls sideways. The table below is display:none there, so a screen
+        reader meets each value once.
+      */}
+      <div className={cn("rounded-2xl border border-border sm:hidden", className)} role="region" aria-label={caption}>
+        <ul className="divide-y divide-border">
           {rows.map((row) => (
-            <tr key={row.key} className="border-b border-border last:border-b-0">
+            <li key={row.key} className={cn("px-4 py-3", row.highlight && "border-l-[3px] border-l-accent")}>
+              <p className="text-[13px] font-medium">{row.label}</p>
+              {row.highlight ? <p className="text-[11px] text-muted">Relevant to your goal</p> : null}
+              <dl className="mt-1.5 space-y-1 text-[14px]">
+                {row.cells.map((cell, i) => (
+                  <div key={i} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3">
+                    <dt className="truncate text-muted">{columns[i]?.name}</dt>
+                    <dd className="break-words">{cell}</dd>
+                  </div>
+                ))}
+              </dl>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div
+        className={cn(
+          "hidden overflow-x-auto rounded-2xl border border-border sm:block",
+          /* Momentum scrolling and no page bounce when the table hits its end. */
+          "overscroll-x-contain",
+          className,
+        )}
+        /* A scroll region has to be reachable by keyboard, or its right hand
+           columns are mouse only. */
+        tabIndex={0}
+        role="region"
+        aria-label={caption}
+      >
+        {/* Fixed layout: the label column is fixed and the item columns share
+            the rest evenly, so three items fill the width and six still fit a
+            desktop. Below 170px a column would be unreadable, so the minimum
+            width is set from the column count and the region scrolls past it. */}
+        <table
+          className="w-full table-fixed border-collapse text-left text-[14px]"
+          style={{ minWidth: 176 + columns.length * 170 }}
+        >
+          <caption className="sr-only">{caption}</caption>
+          <thead>
+            <tr className="border-b border-border">
               <th
-                scope="row"
-                className={cn(
-                  "sticky left-0 z-[1] bg-background px-4 py-3 align-top text-[13px] font-medium",
-                  /* A goal marks rows, it does not reorder or score them. The
-                     marker is a hairline in the accent, which the brand allows
-                     as an active state, plus words for anyone who cannot see it. */
-                  row.highlight && "border-l-[3px] border-l-accent",
-                )}
+                scope="col"
+                className="sticky left-0 z-[1] w-44 bg-background px-4 py-3 text-[12px] font-medium text-muted"
               >
-                {row.label}
-                {row.highlight ? (
-                  <span className="mt-0.5 block text-[11px] font-normal text-muted">
-                    Relevant to your goal
-                  </span>
-                ) : null}
+                <span className="sr-only">Attribute</span>
               </th>
-              {row.cells.map((cell, i) => (
-                <td key={i} className="px-4 py-3 align-top">
-                  <div className="break-words">{cell}</div>
-                </td>
+              {columns.map((c) => (
+                <th
+                  key={`${c.type}:${c.id}`}
+                  scope="col"
+                  className="px-4 py-3 align-bottom text-[13px] font-semibold"
+                >
+                  <span className="line-clamp-2">{c.name}</span>
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key} className="border-b border-border last:border-b-0">
+                <th
+                  scope="row"
+                  className={cn(
+                    "sticky left-0 z-[1] bg-background px-4 py-3 align-top text-[13px] font-medium",
+                    /* A goal marks rows, it does not reorder or score them. The
+                       marker is a hairline in the accent, which the brand allows
+                       as an active state, plus words for anyone who cannot see it. */
+                    row.highlight && "border-l-[3px] border-l-accent",
+                  )}
+                >
+                  {row.label}
+                  {row.highlight ? (
+                    <span className="mt-0.5 block text-[11px] font-normal text-muted">
+                      Relevant to your goal
+                    </span>
+                  ) : null}
+                </th>
+                {row.cells.map((cell, i) => (
+                  <td key={i} className="px-4 py-3 align-top">
+                    <div className="break-words">{cell}</div>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

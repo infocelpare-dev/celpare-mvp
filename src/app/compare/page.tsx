@@ -11,10 +11,18 @@ import { SparkIcon } from "@/components/ui/spark-icon";
 import { CompareProvider } from "@/components/compare/compare-provider";
 import { CompareBuilder, type BuilderSlot } from "@/components/compare/builder";
 import { AskAboutComparison, CompareActions } from "@/components/compare/compare-actions";
-import { ModelsView, MODEL_SECTIONS } from "@/components/compare/models-view";
+import { ModelsView } from "@/components/compare/models-view";
+import {
+  CompareDebugPanel,
+  CostSection,
+  FitSection,
+  KeyDifferences,
+  MixedPanel,
+  PerformanceSection,
+  TradeoffChart,
+} from "@/components/compare/engine-sections";
 import {
   CapabilitiesSection,
-  DifferencesSection,
   PricingSection,
   PrivacySection,
   ReviewsSection,
@@ -29,10 +37,14 @@ import {
 } from "@/components/compare/sections";
 import { cn } from "@/lib/utils";
 import { createClient, getCurrentUser, isSupabaseConfigured } from "@/lib/supabase/server";
-import { loadComparison } from "@/lib/compare/queries";
 import { compareHref, parseGoal, parseRefs, parseView, refKey, viewType } from "@/lib/compare/params";
 import { recordCompareEvents } from "@/lib/compare/analytics";
-import { MIN_ITEMS, type CompareItem, type Recommendation } from "@/lib/compare/types";
+import { MIN_ITEMS, type CompareItem } from "@/lib/compare/types";
+import { getAdminSession } from "@/lib/admin/guard";
+import { formatScenario, formatWeights, parseScenario, parseWeights } from "@/lib/compare/intelligence/request";
+import { debugAllowed } from "@/lib/compare/intelligence/debug-gate";
+import { loadCompareData, runCompareOn } from "@/lib/compare/intelligence/server/engine";
+import { buildDebug } from "@/lib/compare/intelligence/server/debug";
 
 export const metadata: Metadata = {
   title: "Compare",
@@ -55,9 +67,11 @@ export const dynamic = "force-dynamic";
   Everything below the builder is rendered on the server from the public record
   (D111), and every change the person makes is a new URL (D114).
 
-  WHAT THIS PAGE DOES NOT DO (D115). It does not rank, score, weight or choose.
-  The recommendation slot is typed and always empty; the Compare Intelligence
-  phase fills it without this page changing.
+  COMPARE INTELLIGENCE (compare_v1, 4BJ, guide 16). One engine run per request
+  over the data the sections already read: key differences with their evidence,
+  performance, a cost estimate from explicit assumptions, tradeoffs, and fit
+  ONLY when a goal or weights are set (D161). It never ranks the items, names a
+  winner or scores anything overall, and the columns keep the person's order.
 */
 
 async function savedKeys(items: CompareItem[]): Promise<Set<string>> {
@@ -92,23 +106,44 @@ async function savedKeys(items: CompareItem[]): Promise<Set<string>> {
   return out;
 }
 
-const TOOL_SECTIONS: SectionId[] = [
-  "summary",
-  "differences",
-  "pricing",
-  "capabilities",
-  "use-cases",
-  "technical",
-  "reviews",
-  "tradeoffs",
-  "privacy",
-  "sources",
-];
+function toolSections(fit: boolean, mixed: boolean): SectionId[] {
+  return [
+    "summary",
+    ...(fit ? (["fit"] as const) : []),
+    ...(mixed ? (["mixed"] as const) : []),
+    "differences",
+    "pricing",
+    "capabilities",
+    "use-cases",
+    "technical",
+    "reviews",
+    "tradeoffs",
+    "privacy",
+    "sources",
+  ];
+}
+
+function modelSections(fit: boolean, mixed: boolean, chart: boolean): SectionId[] {
+  return [
+    "glance",
+    ...(fit ? (["fit"] as const) : []),
+    ...(mixed ? (["mixed"] as const) : []),
+    "differences",
+    "pricing",
+    "cost",
+    "performance",
+    ...(chart ? (["tradeoff-chart"] as const) : []),
+    "capabilities",
+    "parameters",
+    "benchmarks",
+    "sources",
+  ];
+}
 
 export default async function ComparePage({
   searchParams,
 }: {
-  searchParams: Promise<{ items?: string; a?: string; b?: string; goal?: string; view?: string }>;
+  searchParams: Promise<{ items?: string; a?: string; b?: string; goal?: string; view?: string; w?: string; scenario?: string; debug?: string }>;
 }) {
   const params = await searchParams;
   const allRefs = parseRefs(params);
@@ -118,6 +153,10 @@ export default async function ComparePage({
   const toolCount = allRefs.filter((r) => r.type === "tool").length;
   const modelCount = allRefs.length - toolCount;
   const goal = parseGoal(params.goal);
+  const weights = parseWeights(params.w);
+  const scenario = parseScenario(params.scenario);
+  const wParam = formatWeights(weights);
+  const scenarioParam = formatScenario(scenario);
   const noun = view === "models" ? "model" : "tool";
   const nouns = view === "models" ? "models" : "tools";
 
@@ -129,10 +168,26 @@ export default async function ComparePage({
     userId = user?.id ?? null;
   }
 
-  const comparison = await loadComparison(refs);
+  const data = await loadCompareData(refs.map(refKey).join(","));
+  const comparison = data.comparison;
   const items = comparison.slots.flatMap((s) => (s.status === "ok" ? [s.item] : []));
   const saved = signedIn ? await savedKeys(items) : new Set<string>();
   const ready = items.length >= MIN_ITEMS;
+
+  /* compare_v1. Tabs never mix (D116), so this tab's run refuses a mixed set. */
+  const run = ready ? runCompareOn(data, { goal, weights, scenario, allowMixed: false }) : null;
+  const result = run?.result ?? null;
+
+  /* The tools and models panel (D162): only with a goal or weights, and only
+     when the URL holds both kinds. Its own run over every item, shared
+     dimensions only. */
+  const wantsMixed = ready && (goal !== null || weights !== null) && toolCount > 0 && modelCount > 0;
+  const mixedRun = wantsMixed ? runCompareOn(await loadCompareData(allRefs.map(refKey).join(",")), { goal, weights, scenario: null }) : null;
+  const mixed = mixedRun?.result?.fit ? mixedRun.result : null;
+
+  const debugRequested = params.debug === "1";
+  const isAdmin = debugRequested && signedIn ? (await getAdminSession()) !== null : false;
+  const debug = run && debugAllowed({ requested: debugRequested, signedIn, isAdmin }) ? buildDebug(run) : null;
 
   if (ready) {
     /* Not awaited: telemetry never holds up a render. */
@@ -176,10 +231,9 @@ export default async function ComparePage({
     now: comparison.readAt,
   };
 
-  const nav: SectionId[] = view === "models" ? [...MODEL_SECTIONS] : TOOL_SECTIONS;
-
-  /* Nothing produces one yet. The type is here so the slot is real. */
-  const recommendation: Recommendation | null = null;
+  const hasFit = Boolean(result?.fit);
+  const nav: SectionId[] =
+    view === "models" ? modelSections(hasFit, Boolean(mixed), Boolean(result?.pareto)) : toolSections(hasFit, Boolean(mixed));
 
   /* A starting point for an empty tab, built from real catalogue rows. It keeps
      whatever the other tab already holds. */
@@ -209,7 +263,7 @@ export default async function ComparePage({
 
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />} signedIn={signedIn}>
-      <CompareProvider allRefs={allRefs} view={view} goal={goal} itemCount={items.length}>
+      <CompareProvider allRefs={allRefs} view={view} goal={goal} weights={wParam} scenario={scenarioParam} itemCount={items.length}>
         <Container className="py-6 sm:py-8">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -250,7 +304,7 @@ export default async function ComparePage({
               return (
                 <Link
                   key={v}
-                  href={compareHref(allRefs, goal, v)}
+                  href={compareHref(allRefs, goal, v, { w: wParam, scenario: scenarioParam })}
                   aria-current={on ? "page" : undefined}
                   scroll={false}
                   className={cn(
@@ -286,7 +340,7 @@ export default async function ComparePage({
                 last one, so it is reachable from anywhere on the page. */}
             <nav aria-label="Comparison sections" className="sticky top-0 z-10 border-y border-border bg-background">
               <Container>
-                <ul className="-mx-4 flex gap-1 overflow-x-auto px-4 py-2 sm:mx-0 sm:px-0">
+                <ul className="-mx-4 flex gap-1 overflow-x-auto px-4 py-2 sm:mx-0 sm:px-0 lg:flex-wrap lg:overflow-visible">
                   {nav.map((id) => (
                     <li key={id} className="shrink-0">
                       <a
@@ -312,11 +366,31 @@ export default async function ComparePage({
 
             <Container>
               {view === "models" ? (
-                <ModelsView {...props} />
+                <ModelsView
+                  {...props}
+                  after={{
+                    glance: result ? (
+                      <>
+                        <FitSection result={result} />
+                        {mixed ? <MixedPanel result={mixed} /> : null}
+                        <KeyDifferences result={result} />
+                      </>
+                    ) : null,
+                    pricing: result ? (
+                      <>
+                        <CostSection result={result} />
+                        <PerformanceSection result={result} items={items} />
+                        <TradeoffChart result={result} />
+                      </>
+                    ) : null,
+                  }}
+                />
               ) : (
                 <>
-                  <SummarySection {...props} recommendation={recommendation} />
-                  <DifferencesSection {...props} />
+                  <SummarySection {...props} />
+                  {result ? <FitSection result={result} /> : null}
+                  {mixed ? <MixedPanel result={mixed} /> : null}
+                  {result ? <KeyDifferences result={result} /> : null}
                   <PricingSection {...props} />
                   <CapabilitiesSection {...props} />
                   <UseCasesSection {...props} />
@@ -327,6 +401,8 @@ export default async function ComparePage({
                   <SourcesSection {...props} />
                 </>
               )}
+
+              {debug ? <CompareDebugPanel debug={debug} /> : null}
 
               <div data-compare-section="end">
                 <EndOfList
