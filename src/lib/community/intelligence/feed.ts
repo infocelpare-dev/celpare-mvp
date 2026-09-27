@@ -2,6 +2,7 @@ import { EXPLORATION, INTENT } from "./config";
 import { applyOverride, type Assignment } from "./experiments";
 import type { SeedTokens } from "./features";
 import { isColdStart, type SessionProfile } from "./interests";
+import type { StoredPostState } from "./lifecycle";
 import { assembleFeed, runPipeline, type DropReason } from "./pipeline";
 import { OBJECTIVES } from "./scoring";
 import type {
@@ -45,8 +46,10 @@ export const FEED = {
   switch off. The profile inputs added with v3 (served state, position aware
   ignores, mutual follows) are shared by every version and stay.
 */
-export const FEED_ALGORITHM: { forYou: "feed_v2" | "feed_v3"; following: "following_v2" | "following_v3" } = {
-  forYou: "feed_v3",
+export const FEED_ALGORITHM: { forYou: "feed_v2" | "feed_v3" | "feed_v4"; following: "following_v2" | "following_v3" } = {
+  /* feed_v4 is feed_v3 plus the stored post lifecycle (distribution_v2).
+     Rolling back to feed_v3 stops the stored state being read at all. */
+  forYou: "feed_v4",
   following: "following_v3",
 };
 
@@ -69,6 +72,8 @@ export type FeedInput = {
   followCount?: number;
   /* Admin debug: filled with why candidates were dropped or demoted. */
   trace?: Map<string, DropReason>;
+  /* feed_v4: each post's stored lifecycle (lifecycle.ts). */
+  postStates?: Map<string, StoredPostState>;
 };
 
 /*
@@ -85,7 +90,8 @@ export function explorationSlots(pages: number, cold: boolean, intent: RankingCo
 export function rankForYou(input: FeedInput): FeedResult {
   const cold = isColdStart(input.profile);
   const pages = Math.min(Math.max(1, input.pages), FEED.MAX_PAGES);
-  const v3 = FEED_ALGORITHM.forYou === "feed_v3";
+  /* v4 keeps every v3 stage and adds the stored state. */
+  const v3 = FEED_ALGORITHM.forYou !== "feed_v2";
   const objective = applyOverride(v3 ? OBJECTIVES.for_you_v3 : OBJECTIVES.for_you, input.assignment.override);
 
   const ranked = runPipeline({
@@ -111,6 +117,7 @@ export function rankForYou(input: FeedInput): FeedResult {
     network: input.network,
     followCount: input.followCount,
     trace: input.trace,
+    postStates: FEED_ALGORITHM.forYou === "feed_v4" ? input.postStates : undefined,
   });
 
   const { items, complete } = assembleFeed(ranked, FEED.PAGE_SIZE, pages);

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Link2 } from "lucide-react";
+import { ChartNoAxesColumn, Link2 } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
@@ -212,6 +212,17 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
             reposted={viewer.reposted.has(post.id)}
             className="-ms-3"
           />
+
+          {/* 4BG: how this post travelled, for its author only (D148). */}
+          {isOwner ? (
+            <Link
+              href={`/community/${post.id}/insights`}
+              className="mt-1 inline-flex h-11 items-center gap-1.5 rounded-full px-3 -ms-3 text-[13px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <ChartNoAxesColumn className="size-[18px]" aria-hidden />
+              Insights
+            </Link>
+          ) : null}
 
           {isOwner || signedIn ? (
             <PostControls

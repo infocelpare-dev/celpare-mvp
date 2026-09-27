@@ -30,6 +30,13 @@ export function FeedDebugSummary({
   for (const [, r] of dropped) byReason.set(r, (byReason.get(r) ?? 0) + 1);
   const whyEntry = why ? debug.items[why] : undefined;
   const whyDrop = why ? debug.dropped?.[why] : undefined;
+  const whyStage = why ? debug.lifecycle?.[why] : undefined;
+  /* feed_v4: how the pool splits across stored lifecycle stages. */
+  const stages = new Map<string, number>();
+  for (const s of Object.values(debug.lifecycle ?? {})) {
+    const key = s.stale ? `${s.stage} (stale)` : s.stage;
+    stages.set(key, (stages.get(key) ?? 0) + 1);
+  }
   return (
     <div className="mb-3 rounded-2xl border border-border px-4 py-3 font-mono text-[12px] leading-relaxed text-muted">
       <p className="text-foreground">Ranking debug (admins only)</p>
@@ -42,6 +49,12 @@ export function FeedDebugSummary({
           {Object.entries(debug.sources)
             .map(([k, v]) => `${k} ${v}`)
             .join(", ")}
+        </p>
+      ) : null}
+      {stages.size ? (
+        <p>
+          lifecycle{" "}
+          {[...stages.entries()].map(([k, v]) => `${k} ${v}`).join(", ")}
         </p>
       ) : null}
       {byReason.size ? (
@@ -58,6 +71,7 @@ export function FeedDebugSummary({
             : whyDrop
               ? `not on the page: ${whyDrop}`
               : "not a candidate: no source retrieved it, or it is not visible to this account"}
+          {whyStage ? ` · stage ${whyStage.stage}, wave ${whyStage.wave}, perf ${whyStage.perf ?? "?"}${whyStage.stale ? ", stale" : ""}` : ""}
         </p>
       ) : null}
       <p>
@@ -84,7 +98,16 @@ export function FeedDebugSummary({
   );
 }
 
-export function FeedDebugItem({ entry, now }: { entry: FeedDebug["items"][string] | undefined; now: number }) {
+export function FeedDebugItem({
+  entry,
+  now,
+  lifecycle,
+}: {
+  entry: FeedDebug["items"][string] | undefined;
+  now: number;
+  /* feed_v4: the post's stored lifecycle state. */
+  lifecycle?: NonNullable<FeedDebug["lifecycle"]>[string];
+}) {
   if (!entry) return null;
   const d = entry.debug;
   return (
@@ -93,6 +116,12 @@ export function FeedDebugItem({ entry, now }: { entry: FeedDebug["items"][string
         #{entry.position} · {d?.tier ?? "?"} · score {entry.score} · {entry.primaryReason ?? "no reason"}
       </summary>
       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-0.5 break-words">
+        <dt>lifecycle</dt>
+        <dd>
+          {lifecycle
+            ? `${lifecycle.stage}, wave ${lifecycle.wave}, perf ${lifecycle.perf ?? "?"}${lifecycle.stale ? ", stale (per request fallback)" : ""}`
+            : "no stored state (per request fallback)"}
+        </dd>
         <dt>supporting</dt>
         <dd>{entry.supporting.join(", ") || "none"}</dd>
         <dt>sources</dt>

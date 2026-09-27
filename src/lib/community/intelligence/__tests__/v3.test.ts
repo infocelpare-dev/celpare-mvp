@@ -37,11 +37,13 @@ function served(id: string, times: number, at = NOW - 10 * 60_000): SeenState {
 const seenRows = (authorId: string, positions: number[], at = NOW - 2 * H): InterestSignal[] =>
   positions.map((position, i) => ({ action: "seen", at: at - i * 60_000, postId: `${authorId}-p${i}`, authorId, topicId: `t-${authorId}`, position }));
 
-describe("feed_v3 is what For You and Following run", () => {
-  it("names v3 on both surfaces", () => {
-    assert.equal(FEED_ALGORITHM.forYou, "feed_v3");
+describe("feed_v3's stages run under feed_v4", () => {
+  /* feed_v4 (4BG) is feed_v3 plus the stored post lifecycle; every v3 stage
+     below still runs. Following stays following_v3. */
+  it("names v4 on For you and v3 on Following", () => {
+    assert.equal(FEED_ALGORITHM.forYou, "feed_v4");
     assert.equal(FEED_ALGORITHM.following, "following_v3");
-    assert.equal(forYou({ candidates: [cand(item())] }).algorithm, "feed_v3");
+    assert.equal(forYou({ candidates: [cand(item())] }).algorithm, "feed_v4");
   });
 });
 
@@ -291,7 +293,7 @@ describe("Why not (admin debug trace)", () => {
   });
 });
 
-describe("Reels stay reels_v2", () => {
+describe("Reels build a v2 only profile (reels_v3 adds only the stored state)", () => {
   it("a profile built v2 only has no v3 inputs, and reels rank the same with or without v3 rows", () => {
     const base: InterestSignal[] = [{ action: "complete", at: NOW - H, postId: "v0", topicId: "ai", authorId: "k" }];
     const extra: InterestSignal[] = [

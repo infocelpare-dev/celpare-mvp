@@ -267,7 +267,7 @@ export default async function CommunityPage({
                           socialProof={ranked?.socialProof[post.id] ?? null}
                         />
                       </FeedItem>
-                      {ranked?.debug ? <FeedDebugItem entry={ranked.debug.items[post.id]} now={now} /> : null}
+                      {ranked?.debug ? <FeedDebugItem entry={ranked.debug.items[post.id]} now={now} lifecycle={ranked.debug.lifecycle?.[post.id]} /> : null}
                     </li>
                   ))}
                 </ol>

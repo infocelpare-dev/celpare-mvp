@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import { POST_SELECT, normalisePost, type FeedPost } from "@/lib/community/queries";
 import { buildInterestProfile, topKeys } from "../interests";
+import { STAGES, type Stage, type StoredPostState } from "../lifecycle";
 import { parseSignalRows, type SignalRow } from "../signals";
 import { tokenize } from "../text";
 import type {
@@ -277,6 +278,54 @@ export async function retrieveByIds(db: SupabaseClient, into: Loaded, ids: strin
   is not configured or the call fails: the caller then ranks on the public
   counters and freshness alone (fallback chain, fallback.ts).
 */
+type PostStateRow = {
+  post_id: string;
+  stage: string;
+  wave: number;
+  new_author: boolean;
+  perf_score: number | null;
+  velocity: number | null;
+  reference_hourly: number | null;
+  stage_since: string;
+  computed_at: string;
+  stale: boolean;
+};
+
+/*
+  Each post's stored lifecycle (post_states(), service role only: stage, wave
+  and scores, never who). An empty map on any failure: every reader then falls
+  back to the per request computation (D142), so this can never empty a feed.
+*/
+export async function loadPostStates(ids: string[]): Promise<Map<string, StoredPostState>> {
+  const out = new Map<string, StoredPostState>();
+  if (ids.length === 0 || !hasServiceRole()) return out;
+  try {
+    const { data, error } = await createAdminClient().rpc("post_states", { p_ids: ids.slice(0, 500) });
+    if (error) {
+      console.error("[intelligence] post states failed", error.code, error.message);
+      return out;
+    }
+    for (const r of (data as PostStateRow[]) ?? []) {
+      if (!(STAGES as readonly string[]).includes(r.stage)) continue;
+      out.set(r.post_id, {
+        postId: r.post_id,
+        stage: r.stage as Stage,
+        wave: r.wave,
+        newAuthor: r.new_author,
+        perfScore: r.perf_score,
+        velocity: r.velocity ?? 0,
+        referenceHourly: r.reference_hourly,
+        stageSince: Date.parse(r.stage_since),
+        computedAt: Date.parse(r.computed_at),
+        stale: r.stale,
+      });
+    }
+  } catch (err) {
+    console.error("[intelligence] post states threw", err);
+  }
+  return out;
+}
+
 export async function loadPostSignals(ids: string[]): Promise<Map<string, PostSignals> | null> {
   if (ids.length === 0) return new Map();
   if (!hasServiceRole()) {

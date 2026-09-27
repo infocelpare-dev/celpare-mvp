@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /*
-  trending_v1 and rising_v1, as data. What is gaining attention on Celpare right
+  trending_v2 and rising_v2 (trending_v1 and rising_v1 when the stored post
+  lifecycle cannot be read), as data. What is gaining attention on Celpare right
   now: posts, videos, discussions, rising posts, topics, hashtags and creators.
 
   PUBLIC AND THE SAME FOR EVERYBODY. Computed from the anonymous view only, so a
@@ -17,9 +18,8 @@ export const runtime = "nodejs";
   part in a group: never a score, a weight, a view count or anything from
   feed_post_signals directly.
 
-  Nothing in the product renders this yet (Explore's Trending and Rising
-  sections belong to Explore, and wiring them is Explore's decision). It exists
-  so the algorithm has a tested, callable surface.
+  Explore's Trending and Rising sections render the same results (4BG) by
+  calling getTrending directly; this route is the same answer as data.
 */
 
 const schema = z.object({

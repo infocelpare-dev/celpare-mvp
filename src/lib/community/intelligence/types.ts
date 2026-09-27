@@ -47,6 +47,16 @@ export type AlgorithmId =
      performance, same story clustering. Reels stay on reels_v2. */
   | "feed_v3"
   | "following_v3"
+  /* v4, 2026-09-25 (Post Intelligence, 4BG): the For you feed and the video
+     viewer read each post's STORED lifecycle (stage, audience wave, relative
+     performance) from the pg_cron tick instead of recomputing distribution per
+     request; trending and rising are bent by the stored stage. */
+  | "feed_v4"
+  | "reels_v3"
+  | "distribution_v2"
+  | "trending_v2"
+  | "rising_v2"
+  | "upload_v1"
   | "distribution_v1"
   | "viral_v1"
   | "trending_v1"
@@ -164,7 +174,11 @@ export type SignalType =
   | "swipe_watched"
   | "watch"
   | "rewatch"
-  | "report";
+  | "report"
+  /* 4BG: from the feed card. */
+  | "link_click"
+  | "media_open"
+  | "hide";
 
 /* Buckets by how long ago: <1h, 1-6h, 6-24h, 24-72h, 72h-7d, older. */
 export const BUCKET_HOURS = [1, 6, 24, 72, 168, Infinity] as const;

@@ -248,6 +248,7 @@ export function PostActions({
         <button
           type="button"
           onClick={onShare}
+          data-feed-event="share"
           className="inline-flex h-11 min-w-11 cursor-pointer items-center justify-center gap-1.5 rounded-full px-3 text-[13px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
         >
           {copied ? (

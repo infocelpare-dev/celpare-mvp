@@ -1,12 +1,15 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { MAX_POST_IMAGES, isOwnPostUpload } from "@/lib/community/media";
 import { POST_KINDS } from "@/lib/community/kinds";
 import { normaliseUrl } from "@/lib/format";
+import { processPost } from "@/lib/community/intelligence/server/upload";
+import { clampDurationMs } from "@/lib/community/intelligence/upload";
 
 /*
   Every community write. Same doctrine as follow.ts and settings.ts: a zod
@@ -159,9 +162,15 @@ export async function createPost(
   const kinds = formData.getAll("mediaKind").map(String);
   const widths = formData.getAll("mediaWidth").map(String);
   const heights = formData.getAll("mediaHeight").map(String);
+  const durations = formData.getAll("mediaDuration").map(String);
 
-  const media: { url: string; kind: "image" | "video"; width: number | null; height: number | null }[] =
-    [];
+  const media: {
+    url: string;
+    kind: "image" | "video";
+    width: number | null;
+    height: number | null;
+    durationMs: number | null;
+  }[] = [];
 
   for (let i = 0; i < urls.length; i += 1) {
     const candidate = mediaSchema.safeParse({
@@ -185,7 +194,12 @@ export async function createPost(
       return fail("One of those files is not yours to attach.");
     }
 
-    media.push(candidate.data);
+    media.push({
+      ...candidate.data,
+      /* The browser's reading, clamped; never trusted beyond a sane range and
+         corrected later by what the player reports (4BG). */
+      durationMs: candidate.data.kind === "video" ? clampDurationMs(durations[i]) : null,
+    });
   }
 
   const videos = media.filter((m) => m.kind === "video").length;
@@ -257,6 +271,7 @@ export async function createPost(
         url: m.url,
         width: m.width,
         height: m.height,
+        duration_ms: m.durationMs,
         sort_order: i,
       })),
     );
@@ -278,6 +293,12 @@ export async function createPost(
       return fail("Those files did not attach, so the post was not published.");
     }
   }
+
+  /* Post Intelligence (4BG): language, near duplicates, quality and spam,
+     after the response so posting is not slower. It never throws; if it fails
+     the tick moves the post on within ten minutes. */
+  const videoDuration = media.find((m) => m.kind === "video")?.durationMs ?? null;
+  after(() => processPost(postId, videoDuration));
 
   revalidatePath("/community");
   revalidatePath("/profile");

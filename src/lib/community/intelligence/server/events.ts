@@ -20,10 +20,32 @@ import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 */
 
 /* "serve" (feed_v3): the post was delivered to the browser, on screen or not. */
-export const FEED_EVENTS = ["impression", "open", "dwell", "serve"] as const;
+/* link_click, share, profile_visit, media_open and hide added with Post
+   Intelligence (4BG); the feed_events CHECK lists the same values. */
+export const FEED_EVENTS = [
+  "impression",
+  "open",
+  "dwell",
+  "serve",
+  "link_click",
+  "share",
+  "profile_visit",
+  "media_open",
+  "hide",
+] as const;
 export type FeedEventKind = (typeof FEED_EVENTS)[number];
 
-export const FEED_SURFACES = ["for_you", "following", "topic", "trending", "profile", "post"] as const;
+export const FEED_SURFACES = [
+  "for_you",
+  "following",
+  "topic",
+  "trending",
+  "profile",
+  "post",
+  "explore",
+  "search",
+  "video",
+] as const;
 export type FeedEventSurface = (typeof FEED_SURFACES)[number];
 
 export type FeedEvent = {

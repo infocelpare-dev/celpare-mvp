@@ -56,6 +56,9 @@ export type DistributionState = {
   stage: DistributionStage;
   fraction: number;
   viewers: number;
+  /* distribution_v2: the lift the stored wave and perf score earned
+     (lifecycle.ts stateToDistribution). Absent, the stage decides. */
+  boost?: number;
 };
 
 export function distributionStage(
@@ -97,6 +100,7 @@ export function inAudience(
 /* The multiplier a stage applies to ranking beyond the audience check: a post
    in test gets a small lift so it actually collects its first signals. */
 export function distributionBoost(state: DistributionState): number {
+  if (state.boost !== undefined) return state.boost;
   switch (state.stage) {
     case "test":
       return 0.6;

@@ -10,7 +10,8 @@ import { FEED, FEED_ALGORITHM, rankFollowing, rankForYou } from "../feed";
 import type { DropReason } from "../pipeline";
 import { buildInterestProfile, emptyInterestProfile, isColdStart, topKeys } from "../interests";
 import { tokenize } from "../text";
-import { reelsFeed } from "../reels";
+import { REELS_ALGORITHM, reelsFeed } from "../reels";
+import { isFresh, type StoredPostState } from "../lifecycle";
 import {
   risingContent,
   trendingCreators,
@@ -39,6 +40,7 @@ import {
   loadInterestProfile,
   loadNetworkEngagement,
   loadPostSignals,
+  loadPostStates,
   loadSeedTokens,
   retrieveAuthorAffinityCandidates,
   retrieveByIds,
@@ -100,6 +102,8 @@ export type FeedDebug = {
   served?: number;
   /* Post id to why it is not on the page (or lower than one might expect). */
   dropped?: Record<string, DropReason>;
+  /* feed_v4: each candidate's stored lifecycle, and whether it was fresh. */
+  lifecycle?: Record<string, { stage: string; wave: number; perf: number | null; stale: boolean }>;
   items: Record<
     string,
     {
@@ -113,6 +117,19 @@ export type FeedDebug = {
     }
   >;
 };
+
+function lifecycleDebug(states: Map<string, StoredPostState>, now: number): FeedDebug["lifecycle"] {
+  const out: NonNullable<FeedDebug["lifecycle"]> = {};
+  for (const [id, s] of states) {
+    out[id] = {
+      stage: s.stage,
+      wave: s.wave,
+      perf: s.perfScore === null ? null : Math.round(s.perfScore * 100) / 100,
+      stale: s.stale || now - s.computedAt > 20 * 60_000,
+    };
+  }
+  return out;
+}
 
 /* Settle every source; keep the ones that worked. Throws only if ALL failed,
    because an empty feed built from failures would claim the community is empty. */
@@ -262,7 +279,8 @@ export async function getForYouFeed(req: FeedRequest): Promise<RankedFeed> {
   );
   /* feed_v3 reads what the people you follow commented on, reposted and
      (two or more of them) liked; v2 read only their reposts. */
-  const v3 = FEED_ALGORITHM.forYou === "feed_v3";
+  const v3 = FEED_ALGORITHM.forYou !== "feed_v2";
+  const v4 = FEED_ALGORITHM.forYou === "feed_v4";
   const [seeds, lists] = await Promise.all([
     seedsP,
     settle([
@@ -281,10 +299,12 @@ export async function getForYouFeed(req: FeedRequest): Promise<RankedFeed> {
   timings.retrieval = Date.now() - t0 - timings.person;
   const candidates = mergeCandidateSources(lists);
   const ids = candidates.map((c) => c.item.id);
-  /* Signals and network counts are independent reads: one round trip. */
-  const [signalsRead, network] = await Promise.all([
+  /* Signals, network counts and stored states are independent reads: one
+     round trip. */
+  const [signalsRead, network, postStates] = await Promise.all([
     loadPostSignals(ids),
     v3 ? loadNetworkEngagement(db, viewerId, ids) : Promise.resolve(new Map()),
+    v4 ? loadPostStates(ids) : Promise.resolve(new Map<string, StoredPostState>()),
   ]);
   const signals = signalsRead ?? new Map();
   timings.signals = Date.now() - t0 - timings.person - timings.retrieval;
@@ -321,6 +341,7 @@ export async function getForYouFeed(req: FeedRequest): Promise<RankedFeed> {
         network,
         followCount: followed.length,
         trace,
+        postStates,
       }),
     { candidates, signals, profile, pageSize: FEED.PAGE_SIZE, pages, seen, now },
     (err) => console.error(`[intelligence] ${algorithm} failed, serving fallback`, err),
@@ -340,6 +361,7 @@ export async function getForYouFeed(req: FeedRequest): Promise<RankedFeed> {
           candidates: candidates.length,
           sources: Object.fromEntries(lists.map((l) => [l.source, l.items.length])),
           dropped: trace ? Object.fromEntries(trace) : undefined,
+          lifecycle: v4 ? lifecycleDebug(postStates, now) : undefined,
           timings,
         }
       : undefined,
@@ -457,17 +479,23 @@ export async function getReelsFeed(req: FeedRequest & { firstId?: string | null 
     ]),
   ]);
   const candidates = mergeCandidateSources(lists).filter((c) => c.item.media === "video");
-  const signals = (await loadPostSignals(candidates.map((c) => c.item.id))) ?? new Map();
+  const [signalsRead, postStates] = await Promise.all([
+    loadPostSignals(candidates.map((c) => c.item.id)),
+    REELS_ALGORITHM === "reels_v3"
+      ? loadPostStates(candidates.map((c) => c.item.id))
+      : Promise.resolve(new Map<string, StoredPostState>()),
+  ]);
+  const signals = signalsRead ?? new Map();
   const seen = seenStateFor(profile, req.seenCookie, candidates.map((c) => c.item.id), now);
   /* feed_v3 served state is the feed's, not the viewer's (see above). */
   for (const [id, r] of seen) if (r.depth === "served") seen.delete(id);
   /* The requested video is never held back as seen: a link opens on it. */
   if (req.firstId) seen.delete(req.firstId);
 
-  const assignment = assignVariant(viewerId, "reels_v2");
+  const assignment = assignVariant(viewerId, REELS_ALGORITHM);
   const context = contextFor(
     "reels",
-    "reels_v2",
+    REELS_ALGORITHM,
     viewerId,
     now,
     assignment.variant,
@@ -489,11 +517,12 @@ export async function getReelsFeed(req: FeedRequest & { firstId?: string | null 
           viewerKey: viewerId ?? "anon",
           session,
           seen,
+          postStates,
         },
         req.firstId,
       ),
     { candidates, signals, profile, pageSize: 30, pages: 1, seen, now },
-    (err) => console.error("[intelligence] reels_v2 failed, serving fallback", err),
+    (err) => console.error(`[intelligence] ${REELS_ALGORITHM} failed, serving fallback`, err),
   );
 
   const ranked = toRanked(result, loaded);
@@ -532,35 +561,44 @@ export async function getTrending(anon: SupabaseClient, kind: TrendingKind, now:
     src("fresh", undefined, retrieveFreshCandidates(anon, loaded, 100)),
   ]);
   const items = mergeCandidateSources(lists).map((c) => c.item);
-  const signals = (await loadPostSignals(items.map((i) => i.id))) ?? new Map();
-  const input = { items, signals, now };
+  const [signalsRead, states] = await Promise.all([
+    loadPostSignals(items.map((i) => i.id)),
+    loadPostStates(items.map((i) => i.id)),
+  ]);
+  const signals = signalsRead ?? new Map();
+  const input = { items, signals, now, states };
+  /* v2 only when a fresh stored state was actually read: with the tick
+     stopped every state is stale, v1 is what runs, and v1 is what is named. */
+  const v2 = [...states.values()].some((s) => isFresh(s, now));
+  const trendingId: AlgorithmId = v2 ? "trending_v2" : "trending_v1";
+  const risingId: AlgorithmId = v2 ? "rising_v2" : "rising_v1";
   const posts = (xs: { item: { id: string } }[]) => xs.map((x) => loaded.posts.get(x.item.id)).filter((p): p is FeedPost => Boolean(p));
   const strip = (gs: GroupTrend[]) => gs.map(({ key, posts, participants, growth }) => ({ key, posts, participants, growth: Math.round(growth * 100) / 100 }));
 
   let value: TrendingResult;
   switch (kind) {
     case "posts":
-      value = { kind, algorithm: "trending_v1", posts: posts(trendingPosts(input)) };
+      value = { kind, algorithm: trendingId, posts: posts(trendingPosts(input)) };
       break;
     case "reels":
-      value = { kind, algorithm: "trending_v1", posts: posts(trendingReels(input)) };
+      value = { kind, algorithm: trendingId, posts: posts(trendingReels(input)) };
       break;
     case "discussions":
-      value = { kind, algorithm: "trending_v1", posts: posts(trendingDiscussions(input)) };
+      value = { kind, algorithm: trendingId, posts: posts(trendingDiscussions(input)) };
       break;
     case "rising": {
       const top = new Set(trendingPosts(input, 10).map((x) => x.item.id));
-      value = { kind, algorithm: "rising_v1", posts: posts(risingContent(input, 10, top)) };
+      value = { kind, algorithm: risingId, posts: posts(risingContent(input, 10, top)) };
       break;
     }
     case "topics":
-      value = { kind, algorithm: "trending_v1", groups: strip(trendingTopics(input)) };
+      value = { kind, algorithm: trendingId, groups: strip(trendingTopics(input)) };
       break;
     case "hashtags":
-      value = { kind, algorithm: "trending_v1", groups: strip(trendingHashtags(input)) };
+      value = { kind, algorithm: trendingId, groups: strip(trendingHashtags(input)) };
       break;
     case "creators":
-      value = { kind, algorithm: "trending_v1", groups: strip(trendingCreators(input)) };
+      value = { kind, algorithm: trendingId, groups: strip(trendingCreators(input)) };
       break;
   }
   trendCache.set(kind, { at: now, value });

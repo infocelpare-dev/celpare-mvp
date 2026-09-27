@@ -43,6 +43,9 @@ const KNOWN = new Set<SignalType>([
   "watch",
   "rewatch",
   "report",
+  "link_click",
+  "media_open",
+  "hide",
 ]);
 
 function stat(): SignalStat {

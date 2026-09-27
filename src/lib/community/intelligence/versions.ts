@@ -61,6 +61,37 @@ export const ALGORITHMS: Record<AlgorithmId, AlgorithmInfo> = {
     surface: "following",
     objective: "following_v2 plus served rotation, dwell hygiene and one story shown once. Still a timeline first.",
   },
+  feed_v4: {
+    id: "feed_v4",
+    surface: "for_you",
+    objective:
+      "feed_v3 plus each post's stored lifecycle: the audience wave it has earned and how it performs against its creator's usual widen or narrow its reach; held and suppressed posts are never exploration picks.",
+  },
+  reels_v3: {
+    id: "reels_v3",
+    surface: "reels",
+    objective: "reels_v2 plus the stored lifecycle: a video earns wider audiences in waves, judged first on completion and shares.",
+  },
+  distribution_v2: {
+    id: "distribution_v2",
+    surface: "shared",
+    objective: "Audience waves from the stored lifecycle (testing, promising, accelerating, trending, viral); distribution_v1 when the state is missing or stale.",
+  },
+  trending_v2: {
+    id: "trending_v2",
+    surface: "trending",
+    objective: "trending_v1 bent by the stored stage: trending and viral posts lifted, cooling ones lowered, held and suppressed ones never trend.",
+  },
+  rising_v2: {
+    id: "rising_v2",
+    surface: "rising",
+    objective: "rising_v1 limited to posts the tick has not yet seen peak, with promising and accelerating ones lifted.",
+  },
+  upload_v1: {
+    id: "upload_v1",
+    surface: "shared",
+    objective: "What processing learns once at upload: language, near duplicates, length, quality, spam and bait.",
+  },
   distribution_v1: {
     id: "distribution_v1",
     surface: "shared",

@@ -1,6 +1,7 @@
 import { applyOverride, type Assignment } from "./experiments";
 import type { SeedTokens } from "./features";
 import { getSessionInterestProfile, type SessionEvent, type SessionProfile } from "./interests";
+import type { StoredPostState } from "./lifecycle";
 import { unitHash } from "./math";
 import { runPipeline } from "./pipeline";
 import { OBJECTIVES } from "./scoring";
@@ -33,6 +34,13 @@ import type {
   so often. The order the viewer receives is that sequence.
 */
 
+/*
+  Which version the viewer runs. reels_v3 (D146) reads each video's stored
+  lifecycle, so a video earns wider audiences in waves judged on completion and
+  shares. ROLLBACK is this line: reels_v2 stops the stored state being read.
+*/
+export const REELS_ALGORITHM: "reels_v2" | "reels_v3" = "reels_v3";
+
 export const REELS = {
   POOL_KEEP: 80,
   LIST_SIZE: 30,
@@ -59,6 +67,8 @@ export type ReelsInput = {
      they are used instead of sessionEvents. */
   session?: SessionProfile | null;
   seen?: SeenState;
+  /* reels_v3: each video's stored lifecycle. */
+  postStates?: Map<string, StoredPostState>;
 };
 
 export function retrieveReelCandidates(candidates: Candidate[]): Candidate[] {
@@ -82,6 +92,7 @@ export function rankReels(input: ReelsInput, session: SessionProfile | null): Ra
     explorationCount: REELS.EXPLORATION_COUNT,
     viewerKey: input.viewerKey,
     seen: input.seen,
+    postStates: REELS_ALGORITHM === "reels_v3" ? input.postStates : undefined,
   });
 }
 
@@ -219,7 +230,7 @@ export function reelsFeed(input: ReelsInput, firstId?: string | null): FeedResul
   return {
     items,
     complete: items.length < REELS.LIST_SIZE,
-    algorithm: "reels_v2",
+    algorithm: REELS_ALGORITHM,
     variant: input.assignment.variant,
     experimentId: input.assignment.experimentId,
     fallback: null,

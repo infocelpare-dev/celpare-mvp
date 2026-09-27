@@ -5,6 +5,7 @@ import {
   newReelSession,
   nextReel,
   previousReel,
+  REELS_ALGORITHM,
   reelsFeed,
   selectNextReel,
   sequenceReels,
@@ -47,7 +48,7 @@ describe("Reels (reels_v2)", () => {
       ],
     ]);
     const res = reelsFeed(input({ candidates: [cand(liked, "video"), cand(watched, "video")], signals: sig }));
-    assert.equal(res.algorithm, "reels_v2");
+    assert.equal(res.algorithm, REELS_ALGORITHM);
     assert.equal(res.items[0].item.id, watched.id);
   });
 

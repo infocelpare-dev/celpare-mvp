@@ -1,4 +1,5 @@
 import { calculateTrendDecay } from "./freshness";
+import { NOT_FOR_DISCOVERY, isFresh, type Stage, type StoredPostState } from "./lifecycle";
 import { clamp01, hoursBetween, percentile, saturate } from "./math";
 import { conversationQuality } from "./quality";
 import { contentIsRecommendationEligible, spamRisk } from "./safety";
@@ -44,7 +45,37 @@ export type TrendInput = {
   items: ContentItem[];
   signals: Map<string, PostSignals>;
   now: number;
+  /* trending_v2 and rising_v2: each post's stored lifecycle (lifecycle.ts).
+     Absent, or stale for a post, that post is judged as v1 judged it. */
+  states?: Map<string, StoredPostState>;
 };
+
+/*
+  trending_v2: the stored stage bends the per request score. A post the tick
+  already found trending or viral is lifted, one past its peak is lowered, and
+  a held or suppressed post can never trend (D144). The per request score still
+  decides the order among equals, and is still the whole answer when the state
+  is missing, so a stopped tick degrades to trending_v1.
+*/
+export const STAGE_TREND_LIFT: Partial<Record<Stage, number>> = {
+  viral: 1.6,
+  trending: 1.4,
+  accelerating: 1.2,
+  peak: 1,
+  promising: 1,
+  cooling: 0.7,
+  long_tail: 0.5,
+};
+
+function storedStage(input: TrendInput, id: string): Stage | null {
+  const s = input.states?.get(id);
+  return isFresh(s, input.now) ? s.stage : null;
+}
+
+function trendLift(input: TrendInput, id: string): number {
+  const stage = storedStage(input, id);
+  return stage ? (STAGE_TREND_LIFT[stage] ?? 1) : 1;
+}
 
 function recentUnits(s: PostSignals): number {
   return (
@@ -58,11 +89,12 @@ function participants(s: PostSignals): number {
   return PARTICIPATION.reduce((a, t) => a + uniqWithin(s, t, 3), 0);
 }
 
-function eligible(items: ContentItem[], signals: Map<string, PostSignals>): ContentItem[] {
+function eligible(items: ContentItem[], signals: Map<string, PostSignals>, input?: TrendInput): ContentItem[] {
   const byAuthor = new Map<string, ContentItem[]>();
   for (const i of items) byAuthor.set(i.authorId, [...(byAuthor.get(i.authorId) ?? []), i]);
   return items.filter(
     (i) =>
+      !(input && NOT_FOR_DISCOVERY.has(storedStage(input, i.id) ?? "testing")) &&
       contentIsRecommendationEligible(i, signalsFor(signals, i.id), null, {
         spam: spamRisk(i, byAuthor.get(i.authorId) ?? []),
       }).eligible,
@@ -79,8 +111,8 @@ export function trendScore(item: ContentItem, s: PostSignals, now: number): numb
 }
 
 export function trendingPosts(input: TrendInput, limit = 20): Scored[] {
-  return eligible(input.items, input.signals)
-    .map((item) => ({ item, score: trendScore(item, signalsFor(input.signals, item.id), input.now) }))
+  return eligible(input.items, input.signals, input)
+    .map((item) => ({ item, score: trendScore(item, signalsFor(input.signals, item.id), input.now) * trendLift(input, item.id) }))
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
@@ -88,14 +120,14 @@ export function trendingPosts(input: TrendInput, limit = 20): Scored[] {
 
 /* Reels trend on watching: completions and deep watches count, not just likes. */
 export function trendingReels(input: TrendInput, limit = 20): Scored[] {
-  return eligible(input.items.filter((i) => i.media === "video"), input.signals)
+  return eligible(input.items.filter((i) => i.media === "video"), input.signals, input)
     .map((item) => {
       const s = signalsFor(input.signals, item.id);
       const watchers = uniqWithin(s, "swipe_watched", 3) + uniqWithin(s, "complete", 3) * 1.5 + uniqWithin(s, "rewatch", 3);
       const base = trendScore(item, s, input.now);
       const age = hoursBetween(item.createdAt, input.now);
       const watchTrend = age <= TRENDING.MAX_AGE_HOURS ? saturate(watchers, 4) * calculateTrendDecay(Math.max(0, age - 6)) : 0;
-      return { item, score: base + watchTrend };
+      return { item, score: (base + watchTrend) * trendLift(input, item.id) };
     })
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)
@@ -115,7 +147,7 @@ function groupTrends(
   limit: number,
 ): GroupTrend[] {
   const groups = new Map<string, { recent: number; prior: number; posts: number; people: number }>();
-  for (const item of eligible(input.items, input.signals)) {
+  for (const item of eligible(input.items, input.signals, input)) {
     if (hoursBetween(item.createdAt, input.now) > TRENDING.MAX_AGE_HOURS) continue;
     const s = signalsFor(input.signals, item.id);
     const recent = recentUnits(s);
@@ -162,7 +194,7 @@ export function trendingCreators(input: TrendInput, limit = 10): GroupTrend[] {
 /* Discussions: conversation quality and the speed of new replies, never the
    raw comment count. */
 export function trendingDiscussions(input: TrendInput, limit = 10): Scored[] {
-  return eligible(input.items, input.signals)
+  return eligible(input.items, input.signals, input)
     .map((item) => {
       const s = signalsFor(input.signals, item.id);
       const age = hoursBetween(item.createdAt, input.now);
@@ -181,7 +213,7 @@ export function trendingDiscussions(input: TrendInput, limit = 10): Scored[] {
   excludes whatever already tops trending, so the two lists differ.
 */
 export function risingContent(input: TrendInput, limit = 10, excludeIds: Set<string> = new Set()): Scored[] {
-  const pool = eligible(input.items, input.signals);
+  const pool = eligible(input.items, input.signals, input);
   const reach = pool.map((i) => {
     const s = signalsFor(input.signals, i.id);
     return Math.max(s.byType.impression?.totalUniq ?? 0, participants(s));
@@ -191,6 +223,10 @@ export function risingContent(input: TrendInput, limit = 10, excludeIds: Set<str
   return pool
     .map((item, idx) => {
       if (excludeIds.has(item.id)) return { item, score: 0 };
+      /* rising_v2: a post the tick has already seen peak, cool or trend is
+         not rising; one it found promising or accelerating is lifted. */
+      const stage = storedStage(input, item.id);
+      if (stage && ["trending", "viral", "peak", "cooling", "long_tail"].includes(stage)) return { item, score: 0 };
       const age = hoursBetween(item.createdAt, input.now);
       if (age > TRENDING.RISING_MAX_AGE_HOURS) return { item, score: 0 };
       if (reach[idx] > ceiling) return { item, score: 0 };
@@ -199,7 +235,8 @@ export function risingContent(input: TrendInput, limit = 10, excludeIds: Set<str
       const accel = calculateAcceleration(v);
       if (accel <= 0 || v.recent <= 0) return { item, score: 0 };
       const newness = 1 - age / TRENDING.RISING_MAX_AGE_HOURS;
-      return { item, score: accel * saturate(participants(s), 3) * (0.5 + 0.5 * newness) };
+      const lift = stage === "accelerating" ? 1.4 : stage === "promising" ? 1.2 : 1;
+      return { item, score: accel * saturate(participants(s), 3) * (0.5 + 0.5 * newness) * lift };
     })
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)

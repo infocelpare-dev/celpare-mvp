@@ -2,6 +2,7 @@ import { EXPLORATION, IN_NETWORK_SOURCES, NEGATIVE, NOVELTY, SAME_STORY, SOURCE_
 import { applyDiversity, applyFrequencyControls } from "./diversity";
 import { distributionStage, inAudience, type DistributionState } from "./distribution";
 import { explainRanking } from "./explain";
+import { NOT_FOR_DISCOVERY, isFresh, stateToDistribution, type StoredPostState } from "./lifecycle";
 import { NO_SEEDS, extractFeatures, type SeedTokens } from "./features";
 import { calculateFreshness, type FreshnessProfile } from "./freshness";
 import { interestIn, isColdStart, topKeys, type SessionProfile } from "./interests";
@@ -86,6 +87,9 @@ export type PipelineOptions = {
   /* Filled when given: post id to the stage that dropped or demoted it, for
      the admin "why not" view. Never read by ranking. */
   trace?: Map<string, DropReason>;
+  /* distribution_v2 (feed_v4, reels_v3): each post's stored lifecycle state.
+     A missing or stale state falls back to distribution_v1 for that post. */
+  postStates?: Map<string, StoredPostState>;
 };
 
 /* Why a candidate is not where one might expect (admin debug only). */
@@ -375,7 +379,9 @@ export function runPipeline(opts: PipelineOptions): RankedItem[] {
   const outOfAudience = new Set<string>();
   for (const c of eligible) {
     const s = signalsFor(signals, c.item.id);
-    const state = distributionStage(c.item, s, now, viral.get(c.item.id));
+    const state =
+      stateToDistribution(opts.postStates?.get(c.item.id), totalUniq(s, "impression"), now) ??
+      distributionStage(c.item, s, now, viral.get(c.item.id));
     dist.set(c.item.id, state);
     if (!opts.distribution) continue;
     const followed = profile?.followedAuthors.has(c.item.authorId) ?? false;
@@ -586,6 +592,12 @@ export function runPipeline(opts: PipelineOptions): RankedItem[] {
     const picks = pickFrom
       .map((w) => heavy(w, true))
       .filter((w) => w.explorationValue > 0 && w.familiarity < EXPLORE_BELOW_FAMILIARITY)
+      /* distribution_v2: a held or suppressed post is never an exploration
+         pick; it reaches followers and ranks last elsewhere (D126, D144). */
+      .filter((w) => {
+        const st = opts.postStates?.get(w.item.id);
+        return !(isFresh(st, now) && NOT_FOR_DISCOVERY.has(st.stage));
+      })
       .map((w) => ({
         w,
         /* feed_v3: an exploration pick is held to the same bar as the rest:

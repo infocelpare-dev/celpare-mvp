@@ -59,6 +59,9 @@ type Item = {
   kind: "image" | "video";
   width: number | null;
   height: number | null;
+  /* Videos only: the length the browser read from the file (4BG). The
+     server clamps it and the player's own reports correct it later. */
+  durationMs: number | null;
   /* Local only, for the preview and the size line. */
   name: string;
   size: number;
@@ -163,13 +166,16 @@ export function PostMediaUpload() {
           data: { publicUrl },
         } = supabase.storage.from(bucket).getPublicUrl(path);
 
-        const dims = isVideo ? null : await imageSize(file);
+        const dims = isVideo ? await videoMeta(file) : await imageSize(file);
 
         added.push({
           url: publicUrl,
           kind: isVideo ? "video" : "image",
-          width: dims?.width ?? null,
-          height: dims?.height ?? null,
+          /* || rather than ??: a video that reports 0 has no known size, and
+             the action's schema refuses a width of 0. */
+          width: dims?.width || null,
+          height: dims?.height || null,
+          durationMs: dims && "durationMs" in dims ? (dims.durationMs as number | null) : null,
           name: file.name,
           size: file.size,
         });
@@ -242,6 +248,7 @@ export function PostMediaUpload() {
               <input type="hidden" name="mediaKind" value={item.kind} />
               <input type="hidden" name="mediaWidth" value={item.width ?? ""} />
               <input type="hidden" name="mediaHeight" value={item.height ?? ""} />
+              <input type="hidden" name="mediaDuration" value={item.durationMs ?? ""} />
             </li>
           ))}
         </ul>
@@ -301,6 +308,38 @@ export function PostMediaUpload() {
       ) : null}
     </div>
   );
+}
+
+/*
+  A video's size and length from its metadata, read locally before the post is
+  written, so distribution knows how long "finished watching" is. Null after
+  five seconds or on any error: a missing length costs nothing but precision.
+*/
+function videoMeta(file: File): Promise<{ width: number; height: number; durationMs: number | null } | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    let done = false;
+    const finish = (value: { width: number; height: number; durationMs: number | null } | null) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      URL.revokeObjectURL(url);
+      video.removeAttribute("src");
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), 5000);
+    video.preload = "metadata";
+    video.muted = true;
+    video.onloadedmetadata = () =>
+      finish({
+        width: video.videoWidth || 0,
+        height: video.videoHeight || 0,
+        durationMs: Number.isFinite(video.duration) && video.duration > 0 ? Math.round(video.duration * 1000) : null,
+      });
+    video.onerror = () => finish(null);
+    video.src = url;
+  });
 }
 
 /*

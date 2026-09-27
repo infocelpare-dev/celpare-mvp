@@ -44,7 +44,7 @@ const MIN_DWELL_MS = 1500;
 
 type Event = {
   postId: string;
-  event: "impression" | "open" | "dwell" | "serve";
+  event: "impression" | "open" | "dwell" | "serve" | "link_click" | "share" | "profile_visit" | "media_open";
   position: number;
   dwellMs?: number;
   reason?: string | null;
@@ -295,12 +295,27 @@ export function FeedItem({
     );
     observer.observe(node);
 
-    /* An open is a click on anything in the card that goes to the post. */
+    /* What a click in the card was: opening the post, the author's profile,
+       the video, an outside link, or sharing (4BG adds all but the first). */
     function onClick(e: MouseEvent) {
-      const a = (e.target as HTMLElement | null)?.closest("a");
-      if (a && a.getAttribute("href") === `/community/${postId}`) {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('[data-feed-event="share"]')) {
+        telemetry!.track({ postId, event: "share", position, reason });
+        return;
+      }
+      const a = target?.closest("a");
+      const href = a?.getAttribute("href");
+      if (!href) return;
+      if (href === `/community/${postId}`) {
         telemetry!.track({ postId, event: "open", position, reason });
         rememberSeen(postId, "viewed");
+      } else if (href === `/community/video/${postId}`) {
+        telemetry!.track({ postId, event: "media_open", position, reason });
+        rememberSeen(postId, "viewed");
+      } else if (href.startsWith("/u/")) {
+        telemetry!.track({ postId, event: "profile_visit", position, reason });
+      } else if ((href.startsWith("http://") || href.startsWith("https://")) && !href.startsWith(window.location.origin)) {
+        telemetry!.track({ postId, event: "link_click", position, reason });
       }
     }
     node.addEventListener("click", onClick);
