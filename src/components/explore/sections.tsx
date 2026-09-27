@@ -4,6 +4,7 @@ import { PostCard } from "@/components/community/post-card";
 import { RecentList } from "@/components/profile/recent-list";
 import { ExploreSection, Grid, Rows, Shelf } from "./section";
 import { ExploreItemCard, type ItemViewer } from "./item";
+import { ExploreSlot } from "./explore-tracker";
 import {
   loadContinueExploring,
   loadDiscussions,
@@ -51,6 +52,56 @@ function def(id: ExploreSectionId) {
      rendered without an entry in it would be a section nothing can reorder. */
   if (!found) throw new Error(`[explore] no section definition for ${id}`);
   return found;
+}
+
+/*
+  A ranked item inside the slot that carries what explore_v1 said about it: the
+  reason line (for the card kinds with no reason slot of their own), Not
+  interested, and the attributes the impression tracker reads. Featured items
+  carry no meta and render bare: they are editorial, not ranked (D158).
+*/
+function titleOf(item: ExploreItem): string {
+  switch (item.kind) {
+    case "tool":
+      return item.tool.name;
+    case "model":
+      return item.model.name;
+    case "person":
+      return item.person.fullName ?? item.person.username;
+    case "topic":
+      return item.topic.name;
+    default:
+      return "this post";
+  }
+}
+
+function Slotted({
+  item,
+  signedIn,
+  as = "li",
+  layout = "block",
+  children,
+}: {
+  item: ExploreItem;
+  signedIn: boolean;
+  as?: "li" | "div";
+  layout?: "shelf" | "block";
+  children: React.ReactNode;
+}) {
+  if (!item.meta) return <>{children}</>;
+  return (
+    <ExploreSlot
+      as={as}
+      layout={layout}
+      meta={item.meta}
+      reason={item.reason}
+      showReason={item.kind !== "tool" && item.kind !== "model"}
+      signedIn={signedIn}
+      title={titleOf(item)}
+    >
+      {children}
+    </ExploreSlot>
+  );
 }
 
 /* ---------------------------------------------------------------------------
@@ -123,7 +174,9 @@ async function ItemShelf({
     >
       <Shelf label={d.title}>
         {state.items.map((item, i) => (
-          <ExploreItemCard key={item.id} item={item} viewer={viewer} index={i} />
+          <Slotted key={item.id} item={item} signedIn={ctx.signedIn} layout="shelf">
+            <ExploreItemCard item={item} viewer={viewer} index={i} as={item.meta ? "div" : undefined} />
+          </Slotted>
         ))}
       </Shelf>
     </ExploreSection>
@@ -138,7 +191,7 @@ export async function ForYouSection({ ctx }: { ctx: ExploreContext }) {
   return (
     <ItemShelf
       id="for-you"
-      state={await loadForYou()}
+      state={await loadForYou(ctx)}
       ctx={ctx}
       emptyText="Nothing to suggest yet."
     />
@@ -149,7 +202,7 @@ export async function TrendingSection({ ctx }: { ctx: ExploreContext }) {
   return (
     <ItemShelf
       id="trending"
-      state={await loadTrending()}
+      state={await loadTrending(ctx)}
       ctx={ctx}
       emptyText="Nothing is trending yet."
     />
@@ -160,7 +213,7 @@ export async function RisingSection({ ctx }: { ctx: ExploreContext }) {
   return (
     <ItemShelf
       id="rising"
-      state={await loadRising()}
+      state={await loadRising(ctx)}
       ctx={ctx}
       emptyText="Nothing is gaining momentum yet."
     />
@@ -280,12 +333,14 @@ export async function DiscussionsSection({ ctx }: { ctx: ExploreContext }) {
       >
         {state.items.map((item) =>
           item.kind === "post" ? (
-            <li key={item.id} className="last:[&>article]:border-b-0">
-              <PostCard
-                post={item.post}
-                viewer={viewer.posts}
-                signedIn={ctx.signedIn}
-              />
+            <li key={item.id} className="last:[&_article]:border-b-0">
+              <Slotted item={item} signedIn={ctx.signedIn} as="div">
+                <PostCard
+                  post={item.post}
+                  viewer={viewer.posts}
+                  signedIn={ctx.signedIn}
+                />
+              </Slotted>
             </li>
           ) : null,
         )}
@@ -313,10 +368,11 @@ export async function TopicsSection({ ctx }: { ctx: ExploreContext }) {
       <Grid label={d.title}>
         {state.items.map((item) =>
           item.kind === "topic" ? (
+            <Slotted key={item.id} item={item} signedIn={ctx.signedIn}>
             <ExploreItemCard
-              key={item.id}
               item={item}
               index={0}
+              as={item.meta ? "div" : undefined}
               viewer={{
                 signedIn: ctx.signedIn,
                 viewerId: ctx.viewerId,
@@ -326,6 +382,7 @@ export async function TopicsSection({ ctx }: { ctx: ExploreContext }) {
                 posts: EMPTY_VIEWER_STATE,
               }}
             />
+            </Slotted>
           ) : null,
         )}
       </Grid>
@@ -363,8 +420,14 @@ export async function VideoSection({ ctx }: { ctx: ExploreContext }) {
 */
 export async function ContinueExploringSection({ ctx }: { ctx: ExploreContext }) {
   const d = def("continue-exploring");
-  const state = await loadContinueExploring(ctx);
+  const result = await loadContinueExploring(ctx);
 
+  /* The journey: what sits nearest the things this person just opened. */
+  if (result.mode === "journey") {
+    return <ItemShelf id="continue-exploring" state={result.state} ctx={ctx} emptyText="" />;
+  }
+
+  const state = result.state;
   return (
     <ExploreSection
       def={d}

@@ -25,16 +25,14 @@ const WINDOWS = [7, 30, 90];
 /*
   Recommendation analytics.
 
-  THERE IS NO RECOMMENDATION ENGINE. This page is the visibility layer built
-  ahead of it, and it says so rather than presenting an empty chart that implies
-  a system is running and producing nothing.
+  Explore Intelligence (explore_v1, 4BI, D151) is the engine that writes here:
+  every impression, click and dismiss of a tool, model, person, topic or
+  category on Explore, with its section and candidate source. Posts and videos
+  shown on Explore are recorded with the feed's events (surface explore), so a
+  view means one thing everywhere. Ask Celpare is still retrieval, not
+  recommendation, and writes nothing here.
 
-  What exists today: Ask Celpare retrieves tools from the catalogue by full text
-  search and the model cites some of them. That is retrieval, not
-  recommendation: there is no candidate generation, no ranking model, no
-  personalisation and no feedback loop.
-
-  recommendation_events is the table a future engine writes to. Its shape is the
+  recommendation_events is that table. Its shape is the
   decision worth making now, and the important column is candidate_source: which
   generator put a row in front of somebody. It is the cheapest diagnostic a
   recommender can record and the one that is painful to add later, because
@@ -75,7 +73,7 @@ export default async function AdminRecommendationsPage({
     <>
       <PageHeader
         title="Recommendations"
-        lead="The admin view of a system that does not exist yet. Nothing here is estimated or projected."
+        lead="What Explore recommended, and what people did with it. Nothing here is estimated or projected."
         action={
           <Link
             href="/admin/search"
@@ -88,14 +86,13 @@ export default async function AdminRecommendationsPage({
 
       <div className="mt-5">
         <Panel className="px-4 py-4">
-          <p className="text-[13px] font-medium">There is no recommendation engine.</p>
+          <p className="text-[13px] font-medium">Explore Intelligence, explore_v1.</p>
           <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
-            What Celpare does today is retrieval: Ask Celpare searches the catalogue by full text
-            and the model cites what comes back. There is no candidate generation, no ranking
-            model, no personalisation and no feedback loop, so there is nothing for these numbers
-            to measure yet. This page and the table behind it were built now so that whatever
-            engine arrives has a defined place to report to, and so that its first version can be
-            judged rather than guessed at.
+            Explore ranks tools, models, people, topics and categories with hand set weights, not a
+            trained model, and records here every time one is shown, opened or dismissed. Posts and
+            videos shown on Explore are counted with the feed&apos;s events instead, so a view means
+            one thing everywhere. Ask Celpare is retrieval and does not write here. Append ?debug=1
+            to /explore to see why any item ranked where it did.
           </p>
         </Panel>
       </div>
@@ -137,7 +134,7 @@ export default async function AdminRecommendationsPage({
         <div className="mt-6">
           <EmptyState
             title="Nothing has been recorded"
-            body="The table is empty because nothing writes to it. When a recommender ships, every impression, click, save and dismissal it produces lands here, tagged with the surface it appeared on and the candidate source that generated it."
+            body="Nothing was shown on Explore in this window. Every impression, click and dismissal of a tool, model, person or topic lands here, tagged with its section and the candidate source that generated it."
           />
         </div>
       ) : (
@@ -188,6 +185,28 @@ export default async function AdminRecommendationsPage({
               />
             </Section>
 
+            <Section title="By Explore section" className="mt-0">
+              <RankedBars
+                valueLabel="impressions"
+                rows={(data.by_section ?? []).map((s) => ({
+                  label: s.section,
+                  value: s.impressions,
+                  secondary: `${s.clicks} clicks`,
+                }))}
+              />
+            </Section>
+
+            <Section title="By entity" className="mt-0">
+              <RankedBars
+                valueLabel="impressions"
+                rows={(data.by_entity ?? []).map((s) => ({
+                  label: s.entity_type,
+                  value: s.impressions,
+                  secondary: `${s.clicks} clicks, ${s.dismissals} dismissed`,
+                }))}
+              />
+            </Section>
+
             <Section title="Most clicked tools" className="mt-0">
               <RankedBars
                 valueLabel="clicks"
@@ -202,14 +221,14 @@ export default async function AdminRecommendationsPage({
         </>
       )}
 
-      <Section title="What a first engine would need to write">
+      <Section title="What each row carries">
         <Panel className="px-4 py-4">
           <p className="text-[13px] leading-relaxed text-muted">
-            One row per event in <span className="font-mono">recommendation_events</span>, carrying
-            the surface it appeared on, the tool, the position in the list, the candidate source
-            that generated it, and whether it was shown, clicked, saved or dismissed. Impressions
-            are the part usually skipped and the part that makes everything else meaningful: clicks
-            without impressions is a popularity list, not a measurement.
+            One row per event in <span className="font-mono">recommendation_events</span>: the
+            entity and its type, the Explore section and position, the candidate source and reason
+            that placed it, the algorithm version, and whether it was shown, clicked or dismissed.
+            Impressions are the part that makes everything else meaningful: clicks without
+            impressions is a popularity list, not a measurement.
           </p>
         </Panel>
       </Section>

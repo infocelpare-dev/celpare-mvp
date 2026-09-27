@@ -360,7 +360,7 @@ function personCompleteness(p: PersonCandidate): number {
   return parts.filter(Boolean).length / parts.length;
 }
 
-function qualityOf(candidate: Candidate): number {
+export function qualityOf(candidate: Candidate): number {
   const w = WEIGHTS;
 
   if (candidate.type === "tool") {
@@ -577,7 +577,7 @@ function personalizationOf(candidate: Candidate, affinity: Affinity): number {
    Penalties.
    --------------------------------------------------------------------------- */
 
-function penaltyOf(candidate: Candidate): number {
+export function penaltyOf(candidate: Candidate): number {
   let penalty = 0;
 
   if (candidate.type === "tool") {

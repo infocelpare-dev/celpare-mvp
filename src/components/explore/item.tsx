@@ -5,6 +5,7 @@ import {
   ToolCard,
   TopicCard,
   VideoCard,
+  type CardRoot,
 } from "./cards";
 import type { ExploreItem } from "@/lib/explore/types";
 import type { ViewerState } from "@/lib/community/queries";
@@ -44,12 +45,15 @@ export function ExploreItemCard({
   item,
   viewer,
   index,
+  as,
 }: {
   item: ExploreItem;
   viewer: ItemViewer;
   /* Position in its shelf. Only the video card uses it, to decide whether it is
      near enough to the front to be worth a poster frame. */
   index: number;
+  /* "div" inside an Explore slot, which is the list item. */
+  as?: CardRoot;
 }) {
   switch (item.kind) {
     case "tool":
@@ -59,6 +63,7 @@ export function ExploreItemCard({
           reason={item.reason}
           saved={viewer.savedTools.has(item.tool.id)}
           signedIn={viewer.signedIn}
+          as={as}
         />
       );
 
@@ -69,6 +74,7 @@ export function ExploreItemCard({
           reason={item.reason}
           saved={viewer.savedModels.has(item.model.id)}
           signedIn={viewer.signedIn}
+          as={as}
         />
       );
 
@@ -80,14 +86,15 @@ export function ExploreItemCard({
           followsYou={viewer.followsMe?.has(item.person.id) ?? false}
           signedIn={viewer.signedIn}
           viewerId={viewer.viewerId}
+          as={as}
         />
       );
 
     case "topic":
-      return <TopicCard topic={item.topic} />;
+      return <TopicCard topic={item.topic} as={as} />;
 
     case "video":
-      return <VideoCard post={item.post} index={index} />;
+      return <VideoCard post={item.post} index={index} as={as} />;
 
     case "post":
       /*
@@ -98,6 +105,6 @@ export function ExploreItemCard({
         space, and Discussions on the same page still renders the genuine
         PostCard at full width. Section 18.
       */
-      return <PostShelfCard post={item.post} />;
+      return <PostShelfCard post={item.post} as={as} />;
   }
 }

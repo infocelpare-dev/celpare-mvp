@@ -58,6 +58,10 @@ import type { FeedPost } from "@/lib/community/queries";
   target, and Save and Follow still work.
 */
 
+/* A card is a list item on its own, and a div inside Explore's ranked slot,
+   which is then the list item (explore-tracker.tsx). */
+export type CardRoot = "li" | "div";
+
 /* 264px: two thirds of a 390px screen, so the next card always peeks. */
 const CARD =
   "relative flex h-full w-[264px] shrink-0 snap-start flex-col rounded-2xl border border-border p-4 transition-colors duration-200 ease-out hover:bg-surface";
@@ -79,17 +83,19 @@ export function ToolCard({
   reason,
   saved,
   signedIn,
+  as: Root = "li",
 }: {
   tool: ToolCandidate;
   reason: string | null;
   saved: boolean;
   signedIn: boolean;
+  as?: CardRoot;
 }) {
   const rated = tool.ratingCount > 0 && tool.rating !== null;
   const views = tool.engagement.viewsTotal;
 
   return (
-    <li className={CARD}>
+    <Root className={CARD}>
       <div className="flex items-start gap-3">
         {/* A circle with padding and object-contain, per 4AJ.5, so a wide
             wordmark does not lose its ends to the clip. */}
@@ -163,8 +169,17 @@ export function ToolCard({
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-2">
-          {reason ? <Badge>{reason}</Badge> : <span />}
-          <span className={`${OVER} flex items-center`}>
+          {/* explore_v1 reasons are longer than search's: shrink and truncate,
+              full text in the title, so the Compare and Save controls keep
+              their room. */}
+          {reason ? (
+            <Badge className="shrink" title={reason}>
+              <span className="truncate">{reason}</span>
+            </Badge>
+          ) : (
+            <span />
+          )}
+          <span className={`${OVER} flex shrink-0 items-center`}>
             <CompareLink type="tool" slug={tool.slug} name={tool.name} />
             <SaveToCollection
               entityType="tool"
@@ -176,7 +191,7 @@ export function ToolCard({
           </span>
         </div>
       </div>
-    </li>
+    </Root>
   );
 }
 
@@ -195,14 +210,16 @@ export function ModelCard({
   reason,
   saved,
   signedIn,
+  as: Root = "li",
 }: {
   model: ModelCandidate;
   reason: string | null;
   saved: boolean;
   signedIn: boolean;
+  as?: CardRoot;
 }) {
   return (
-    <li className={CARD}>
+    <Root className={CARD}>
       <div className="flex items-start gap-3">
         <span className="flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-[16px] font-semibold text-muted">
           <span aria-hidden>{model.name.slice(0, 1).toUpperCase()}</span>
@@ -259,11 +276,13 @@ export function ModelCard({
               <span className="sr-only">for {model.name}, opens in a new tab</span>
             </a>
           ) : reason ? (
-            <Badge>{reason}</Badge>
+            <Badge className="shrink" title={reason}>
+              <span className="truncate">{reason}</span>
+            </Badge>
           ) : (
             <span />
           )}
-          <span className={`${OVER} flex items-center`}>
+          <span className={`${OVER} flex shrink-0 items-center`}>
             <CompareLink type="model" slug={model.slug} name={model.name} />
             <SaveToCollection
               entityType="model"
@@ -275,7 +294,7 @@ export function ModelCard({
           </span>
         </div>
       </div>
-    </li>
+    </Root>
   );
 }
 
@@ -289,12 +308,14 @@ export function PersonCard({
   followsYou = false,
   signedIn,
   viewerId,
+  as: Root = "li",
 }: {
   person: PersonCandidate;
   following: boolean;
   followsYou?: boolean;
   signedIn: boolean;
   viewerId: string | null;
+  as?: CardRoot;
 }) {
   /*
     personName() READS SNAKE_CASE AND A CANDIDATE IS CAMELCASE.
@@ -311,7 +332,7 @@ export function PersonCard({
   const isSelf = Boolean(viewerId) && viewerId === person.id;
 
   return (
-    <li className={CARD}>
+    <Root className={CARD}>
       <div className="flex items-start gap-3">
         <Avatar
           size="md"
@@ -382,7 +403,7 @@ export function PersonCard({
           )}
         </div>
       </div>
-    </li>
+    </Root>
   );
 }
 
@@ -397,9 +418,9 @@ export function PersonCard({
   than 0, because 0 would be a false statement about a category that has tools in
   it, and the card shows nothing instead of a zero.
 */
-export function TopicCard({ topic }: { topic: ExploreTopic }) {
+export function TopicCard({ topic, as: Root = "li" }: { topic: ExploreTopic; as?: CardRoot }) {
   return (
-    <li className="relative">
+    <Root className="relative">
       <Link
         href={topic.href}
         className="flex h-full flex-col rounded-2xl border border-border p-3.5 transition-colors duration-200 ease-out hover:bg-surface sm:p-4"
@@ -422,7 +443,7 @@ export function TopicCard({ topic }: { topic: ExploreTopic }) {
           )}
         </span>
       </Link>
-    </li>
+    </Root>
   );
 }
 
@@ -454,13 +475,13 @@ export function TopicCard({ topic }: { topic: ExploreTopic }) {
 
   THE COUNTS ARE REAL AND HIDDEN AT ZERO, which is the post card's own rule.
 */
-export function PostShelfCard({ post }: { post: FeedPost }) {
+export function PostShelfCard({ post, as: Root = "li" }: { post: FeedPost; as?: CardRoot }) {
   const author = post.author;
   const name = author ? personName(author) : "Someone";
   const media = post.media[0] ?? null;
 
   return (
-    <li className={CARD}>
+    <Root className={CARD}>
       <div className="flex items-center gap-2">
         <Avatar
           size="sm"
@@ -520,7 +541,7 @@ export function PostShelfCard({ post }: { post: FeedPost }) {
           </span>
         </div>
       </div>
-    </li>
+    </Root>
   );
 }
 
@@ -551,9 +572,11 @@ export function PostShelfCard({ post }: { post: FeedPost }) {
 export function VideoCard({
   post,
   index,
+  as: Root = "li",
 }: {
   post: VideoPost;
   index: number;
+  as?: CardRoot;
 }) {
   const author = post.author;
   const name = author ? personName(author) : "Someone";
@@ -561,7 +584,7 @@ export function VideoCard({
   const withPoster = index < 2;
 
   return (
-    <li className={`${CARD} overflow-hidden p-0`}>
+    <Root className={`${CARD} overflow-hidden p-0`}>
       <div className="relative aspect-[9/13] w-full shrink-0 bg-surface">
         {withPoster ? (
           /*
@@ -618,6 +641,6 @@ export function VideoCard({
           <span className="truncate">{name}</span>
         </span>
       </div>
-    </li>
+    </Root>
   );
 }

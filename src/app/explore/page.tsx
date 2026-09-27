@@ -23,9 +23,13 @@ import {
   TrendingSection,
   VideoSection,
 } from "@/components/explore/sections";
-import { sectionsForTab, type ExploreSectionId } from "@/lib/explore/sections";
+import { orderedSections, sectionsForTab, type ExploreSectionId } from "@/lib/explore/sections";
+import { ExploreTracker } from "@/components/explore/explore-tracker";
+import { ExploreDebugPanel } from "@/components/explore/explore-debug";
+import { getAdminSession } from "@/lib/admin/guard";
+import { buildExploreDebug } from "@/lib/explore/intelligence/server/debug";
 import { isExploreTab, type ExploreTab } from "@/lib/explore/types";
-import type { ExploreContext } from "@/lib/explore/queries";
+import { exploreFor, type ExploreContext } from "@/lib/explore/queries";
 
 /* Reads the session cookie, so it must never be prerendered. */
 export const dynamic = "force-dynamic";
@@ -67,11 +71,12 @@ export const metadata: Metadata = {
   and nothing else, which is section 28, and a failed one reports a failure
   rather than claiming the platform is empty, which is section 30 and D99.
 
-  NO RANKING IS IMPLEMENTED HERE OR ANYWHERE UNDER IT. Section 24. For you,
-  Trending and Rising are real sections with no provider yet and they say so in a
-  sentence. Everything else is either a fact (recency, the taxonomy, your own
-  recent activity) or a ranker that already shipped and is being called rather
-  than rewritten.
+  THE RANKING IS explore_v1 (4BI, D150), in lib/explore/intelligence: one
+  candidate pool per request, shared features, a scorer per entity type and an
+  objective per shelf. This page asks it for the shelf order (D156) and each
+  section asks it for its own shelf; React cache() makes that one run. Featured
+  stays an editorial pick (D158). Admins can append ?debug=1 (and &why=<type:id>)
+  to see why each item is where it is.
 */
 
 /* The registry gives the order and the titles; this gives the component. Both
@@ -114,7 +119,17 @@ export default async function ExplorePage({
   }
 
   const ctx: ExploreContext = { tab, signedIn, viewerId };
-  const sections = sectionsForTab(tab);
+
+  /* One ranking run for the whole page. The All tab takes its shelf order from
+     it; a tab keeps the registry order. Failure leaves the registry order and
+     every ranked shelf reports its own error. */
+  const explore = await exploreFor(ctx);
+  const sections = tab === "all" ? orderedSections(explore?.order ?? null) : sectionsForTab(tab);
+
+  /* Admins only, checked on the server; nobody else gets the data computed. */
+  const debug = params?.debug === "1" && signedIn && explore !== null && (await getAdminSession()) !== null;
+  const why = typeof params?.why === "string" && /^[a-z]+:[a-z0-9-]{1,80}$/i.test(params.why) ? params.why : null;
+  const debugView = debug && explore ? buildExploreDebug(explore, why) : null;
 
   return (
     <AppShell
@@ -150,6 +165,9 @@ export default async function ExplorePage({
         <div className="mt-5">
           <ExploreTabs active={tab} />
         </div>
+
+        {debugView ? <ExploreDebugPanel view={debugView} /> : null}
+        <ExploreTracker variant={explore?.assignment.variant ?? null} />
 
         {/*
           One busy status for the whole page. Eight per section would announce

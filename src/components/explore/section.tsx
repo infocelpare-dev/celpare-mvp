@@ -80,7 +80,7 @@ export function ExploreSection({
              empty space, and a heading with a sentence under it is the smallest
              honest thing a section can be. */
           <p className="text-[14px] leading-relaxed text-muted">
-            {status === "pending" ? note : emptyText}
+            {status === "pending" ? note : (note ?? emptyText)}
           </p>
         )}
       </div>

@@ -1,100 +1,54 @@
 import "server-only";
 import { cache } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import {
-  POST_SELECT,
-  normalisePost,
-  readerFor,
-  type FeedPost,
-  type Topic,
-} from "@/lib/community/queries";
-import { RANKING, interleaveAuthors, scoreOf } from "@/lib/community/ranking";
-import { toVideoPosts, type VideoPost } from "@/lib/community/video";
-import { loadRecommendations } from "@/lib/search/recommendations";
+import { readerFor } from "@/lib/community/queries";
+import { toVideoPosts } from "@/lib/community/video";
 import { getFeatured } from "@/lib/platform/settings";
 import {
   MODEL_ROW_COLUMNS,
   TOOL_ROW_COLUMNS,
   modelFromRow,
-  personFromRow,
   toolFromRow,
 } from "@/lib/search/rows";
 import type { RecentRow } from "@/lib/profile/queries";
 import type { SaveEntity } from "@/lib/collections/types";
-import type {
-  ExploreTab,
-  ExploreItem,
-  ExploreItemKind,
-  ExploreTopic,
-  SectionState,
-} from "./types";
-import { TAB_KIND, empty, failed, ok, pending } from "./types";
+import { SECTION_TYPES } from "./intelligence/config";
+import { explainExploreReason } from "./intelligence/reasons";
+import { getExplore, type ExploreResult } from "./intelligence/server/engine";
+import type { ExploreScored, ExploreSectionId as RankedSectionId } from "./intelligence/types";
+import type { ExploreTab, ExploreItem, ExploreTopic, SectionState } from "./types";
+import { TAB_KIND, empty, failed, ok } from "./types";
 
 /*
   Every Explore read.
 
-  WHAT THIS FILE IS NOT. It is not a ranker, not a recommender, not a trending
-  score and not a personalisation model. Section 24 of the brief rules all of
-  those out, and the reason it gives is the right one: a placeholder score
-  written now becomes the permanent architecture by accident. So nothing here
-  computes a number that decides what is interesting.
+  THE RANKED SHELVES COME FROM explore_v1 (4BI, D150). For you, Trending,
+  Rising, New, Tools, Models, People, Topics, Discussions, Videos and Continue
+  exploring are all sections of ONE ranking run over ONE candidate pool per
+  request (lib/explore/intelligence). This file only maps what it ranked back
+  onto the shapes the cards already draw, so no card changed to accept it.
 
-  WHAT IT DOES INSTEAD. Retrieval, and only retrieval, against the systems that
-  already exist. Recommended tools, models and people are the SHIPPED
-  recommendation pass from search, called rather than reimplemented. Discussions
-  are the SHIPPED feed ranker from D29, applied to a candidate window the same
-  way /community applies it. New and recently added is recency, which is a fact
-  about a row rather than a judgement about it. For you, Trending and Rising have
-  no provider at all and say so.
+  WHAT IS NOT RANKED. Featured is an editorial pick and stays in the order the
+  administrator chose (D158). Continue exploring falls back to the person's own
+  recent activity list when they have explored nothing yet.
 
   EVERY PROVIDER REPORTS WHETHER IT RAN. "Nothing here" is a claim about the
   platform, and making it at the moment the platform cannot be read is a false
-  negative dressed as an answer. That is D99, learned on /search when the
-  connection dropped and the page answered 200 with No results. Here it is per
-  section rather than per page: a section that fails reports `error` and offers a
-  retry, and the ten around it are unaffected.
+  negative dressed as an answer (D99). When the pool could not be built, or
+  every entity type a shelf holds failed to load, the shelf reports an error
+  and offers a retry; the rest of the page is unaffected (D109).
 
-  IT READS THROUGH readerFor, so a signed out visitor gets exactly what anon's
-  policies allow. Explore is public in the same way the feed (D32) and search
-  are, and nothing on this surface is widened for it. Privacy is enforced
-  underneath: every post and profile select policy already calls
-  profile_shares(), so a query written here inherits it and none of these
-  re-implements it.
+  PRIVACY IS ENFORCED UNDERNEATH. The pool is read through the viewer's own
+  client, so every post and profile policy (profile_shares) applies; history
+  comes from functions that answer for auth.uid() only; social proof is counts
+  only (D155). A reason is shown only when the ranking feature behind it
+  crossed its threshold.
 */
 
 export const EXPLORE = {
-  /* How many cards a horizontal shelf holds. Small on purpose: a shelf is a
-     sample of a section, not the section. */
-  SHELF: 8,
-  /* How many posts the Discussions list shows. */
-  DISCUSSIONS: 6,
-  /* How many rows Continue exploring shows. */
+  /* How many rows Continue exploring shows when it falls back to history. */
   RECENT: 6,
-  /* The candidate window for Discussions, before the feed's own ranker orders
-     it. The same window /community uses, so the two cannot disagree about what
-     was eligible. */
-  DISCUSSION_WINDOW: RANKING.CANDIDATE_WINDOW,
-  /* Per type cap inside New and recently added, so one busy table cannot fill a
-     mixed shelf. Section 26: the surface must support diversity even though
-     nothing ranks for it yet. */
-  NEW_PER_KIND: 3,
 } as const;
-
-/* How many suggestions to pull before re-sorting them by join date. Wider than
-   the cap, because suggested_people orders by follower count and the newest
-   account is not usually the most followed one. */
-const NEW_PEOPLE_POOL = 20;
-
-/* What the section is when a tab has narrowed it. */
-const NEW_SUBTITLE: Record<ExploreItemKind, string> = {
-  tool: "The latest tools added to the catalogue.",
-  model: "The latest models added to the catalogue.",
-  post: "The latest posts from the community.",
-  person: "People who joined Celpare recently.",
-  topic: "The latest across Celpare.",
-  video: "The latest posts from the community.",
-};
 
 export type ExploreContext = {
   tab: ExploreTab;
@@ -102,190 +56,152 @@ export type ExploreContext = {
   viewerId: string | null;
 };
 
-/* ---------------------------------------------------------------------------
-   Shared reads, deduplicated across sections.
+/* Which entity types a tab narrows every shelf to. Topics are topics and
+   categories, the two real taxonomies. */
+const TAB_TYPES: Record<ExploreTab, string | null> = {
+  all: null,
+  tools: "tool",
+  models: "model",
+  posts: "post",
+  people: "person",
+  topics: "topic,category",
+  videos: "video",
+};
 
-   Three sections read the recommendation pass and two read a Supabase client.
-   React's cache() collapses those to one call each per render, which is what
-   keeps a dozen independently streamed sections from becoming a dozen times the
-   queries. It is per request, so nothing is shared between two people.
-   --------------------------------------------------------------------------- */
-
-const recommendations = cache(
-  async (signedIn: boolean, viewerId: string | null) =>
-    loadRecommendations({ signedIn, viewerId }),
-);
+export function exploreFor(ctx: ExploreContext): Promise<ExploreResult | null> {
+  return getExplore(ctx.signedIn, ctx.viewerId, TAB_TYPES[ctx.tab]);
+}
 
 const reader = cache(async (signedIn: boolean) => readerFor(signedIn));
 
 /* ---------------------------------------------------------------------------
-   The three that have no provider yet.
-
-   They are REAL SECTIONS with a real place in the order and no contents, not
-   stubs to be deleted. The day a ranker exists, each one's body is replaced and
-   nothing above or below it changes. Rendering them rather than hiding them is
-   deliberate: hiding would leave the page silently missing the three things the
-   brief puts first, and there would be no way to see that the seam is there.
+   explore_v1 to the page's shapes
    --------------------------------------------------------------------------- */
 
-export async function loadForYou(): Promise<SectionState> {
-  return pending(
-    "Celpare is still learning what you might like. This fills in once the Explore ranking layer is built.",
-  );
-}
-
-export async function loadTrending(): Promise<SectionState> {
-  return pending(
-    "Nothing is trending yet. Trending needs a momentum score across likes, saves and views, which is not built.",
-  );
-}
-
-export async function loadRising(): Promise<SectionState> {
-  return pending(
-    "Nothing is rising yet. Rising measures acceleration rather than totals, and that needs the same ranking layer.",
-  );
-}
-
-/* ---------------------------------------------------------------------------
-   New and recently added
-   --------------------------------------------------------------------------- */
-
-/*
-  Recency is a FACT about a row, which is why this one can be built now and
-  Trending cannot: newest is not a judgement about what is worth seeing.
-
-  It is not a dump of the newest rows either, which section 8 explicitly warns
-  against. Four tables are read in parallel, each capped, and the survivors are
-  merged by their own timestamps. So a week where somebody added twenty tools
-  still leaves room for the new model, the new person and the new post.
-
-  A TOOL IS DATED BY published_at, NOT created_at. A submission sits in review
-  for days, so the row is old by the time anybody can see it, and dating it by
-  when it was written would file a brand new listing behind things people have
-  already seen. Falls back to created_at for the seeded rows, which have no
-  publication date because nothing published them.
-*/
-export async function loadNewAndRecent(ctx: ExploreContext): Promise<SectionState> {
-  const kind = TAB_KIND[ctx.tab];
-
-  try {
-    const db = await reader(ctx.signedIn);
-
-    const wants = (k: string) => kind === null || kind === k;
-    const cap = EXPLORE.NEW_PER_KIND;
-
-    const [tools, models, posts, people] = await Promise.all([
-      wants("tool")
-        ? db
-            .from("tools")
-            .select(TOOL_ROW_COLUMNS)
-            .eq("status", "approved")
-            .order("published_at", { ascending: false, nullsFirst: false })
-            .limit(cap)
-        : null,
-      wants("model")
-        ? db
-            .from("models")
-            .select(MODEL_ROW_COLUMNS)
-            .eq("status", "approved")
-            .order("created_at", { ascending: false })
-            .limit(cap)
-        : null,
-      wants("post") || wants("video")
-        ? db
-            .from("posts")
-            .select(POST_SELECT)
-            .eq("status", "visible")
-            .is("deleted_at", null)
-            .order("created_at", { ascending: false })
-            .limit(cap)
-        : null,
-      /*
-        PEOPLE COME THROUGH suggested_people, NOT OFF THE profiles TABLE.
-
-        The first version of this read profiles directly and filtered
-        account_status = 'active'. It returned NOTHING for a signed out visitor
-        and nobody noticed, because `account_status` IS NOT IN THE anon SELECT
-        GRANT: the filter referenced a column anon cannot see, PostgREST refused
-        the request, and a refused arm contributes an empty list exactly like an
-        arm with no rows. Found by running the page as anon and seeing the one
-        populated shelf come back empty on the People tab.
-
-        It could not be fixed by dropping the filter either. profiles_select_public
-        is `true` for both roles, so RLS does not hide a suspended account: the
-        status column being ungranted is the ONLY thing keeping it out of anon's
-        reach, and a query that cannot read the column cannot exclude the account.
-        Dropping the filter would have published suspended accounts on a
-        discovery shelf.
-
-        suggested_people is SECURITY DEFINER, already excludes suspended accounts
-        and accounts with nothing to show, and already excludes the caller and
-        anybody they follow. It orders by follower count, so the newest are taken
-        from a wider window and re-sorted by the caller. One existing function
-        rather than a new one, and the suspension rule stays in the single place
-        that owns it.
-      */
-      wants("person")
-        ? db.rpc("suggested_people", { p_limit: NEW_PEOPLE_POOL })
-        : null,
-    ]);
-
-    const dated: { at: string; item: ExploreItem }[] = [];
-
-    for (const r of rowsOf(tools)) {
-      const tool = toolFromRow(r, "new");
-      dated.push({
-        at: tool.publishedAt ?? tool.createdAt,
-        item: { kind: "tool", id: tool.id, tool, reason: null },
-      });
-    }
-
-    for (const r of rowsOf(models)) {
-      const model = modelFromRow(r, "new");
-      dated.push({
-        at: model.createdAt,
-        item: { kind: "model", id: model.id, model, reason: null },
-      });
-    }
-
-    for (const row of postRowsOf(posts)) {
-      const post = normalisePost(row);
-      dated.push({
-        at: post.created_at,
-        item: { kind: "post", id: post.id, post, reason: null },
-      });
-    }
-
-    /* Newest first, then capped, because suggested_people orders by follower
-       count and this section is about recency. */
-    const newPeople = rowsOf(people)
-      .map((r) => personFromRow(r, "new"))
-      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-      .slice(0, cap);
-
-    for (const person of newPeople) {
-      dated.push({
-        at: person.createdAt,
-        item: { kind: "person", id: person.id, person, reason: null },
-      });
-    }
-
-    dated.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-
-    /*
-      The heading's subtitle has to follow the tab or it states something false.
-      On the Tools tab this section holds only tools, and the registry's
-      "The latest across tools, models, people and posts" would then be a
-      sentence about a shelf that is not there. Seen in the rendered HTML.
-    */
-    return ok(
-      dated.slice(0, EXPLORE.SHELF).map((d) => d.item),
-      { reason: kind === null ? null : NEW_SUBTITLE[kind] },
-    );
-  } catch (error) {
-    console.error("[explore] new and recent failed", error);
-    return failed();
+function topicOf(result: ExploreResult, s: ExploreScored): ExploreTopic | null {
+  const c = s.candidate;
+  if (c.entityType === "topic") {
+    const t = result.pool.topics.get(c.refId);
+    if (!t) return null;
+    return {
+      taxonomy: "topic",
+      slug: t.slug,
+      name: t.name,
+      description: t.description,
+      count: result.pool.topicPostCounts.get(t.id) ?? 0,
+      countNoun: "posts",
+      href: `/community/topic/${t.slug}`,
+    };
   }
+  const cat = result.pool.categories.get(c.refId);
+  if (!cat) return null;
+  return {
+    taxonomy: "category",
+    slug: cat.slug,
+    name: cat.name,
+    description: cat.description,
+    /* Not shown: tool_categories also links tools still in review, so a count
+       here could claim more than anybody can open. Null, never a wrong number. */
+    count: null,
+    countNoun: null,
+    href: `/search?q=${encodeURIComponent(cat.name)}`,
+  };
+}
+
+export function toExploreItem(
+  result: ExploreResult,
+  s: ExploreScored,
+  section: RankedSectionId,
+  position: number,
+): ExploreItem | null {
+  const c = s.candidate;
+  const reason = s.reason ? explainExploreReason(s.reason) : null;
+  const meta = {
+    key: c.key,
+    entityType: c.entityType,
+    entityId: c.refId,
+    section,
+    position,
+    reasonCode: s.reason?.code ?? null,
+    source: s.primarySource,
+  };
+  switch (c.entityType) {
+    case "tool": {
+      const tool = result.pool.tools.get(c.refId);
+      return tool ? { kind: "tool", id: tool.id, tool, reason, meta } : null;
+    }
+    case "model": {
+      const model = result.pool.models.get(c.refId);
+      return model ? { kind: "model", id: model.id, model, reason, meta } : null;
+    }
+    case "person": {
+      const person = result.pool.people.get(c.refId);
+      return person ? { kind: "person", id: person.id, person, reason, meta } : null;
+    }
+    case "post": {
+      const post = result.pool.posts.get(c.refId);
+      return post ? { kind: "post", id: post.id, post, reason, meta } : null;
+    }
+    case "video": {
+      const post = result.pool.posts.get(c.refId);
+      const video = post ? toVideoPosts([post])[0] : undefined;
+      return video ? { kind: "video", id: video.id, post: video, reason, meta } : null;
+    }
+    case "topic":
+    case "category": {
+      const topic = topicOf(result, s);
+      return topic ? { kind: "topic", id: `${topic.taxonomy}-${topic.slug}`, topic, reason, meta } : null;
+    }
+  }
+}
+
+async function rankedSection(ctx: ExploreContext, id: RankedSectionId): Promise<SectionState> {
+  const result = await exploreFor(ctx);
+  if (!result) return failed();
+  const ranking = result.rankings.get(id);
+  if (!ranking) return failed();
+
+  /* Every type this shelf could hold failed to load: an error, not "empty". */
+  const kind = TAB_KIND[ctx.tab];
+  const types = SECTION_TYPES[id].filter((t) => {
+    if (kind === null) return true;
+    return kind === "topic" ? t === "topic" || t === "category" : t === kind;
+  });
+  if (types.length > 0 && types.every((t) => result.pool.failed.has(t))) return failed();
+
+  const items = ranking.items
+    .map((s, i) => toExploreItem(result, s, id, i))
+    .filter((x): x is ExploreItem => x !== null);
+  if (items.length === 0) return { ...empty(), note: ranking.note };
+  /* The heading's subtitle has to follow the tab or it states something false:
+     on the Tools tab, New holds only tools. */
+  return ok(items, { reason: id === "new-and-recent" && kind !== null ? NEW_SUBTITLE[kind] : null });
+}
+
+const NEW_SUBTITLE: Record<NonNullable<(typeof TAB_KIND)[ExploreTab]>, string> = {
+  tool: "The latest tools added to the catalogue.",
+  model: "The latest models added to the catalogue.",
+  post: "The latest posts from the community.",
+  person: "People who joined Celpare recently.",
+  topic: "The latest across Celpare.",
+  video: "The latest videos from the community.",
+};
+
+export const loadForYou = (ctx: ExploreContext) => rankedSection(ctx, "for-you");
+export const loadTrending = (ctx: ExploreContext) => rankedSection(ctx, "trending");
+export const loadRising = (ctx: ExploreContext) => rankedSection(ctx, "rising");
+export const loadNewAndRecent = (ctx: ExploreContext) => rankedSection(ctx, "new-and-recent");
+export const loadRecommendedTools = (ctx: ExploreContext) => rankedSection(ctx, "recommended-tools");
+export const loadRecommendedModels = (ctx: ExploreContext) => rankedSection(ctx, "recommended-models");
+export const loadPeople = (ctx: ExploreContext) => rankedSection(ctx, "people");
+export const loadDiscussions = (ctx: ExploreContext) => rankedSection(ctx, "discussions");
+export const loadVideos = (ctx: ExploreContext) => rankedSection(ctx, "videos");
+export const loadTopics = (ctx: ExploreContext) => rankedSection(ctx, "topics");
+
+/* The shelf order for the All tab (D156). Registry order when ranking failed. */
+export async function loadSectionOrder(ctx: ExploreContext): Promise<RankedSectionId[] | null> {
+  const result = await exploreFor(ctx);
+  return result ? result.order : null;
 }
 
 /* ---------------------------------------------------------------------------
@@ -369,72 +285,6 @@ export async function loadFeatured(ctx: ExploreContext): Promise<SectionState> {
 function position(slugs: string[]): (slug: string) => number {
   const at = new Map(slugs.map((slug, i) => [slug.toLowerCase(), i]));
   return (slug: string) => at.get(slug.toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
-}
-
-/* ---------------------------------------------------------------------------
-   Recommendations, from the pass search already ships
-   --------------------------------------------------------------------------- */
-
-export async function loadRecommendedTools(ctx: ExploreContext): Promise<SectionState> {
-  try {
-    const { tools } = await recommendations(ctx.signedIn, ctx.viewerId);
-    return ok(
-      tools.map((s) => ({
-        kind: "tool" as const,
-        id: s.candidate.id,
-        tool: s.candidate,
-        /* The ranker's own reason, when it produced one. Never written here:
-           section 27 forbids the UI inventing a reason the backend did not
-           give. */
-        reason: s.reason,
-      })),
-    );
-  } catch (error) {
-    console.error("[explore] recommended tools failed", error);
-    return failed();
-  }
-}
-
-export async function loadRecommendedModels(ctx: ExploreContext): Promise<SectionState> {
-  try {
-    const { models } = await recommendations(ctx.signedIn, ctx.viewerId);
-    return ok(
-      models.map((s) => ({
-        kind: "model" as const,
-        id: s.candidate.id,
-        model: s.candidate,
-        reason: s.reason,
-      })),
-    );
-  } catch (error) {
-    console.error("[explore] recommended models failed", error);
-    return failed();
-  }
-}
-
-/*
-  People.
-
-  suggested_people already excludes the caller and anybody they follow, so every
-  row here is somebody they do not: a suggestion you have already acted on is a
-  wasted row. It is SECURITY DEFINER and answers for auth.uid(), so a signed out
-  visitor gets the same public list with no personalisation.
-*/
-export async function loadPeople(ctx: ExploreContext): Promise<SectionState> {
-  try {
-    const { people } = await recommendations(ctx.signedIn, ctx.viewerId);
-    return ok(
-      people.map((person) => ({
-        kind: "person" as const,
-        id: person.id,
-        person,
-        reason: null,
-      })),
-    );
-  } catch (error) {
-    console.error("[explore] people failed", error);
-    return failed();
-  }
 }
 
 /*
@@ -545,280 +395,6 @@ export async function loadSaved(
 }
 
 /* ---------------------------------------------------------------------------
-   Discussions
-   --------------------------------------------------------------------------- */
-
-/*
-  The community's own conversations, ordered by the feed's OWN ranker.
-
-  D29 is time decayed engagement with the weights in one file, and this imports
-  that file rather than forming a second opinion about what a popular post is.
-
-  Section 23 is the constraint that shapes the rest: Explore must not simply be
-  the feed. So this takes the ranked window and drops the authors the viewer
-  already follows, because those posts are what /community shows them. What is
-  left is the part of the community they are not already seeing, which is what
-  discovery means.
-*/
-export async function loadDiscussions(ctx: ExploreContext): Promise<SectionState> {
-  try {
-    const db = await reader(ctx.signedIn);
-
-    const [result, followed] = await Promise.all([
-      db
-        .from("posts")
-        .select(POST_SELECT)
-        .eq("status", "visible")
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(EXPLORE.DISCUSSION_WINDOW),
-      followedAuthors(ctx.viewerId),
-    ]);
-
-    if (result.error) {
-      console.error(
-        "[explore] discussions failed",
-        result.error.code,
-        result.error.message,
-      );
-      return failed();
-    }
-
-    const rows = postRowsOf(result).map(normalisePost);
-
-    /*
-      Somebody you follow is not a discovery, so their posts come out. Dropped
-      rather than pushed down, because the feed already shows them and a
-      duplicate is worse than a shorter shelf.
-
-      UNLESS THAT EMPTIES IT. With two accounts, following the only other person
-      would leave this permanently blank while visible posts exist, which is a
-      false statement about the community. So the filter applies only when
-      something survives it.
-    */
-    const discovery = rows.filter((p) => !followed.has(p.author_id));
-    const pool = discovery.length > 0 ? discovery : rows;
-
-    const now = Date.now();
-    const ranked = [...pool].sort((a, b) => scoreOf(b, now) - scoreOf(a, now));
-
-    return ok(
-      interleaveAuthors(ranked)
-        .slice(0, EXPLORE.DISCUSSIONS)
-        .map((post) => ({
-          kind: "post" as const,
-          id: post.id,
-          post,
-          reason: null,
-        })),
-    );
-  } catch (error) {
-    console.error("[explore] discussions failed", error);
-    return failed();
-  }
-}
-
-async function followedAuthors(viewerId: string | null): Promise<Set<string>> {
-  if (!viewerId || !isSupabaseConfigured()) return new Set<string>();
-
-  try {
-    const db = await createClient();
-    const { data, error } = await db
-      .from("follows")
-      .select("following_id")
-      .eq("follower_id", viewerId);
-
-    if (error) return new Set<string>();
-    return new Set(
-      (data ?? []).map((r) => (r as { following_id: string }).following_id),
-    );
-  } catch {
-    return new Set<string>();
-  }
-}
-
-/* ---------------------------------------------------------------------------
-   Videos
-   --------------------------------------------------------------------------- */
-
-/*
-  The list only. The viewer, the player, the analytics and every action on a
-  video are the ones Phase 4AO built, reached at /community/video/[id], and
-  section 14 is explicit that Explore decides the entry and nothing else.
-
-  An inner join on post_media, so a post with four images never crosses the wire
-  to be discarded here. The same query shape as lib/community/video.ts, which is
-  the file that owns this idea, built from the same POST_SELECT so the two
-  cannot disagree about which columns a post has.
-*/
-export async function loadVideos(ctx: ExploreContext): Promise<SectionState> {
-  try {
-    const db = await reader(ctx.signedIn);
-
-    const { data, error } = await db
-      .from("posts")
-      .select(POST_SELECT.replace("media:post_media(", "media:post_media!inner("))
-      .eq("status", "visible")
-      .is("deleted_at", null)
-      .eq("post_media.media_kind", "video")
-      .order("created_at", { ascending: false })
-      .limit(EXPLORE.SHELF);
-
-    if (error) {
-      console.error("[explore] videos failed", error.code, error.message);
-      return failed();
-    }
-
-    const videos: VideoPost[] = toVideoPosts(
-      ((data as unknown as FeedPost[]) ?? []).map(normalisePost),
-    );
-
-    return ok(
-      videos.map((post) => ({
-        kind: "video" as const,
-        id: post.id,
-        post,
-        reason: null,
-      })),
-    );
-  } catch (error) {
-    console.error("[explore] videos failed", error);
-    return failed();
-  }
-}
-
-/* ---------------------------------------------------------------------------
-   Topics and categories
-   --------------------------------------------------------------------------- */
-
-/*
-  BOTH REAL TAXONOMIES, AND NO THIRD ONE.
-
-  Section 12 lists example topics and says to reuse the existing taxonomy. There
-  are two: `topics`, which is what a post is filed under, and `categories`, which
-  is what a tool is filed under. They are not the same list, and merging them
-  would invent a taxonomy that matches neither table, so both are shown, each
-  with its own count and its own destination.
-
-  A topic goes to /community/topic/[slug], which exists. A category goes to a
-  search for its name, which is what the search empty state already does, because
-  there is no browse-by-category route to send it to and a link that goes nowhere
-  is defect F4.
-
-  THE COUNTS ARE REAL COUNTS. A head count per topic, never an estimate. A topic
-  with no posts shows zero, which is true, and it is still listed, because the
-  topic exists whether or not anybody has used it yet.
-*/
-export async function loadTopics(ctx: ExploreContext): Promise<SectionState> {
-  try {
-    const db = await reader(ctx.signedIn);
-
-    const [topicRows, categoryRows] = await Promise.all([
-      db
-        .from("topics")
-        .select("id, slug, name, description")
-        .order("sort_order", { ascending: true }),
-      db
-        .from("categories")
-        .select("slug, name, description")
-        .order("sort_order", { ascending: true }),
-    ]);
-
-    /* Both arms down is a failure. One arm down is a shorter list, which is the
-       trade every multi source read on this project makes. */
-    if (topicRows.error && categoryRows.error) {
-      console.error(
-        "[explore] topics failed",
-        topicRows.error.code,
-        topicRows.error.message,
-      );
-      return failed();
-    }
-
-    const topics = (topicRows.data as Topic[] | null) ?? [];
-    const categories =
-      (categoryRows.data as
-        | { slug: string; name: string; description: string | null }[]
-        | null) ?? [];
-
-    const counts = await topicPostCounts(
-      db,
-      topics.map((t) => t.id),
-    );
-
-    const items: ExploreItem[] = [];
-
-    for (const t of topics) {
-      const topic: ExploreTopic = {
-        taxonomy: "topic",
-        slug: t.slug,
-        name: t.name,
-        description: t.description,
-        count: counts.get(t.id) ?? 0,
-        countNoun: "posts",
-        href: `/community/topic/${t.slug}`,
-      };
-      items.push({ kind: "topic", id: `topic-${t.slug}`, topic, reason: null });
-    }
-
-    for (const c of categories) {
-      const topic: ExploreTopic = {
-        taxonomy: "category",
-        slug: c.slug,
-        name: c.name,
-        description: c.description,
-        /* Not counted. A count per category needs a join per row, and the number
-           is not what somebody is deciding on here. Null rather than 0, because
-           0 would be a false statement about a category that has tools in it. */
-        count: null,
-        countNoun: null,
-        href: `/search?q=${encodeURIComponent(c.name)}`,
-      };
-      items.push({ kind: "topic", id: `category-${c.slug}`, topic, reason: null });
-    }
-
-    return ok(items);
-  } catch (error) {
-    console.error("[explore] topics failed", error);
-    return failed();
-  }
-}
-
-/*
-  How many visible posts each topic has.
-
-  One head count per topic. Eleven small counts rather than one grouped query,
-  because PostgREST has no group by and the alternative is an RPC, which is a
-  database change this task does not need. They run in parallel and none of them
-  returns a row.
-*/
-async function topicPostCounts(
-  db: SupabaseClient,
-  topicIds: string[],
-): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
-  if (topicIds.length === 0) return out;
-
-  const results = await Promise.all(
-    topicIds.map((id) =>
-      db
-        .from("posts")
-        .select("id", { count: "exact", head: true })
-        .eq("topic_id", id)
-        .eq("status", "visible")
-        .is("deleted_at", null),
-    ),
-  );
-
-  topicIds.forEach((id, i) => {
-    const r = results[i];
-    if (r && !r.error) out.set(id, r.count ?? 0);
-  });
-
-  return out;
-}
-
-/* ---------------------------------------------------------------------------
    Continue exploring
    --------------------------------------------------------------------------- */
 
@@ -834,7 +410,7 @@ async function topicPostCounts(
   It is the last section on the page for the same reason: it is the only one that
   is about you rather than about Celpare.
 */
-export async function loadContinueExploring(
+async function loadRecentActivity(
   ctx: ExploreContext,
 ): Promise<SectionState<RecentRow>> {
   if (!ctx.signedIn || !ctx.viewerId || !isSupabaseConfigured()) {
@@ -859,6 +435,24 @@ export async function loadContinueExploring(
   }
 }
 
+/*
+  Continue exploring (brief section 28): the discovery journey when there is
+  one, from explore_v1's seeds (what this person opened on Explore in this
+  sitting, or this week). With nothing explored yet it is the recent activity
+  list above, which is what this section showed before explore_v1.
+*/
+export type ContinueState =
+  | { mode: "journey"; state: SectionState }
+  | { mode: "recent"; state: SectionState<RecentRow> };
+
+export async function loadContinueExploring(ctx: ExploreContext): Promise<ContinueState> {
+  if (ctx.signedIn && ctx.viewerId) {
+    const journey = await rankedSection(ctx, "continue-exploring");
+    if (journey.status === "ok") return { mode: "journey", state: journey };
+  }
+  return { mode: "recent", state: await loadRecentActivity(ctx) };
+}
+
 /* ---------------------------------------------------------------------------
    Helpers
    --------------------------------------------------------------------------- */
@@ -870,9 +464,4 @@ type Result = { data: unknown; error: { code?: string; message?: string } | null
 function rowsOf(result: Result | null): Record<string, unknown>[] {
   if (!result || result.error) return [];
   return (result.data as Record<string, unknown>[] | null) ?? [];
-}
-
-function postRowsOf(result: Result | null): FeedPost[] {
-  if (!result || result.error) return [];
-  return (result.data as unknown as FeedPost[] | null) ?? [];
 }

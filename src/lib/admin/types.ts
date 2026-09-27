@@ -119,6 +119,9 @@ export type RecommendationAnalytics = {
   by_source: { candidate_source: string; impressions: number; clicks: number; saves: number }[];
   by_surface: { surface: string; impressions: number; clicks: number }[];
   top_tools: { slug: string; name: string; impressions: number; clicks: number; saves: number }[];
+  /* 4BI: Explore writes every entity type, with its section. */
+  by_entity?: { entity_type: string; impressions: number; clicks: number; saves: number; dismissals: number }[];
+  by_section?: { section: string; impressions: number; clicks: number }[];
 };
 
 export type CommunityAnalytics = {

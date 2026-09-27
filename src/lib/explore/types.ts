@@ -124,13 +124,29 @@ export type ExploreTopic = {
   Every provider in this build leaves it null, because nothing yet computes a
   personalisation reason, and the cards render nothing where it would go.
 */
-export type ExploreItem =
+/*
+  What explore_v1 placed and why, for Explore's own events (D151): which
+  section, which position, which source and reason code. Never a score: the
+  scores stay on the server and in the admin debug view only.
+*/
+export type ExploreItemMeta = {
+  key: string;
+  entityType: "tool" | "model" | "post" | "video" | "person" | "topic" | "category";
+  entityId: string;
+  section: string;
+  position: number;
+  reasonCode: string | null;
+  source: string | null;
+};
+
+export type ExploreItem = (
   | { kind: "tool"; id: string; tool: ToolCandidate; reason: string | null }
   | { kind: "model"; id: string; model: ModelCandidate; reason: string | null }
   | { kind: "person"; id: string; person: PersonCandidate; reason: string | null }
   | { kind: "post"; id: string; post: FeedPost; reason: string | null }
   | { kind: "video"; id: string; post: VideoPost; reason: string | null }
-  | { kind: "topic"; id: string; topic: ExploreTopic; reason: string | null };
+  | { kind: "topic"; id: string; topic: ExploreTopic; reason: string | null }
+) & { meta?: ExploreItemMeta };
 
 /* ---------------------------------------------------------------------------
    Section state

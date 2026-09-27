@@ -72,17 +72,16 @@ const ANY: ExploreItemKind[] = [
   THE ORDER, and it is the founder's conceptual order from section 4 rather than
   a reordering of it by what happens to be populated today.
 
-  For you, Trending and Rising sit at the top and are currently pending, because
-  the ranking layer that fills them is explicitly out of scope (section 24). They
-  render one honest line each rather than being hidden, for two reasons: hiding
-  them would leave the page silently missing the three things the brief puts
-  first, and the day a ranker exists they fill in with no layout change.
+  Since explore_v1 (4BI) this is the order of the TABS and of a cold start. On
+  the All tab for a viewer with a profile, the shelves between For you and
+  Continue exploring are reordered per viewer by lib/explore/intelligence/
+  sections.ts (D156), and Featured keeps its place from this list (D158).
 */
 export const EXPLORE_SECTIONS: ExploreSectionDef[] = [
   {
     id: "for-you",
     title: "For you",
-    subtitle: "Personalised discoveries.",
+    subtitle: "Discoveries picked for you, with a few things you have not tried yet.",
     kinds: ANY,
     layout: "shelf",
     priority: "eager",
@@ -122,7 +121,7 @@ export const EXPLORE_SECTIONS: ExploreSectionDef[] = [
   {
     id: "recommended-tools",
     title: "Tools worth a look",
-    subtitle: "Chosen by rating, how complete the listing is and recent interest.",
+    subtitle: "Picked for what you explore, weighed by quality, reviews and what is new to you.",
     kinds: ["tool"],
     layout: "shelf",
     priority: "deferred",
@@ -130,7 +129,7 @@ export const EXPLORE_SECTIONS: ExploreSectionDef[] = [
   {
     id: "recommended-models",
     title: "Models to explore",
-    subtitle: "What the catalogue holds, with nothing inferred about performance.",
+    subtitle: "Matched to what you explore, with recorded evaluations as evidence.",
     kinds: ["model"],
     layout: "shelf",
     priority: "deferred",
@@ -138,7 +137,7 @@ export const EXPLORE_SECTIONS: ExploreSectionDef[] = [
   {
     id: "people",
     title: "People you may know",
-    subtitle: "Developers, builders and creators on Celpare.",
+    subtitle: "Mutual follows and shared interests, never follower counts.",
     kinds: ["person"],
     layout: "shelf",
     priority: "deferred",
@@ -188,4 +187,24 @@ export function sectionsForTab(tab: ExploreTab): ExploreSectionDef[] {
   const kind = TAB_KIND[tab];
   if (kind === null) return EXPLORE_SECTIONS;
   return EXPLORE_SECTIONS.filter((s) => s.kinds.includes(kind));
+}
+
+/*
+  The All tab order for one viewer (D156): explore_v1's order for the ranked
+  shelves, with Featured kept at its registry position. A null order (ranking
+  failed) is the registry order.
+*/
+export function orderedSections(ranked: string[] | null): ExploreSectionDef[] {
+  if (!ranked) return EXPLORE_SECTIONS;
+  const byId = new Map(EXPLORE_SECTIONS.map((s) => [s.id, s]));
+  const out: ExploreSectionDef[] = [];
+  for (const id of ranked) {
+    const d = byId.get(id as ExploreSectionId);
+    if (d) out.push(d);
+  }
+  const featuredAt = EXPLORE_SECTIONS.findIndex((s) => s.id === "featured");
+  const featured = byId.get("featured");
+  if (featured) out.splice(Math.min(featuredAt, out.length), 0, featured);
+  /* The first two render with the document; the rest stream. */
+  return out.map((d, i) => ({ ...d, priority: i < 2 ? "eager" : "deferred" }));
 }
