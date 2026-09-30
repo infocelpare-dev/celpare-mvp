@@ -149,7 +149,13 @@ export function PostActions({
 
   return (
     <div className={cn("mt-3", className)}>
-      <div className="flex items-center gap-1">
+      {/*
+        On a phone the row is wider than the column, and flexbox used to squeeze
+        the icons that sit beside a count down to dots (founder, 2026-09-30).
+        Icons never shrink; below sm the actions trade side padding for room and
+        spread across the row. Every one stays 44px tall.
+      */}
+      <div className="flex items-center justify-between sm:justify-start sm:gap-1 [&_svg]:shrink-0">
         {/*
           Views: a fact, not a control, so it is plain text with no hover and no
           button role. The number is real (D13, D30): distinct accounts or signed
@@ -158,7 +164,7 @@ export function PostActions({
           never as a bare number.
         */}
         {viewCount !== undefined ? (
-          <span className="inline-flex h-11 min-w-11 items-center justify-center gap-1.5 px-3 text-[13px] text-muted">
+          <span className="inline-flex h-11 min-w-8 shrink-0 sm:min-w-11 items-center justify-center gap-1 sm:gap-1.5 px-1 sm:px-3 text-[13px] text-muted">
             <ChartNoAxesColumn className="size-[18px]" aria-hidden />
             <span className="tabular-nums" aria-hidden>
               {formatCount(viewCount)}
@@ -193,7 +199,7 @@ export function PostActions({
             account, and the composer on that page handles the rest. */}
         <Link
           href={href}
-          className="inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
+          className="inline-flex h-11 min-w-8 shrink-0 sm:min-w-11 items-center justify-center gap-1 sm:gap-1.5 rounded-full px-1 sm:px-3 text-[13px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
         >
           <MessageCircle className="size-[18px]" aria-hidden />
           <span className="sr-only">Comments</span>
@@ -249,7 +255,7 @@ export function PostActions({
           type="button"
           onClick={onShare}
           data-feed-event="share"
-          className="inline-flex h-11 min-w-11 cursor-pointer items-center justify-center gap-1.5 rounded-full px-3 text-[13px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
+          className="inline-flex h-11 min-w-8 shrink-0 sm:min-w-11 cursor-pointer items-center justify-center gap-1 sm:gap-1.5 rounded-full px-1 sm:px-3 text-[13px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
         >
           {copied ? (
             <Check className="size-[18px]" aria-hidden />
@@ -273,7 +279,7 @@ export function PostActions({
             onClick={() => setReporting((v) => !v)}
             aria-expanded={reporting}
             className={cn(
-              "ms-auto inline-flex h-11 min-w-11 cursor-pointer items-center justify-center rounded-full px-3 text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground",
+              "ms-auto inline-flex h-11 min-w-8 shrink-0 sm:min-w-11 cursor-pointer items-center justify-center rounded-full px-1 sm:px-3 text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground",
               reporting && "text-foreground",
             )}
           >
@@ -331,7 +337,7 @@ function ActionButton({
       disabled={disabled}
       aria-pressed={on}
       className={cn(
-        "inline-flex h-11 min-w-11 cursor-pointer items-center justify-center gap-1.5 rounded-full px-3 text-[13px]",
+        "inline-flex h-11 min-w-8 shrink-0 sm:min-w-11 cursor-pointer items-center justify-center gap-1 sm:gap-1.5 rounded-full px-1 sm:px-3 text-[13px]",
         "transition-colors duration-200 ease-out hover:bg-surface disabled:cursor-default disabled:opacity-60",
         /*
           The on state is a FILLED icon in ink, not a lime one. globals.css is
@@ -373,7 +379,7 @@ function SignInAction({
   return (
     <Link
       href="/get-started"
-      className="inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
+      className="inline-flex h-11 min-w-8 shrink-0 sm:min-w-11 items-center justify-center gap-1 sm:gap-1.5 rounded-full px-1 sm:px-3 text-[13px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
     >
       {children}
       <span className="sr-only">{label}, sign in first</span>

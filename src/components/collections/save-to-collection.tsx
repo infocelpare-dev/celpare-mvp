@@ -252,7 +252,7 @@ export function SaveToCollection({
           /* On a feed card it lines up with the other 44px pill controls, and
              it widens only when it is carrying a count. */
           variant === "icon" &&
-            "h-11 min-w-11 justify-center rounded-full border-transparent px-3 hover:bg-surface",
+            "h-11 min-w-8 shrink-0 justify-center rounded-full border-transparent px-1 hover:bg-surface sm:min-w-11 sm:px-3",
           /* In a menu it is a row like the rows around it: full width, start
              aligned, no border of its own. */
           variant === "menu" &&

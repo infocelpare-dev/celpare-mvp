@@ -200,8 +200,9 @@ export function PostCard({
             showReport
             isOwner={viewer.viewerId === post.author_id}
             /* Pulled left so the icons line up under the body rather than
-               under the avatar gutter. */
-            className="-ms-3"
+               under the avatar gutter. The pull matches each action's side
+               padding, which is smaller on a phone. */
+            className="-ms-1 sm:-ms-3"
           />
         </div>
       </div>
