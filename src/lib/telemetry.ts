@@ -117,6 +117,29 @@ export async function recordToolView(input: {
   }
 }
 
+/* A model page open (4BK), the model twin of recordToolView. model_view_events
+   is service role only; it feeds the viewer's own activity and co-viewing counts. */
+export async function recordModelView(input: {
+  modelId: string;
+  userId?: string | null;
+  source?: ViewSource | "compare";
+  query?: string | null;
+}): Promise<void> {
+  if (unavailable("model view")) return;
+
+  try {
+    const { error } = await createAdminClient().from("model_view_events").insert({
+      model_id: input.modelId,
+      user_id: input.userId ?? null,
+      source: input.source ?? "direct",
+      query: input.query ? input.query.trim().slice(0, 200) : null,
+    });
+    if (error) console.error("[telemetry] model view insert failed", error.code, error.message);
+  } catch (err) {
+    console.error("[telemetry] model view insert threw", err);
+  }
+}
+
 export type SecurityEventKind =
   | "login_failed"
   | "login_blocked"

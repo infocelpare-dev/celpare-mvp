@@ -13,6 +13,9 @@ import {
 } from "./retrieval";
 import { NO_AFFINITY, rankCandidates, WEIGHTS, type RankContext } from "./ranking";
 import { diversify, interleave } from "./diversity";
+import { searchPreference } from "@/lib/recommend/server/engine";
+import { tieBreak } from "@/lib/recommend/tiebreak";
+
 import {
   isSearchTab,
   type ModelCandidate,
@@ -24,6 +27,10 @@ import {
   type Scored,
   type ToolCandidate,
 } from "./types";
+
+/* Rollback for the engine's tie-break (4BK, D181): false restores the order the
+   Search formula alone produces. */
+const SEARCH_TOOL_MODEL_TIEBREAK = true;
 
 /*
   The pipeline, and the only thing a page calls.
@@ -151,11 +158,25 @@ export async function runSearch(input: SearchInput): Promise<SearchResults> {
 
   const ctx: RankContext = { parsed, affinity, now: Date.now() };
 
+  /*
+    The Tool & Model Recommendation Engine's tie-break (4BK, D181). It reorders
+    tools and models ONLY among results whose relevance is within 5% of each
+    other, by the signed in person's own context. The formula above is untouched,
+    a clearer match can never be passed, and a signed out search, or any failure,
+    leaves the order exactly as ranked.
+  */
+  const preference = SEARCH_TOOL_MODEL_TIEBREAK ? await searchPreference(input.viewerId, parsed.normalized) : null;
+  const byTie = <T extends ToolCandidate | ModelCandidate>(ranked: Scored<T>[]): Scored<T>[] => {
+    if (!preference) return ranked;
+    const rankable = ranked.map((s) => ({ key: `${s.candidate.type}:${s.candidate.id}`, relevance: s.score.relevance, s }));
+    return tieBreak(rankable, preference).map((r) => r.s);
+  };
+
   /* Rank inside each type, then diversify inside each type. Cross type ordering
      happens in interleave, because a score is only roughly comparable across
      entity kinds and pretending otherwise lets one type fill the page. */
-  const tools = diversify(rankCandidates<ToolCandidate>(raw.tools, ctx));
-  const models = diversify(rankCandidates<ModelCandidate>(raw.models, ctx), {
+  const tools = diversify(byTie(rankCandidates<ToolCandidate>(raw.tools, ctx)));
+  const models = diversify(byTie(rankCandidates<ModelCandidate>(raw.models, ctx)), {
     maxRun: WEIGHTS.MAX_PER_PROVIDER_RUN,
   });
   const people = rankCandidates<PersonCandidate>(raw.people, ctx);

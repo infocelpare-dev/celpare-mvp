@@ -5,7 +5,11 @@ import { RecentList } from "@/components/profile/recent-list";
 import { ExploreSection, Grid, Rows, Shelf } from "./section";
 import { ExploreItemCard, type ItemViewer } from "./item";
 import { ExploreSlot } from "./explore-tracker";
+import { RecSlot } from "@/components/recommend/recommendation-tracker";
+import { SECTION_SIZE } from "@/lib/explore/intelligence/config";
 import {
+  EXPLORE_TOOL_MODEL_SOURCE,
+  loadEngineShelf,
   loadContinueExploring,
   loadDiscussions,
   loadFeatured,
@@ -254,7 +258,58 @@ export async function FeaturedSection({ ctx }: { ctx: ExploreContext }) {
   );
 }
 
+/*
+  The Tools and Models shelves, ranked by the Tool & Model Recommendation Engine
+  (4BK). Same section frame and same cards as every other shelf; the slot is the
+  engine's RecSlot, so impressions and clicks are recorded against
+  tool_model_recommendation_v1 and its request id, never mislabelled explore_v1.
+*/
+async function EngineShelf({ id, ctx, emptyText }: { id: "recommended-tools" | "recommended-models"; ctx: ExploreContext; emptyText: string }) {
+  const d = def(id);
+  const { state, request } = await loadEngineShelf(ctx, id, SECTION_SIZE[id]);
+  const viewer = await viewerFor(state.items, ctx);
+  return (
+    <ExploreSection def={d} status={state.status} reason={state.reason} note={state.note} emptyText={emptyText}>
+      <div
+        data-rec-request={request?.requestId ?? ""}
+        data-rec-surface={request?.surface ?? "explore"}
+        data-rec-strategy={request?.strategy ?? "personalized"}
+        data-rec-variant={request?.variant ?? ""}
+        data-rec-section={id}
+      >
+        <Shelf label={d.title}>
+          {state.items.map((item, i) =>
+            item.meta && (item.kind === "tool" || item.kind === "model") && request ? (
+              <RecSlot
+                key={item.id}
+                layout="shelf"
+                entityType={item.kind}
+                entityId={item.meta.entityId}
+                entityKey={item.meta.key}
+                position={item.meta.position}
+                reasonCode={item.meta.reasonCode}
+                source={item.meta.source}
+                surface={request.surface}
+                strategy={request.strategy}
+                requestId={request.requestId}
+                section={id}
+                title={titleOf(item)}
+                signedIn={ctx.signedIn}
+              >
+                <ExploreItemCard item={item} viewer={viewer} index={i} as="div" />
+              </RecSlot>
+            ) : null,
+          )}
+        </Shelf>
+      </div>
+    </ExploreSection>
+  );
+}
+
 export async function RecommendedToolsSection({ ctx }: { ctx: ExploreContext }) {
+  if (EXPLORE_TOOL_MODEL_SOURCE === "engine") {
+    return <EngineShelf id="recommended-tools" ctx={ctx} emptyText="No tools in the catalogue yet." />;
+  }
   return (
     <ItemShelf
       id="recommended-tools"
@@ -274,6 +329,9 @@ export async function RecommendedToolsSection({ ctx }: { ctx: ExploreContext }) 
   same component fills.
 */
 export async function RecommendedModelsSection({ ctx }: { ctx: ExploreContext }) {
+  if (EXPLORE_TOOL_MODEL_SOURCE === "engine") {
+    return <EngineShelf id="recommended-models" ctx={ctx} emptyText="No models in the catalogue yet. They arrive with the directory." />;
+  }
   return (
     <ItemShelf
       id="recommended-models"

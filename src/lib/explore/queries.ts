@@ -18,6 +18,8 @@ import { getExplore, type ExploreResult } from "./intelligence/server/engine";
 import type { ExploreScored, ExploreSectionId as RankedSectionId } from "./intelligence/types";
 import type { ExploreTab, ExploreItem, ExploreTopic, SectionState } from "./types";
 import { TAB_KIND, empty, failed, ok } from "./types";
+import { getRecommendations } from "@/lib/recommend/server/engine";
+import { explainReason } from "@/lib/recommend/reasons";
 
 /*
   Every Explore read.
@@ -193,6 +195,48 @@ export const loadRising = (ctx: ExploreContext) => rankedSection(ctx, "rising");
 export const loadNewAndRecent = (ctx: ExploreContext) => rankedSection(ctx, "new-and-recent");
 export const loadRecommendedTools = (ctx: ExploreContext) => rankedSection(ctx, "recommended-tools");
 export const loadRecommendedModels = (ctx: ExploreContext) => rankedSection(ctx, "recommended-models");
+/*
+  The Tools and Models shelves (4BK, D173). They are ranked by the Tool & Model
+  Recommendation Engine (tool_model_recommendation_v1, strategy personalized)
+  instead of explore_v1; every other shelf, and every content shelf, is still
+  explore_v1 and unchanged. The candidates the cards draw come from explore_v1's
+  already loaded pool, so no card changed and nothing is read twice. Set this to
+  "explore_v1" to roll the two shelves back.
+*/
+export const EXPLORE_TOOL_MODEL_SOURCE: "engine" | "explore_v1" = "engine";
+
+export type EngineShelf = {
+  state: SectionState;
+  /* What the tracker needs to attribute events to the engine request. */
+  request: { requestId: string; surface: string; strategy: string; variant: string } | null;
+};
+
+export async function loadEngineShelf(ctx: ExploreContext, id: "recommended-tools" | "recommended-models", limit: number): Promise<EngineShelf> {
+  const result = await exploreFor(ctx);
+  if (!result) return { state: failed(), request: null };
+  const type: "tool" | "model" = id === "recommended-tools" ? "tool" : "model";
+  if (result.pool.failed.has(type)) return { state: failed(), request: null };
+  const view = await getRecommendations({ surface: "explore", strategy: "personalized", entityTypes: [type], limit, section: id }, ctx.viewerId);
+  if (!view.ok) return { state: failed(), request: null };
+  const items: ExploreItem[] = [];
+  view.result.items.forEach((it, position) => {
+    const meta = { key: it.key, entityType: type, entityId: it.ref.id, section: id, position, reasonCode: it.reason?.code ?? null, source: it.source };
+    const reason = it.reason ? explainReason(it.reason) : null;
+    if (type === "tool") {
+      const tool = result.pool.tools.get(it.ref.id);
+      if (tool) items.push({ kind: "tool", id: it.ref.id, tool, reason, meta });
+    } else {
+      const model = result.pool.models.get(it.ref.id);
+      if (model) items.push({ kind: "model", id: it.ref.id, model, reason, meta });
+    }
+  });
+  const r = view.result;
+  return {
+    state: items.length ? ok(items) : { ...empty(), note: r.note },
+    request: { requestId: r.requestId, surface: r.surface, strategy: r.strategy, variant: r.variant },
+  };
+}
+
 export const loadPeople = (ctx: ExploreContext) => rankedSection(ctx, "people");
 export const loadDiscussions = (ctx: ExploreContext) => rankedSection(ctx, "discussions");
 export const loadVideos = (ctx: ExploreContext) => rankedSection(ctx, "videos");

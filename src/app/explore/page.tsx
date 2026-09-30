@@ -25,6 +25,7 @@ import {
 } from "@/components/explore/sections";
 import { orderedSections, sectionsForTab, type ExploreSectionId } from "@/lib/explore/sections";
 import { ExploreTracker } from "@/components/explore/explore-tracker";
+import { RecommendationTracker } from "@/components/recommend/recommendation-tracker";
 import { ExploreDebugPanel } from "@/components/explore/explore-debug";
 import { getAdminSession } from "@/lib/admin/guard";
 import { buildExploreDebug } from "@/lib/explore/intelligence/server/debug";
@@ -168,6 +169,9 @@ export default async function ExplorePage({
 
         {debugView ? <ExploreDebugPanel view={debugView} /> : null}
         <ExploreTracker variant={explore?.assignment.variant ?? null} />
+        {/* The Tools and Models shelves are the engine's (4BK); their events go
+            through its own tracker, attributed to tool_model_recommendation_v1. */}
+        <RecommendationTracker />
 
         {/*
           One busy status for the whole page. Eight per section would announce

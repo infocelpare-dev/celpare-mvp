@@ -208,32 +208,6 @@ export async function getViewerState(toolId: string, developerId: string | null)
   };
 }
 
-export type RelatedTool = { slug: string; name: string; tagline: string | null; logo_url: string | null };
-
-/*
-  Related tools, by shared tags. Deliberately not a recommendation model: the
-  brief says not to invent one during this work, and a tag overlap is a filter
-  a person can predict and argue with.
-*/
-export async function getRelatedTools(tool: ToolProfile, limit = 4): Promise<RelatedTool[]> {
-  if (!isSupabaseConfigured() || tool.tags.length === 0) return [];
-
-  const db = createAnonClient();
-  const { data, error } = await db
-    .from("tools")
-    .select("slug, name, tagline, logo_url")
-    .overlaps("tags", tool.tags)
-    .neq("id", tool.id)
-    .order("popularity_score", { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    console.error("[tools] related failed", error.code, error.message);
-    return [];
-  }
-  return (data ?? []) as RelatedTool[];
-}
-
 export type DeveloperCard = {
   id: string;
   username: string | null;

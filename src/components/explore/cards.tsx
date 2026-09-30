@@ -227,7 +227,7 @@ export function ModelCard({
 
         <span className="min-w-0 flex-1">
           <Link
-            href={`/search?q=${encodeURIComponent(model.name)}`}
+            href={`/models/${model.slug}`}
             className={`${PRIMARY} block truncate text-[15px]`}
           >
             {model.name}

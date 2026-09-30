@@ -180,9 +180,9 @@ function toModel(r: Row): ModelItem {
     id: String(r.id),
     slug: String(r.slug),
     name: String(r.name),
-    /* There is no model page. The header links the provider site instead of a
-       route that would 404, the same call Search and Explore made. */
-    href: null,
+    /* The lean model page (4BK). Before it existed this was null and the header
+       linked the provider site instead. */
+    href: `/models/${String(r.slug)}`,
     websiteUrl: str(r.website_url),
     description: str(r.description),
     provider: str(r.provider),

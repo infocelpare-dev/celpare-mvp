@@ -29,13 +29,17 @@ import {
 import {
   getDeveloperCard,
   getRatingBreakdown,
-  getRelatedTools,
   getToolProfile,
   getToolReviews,
   getViewerState,
   type ToolProfile,
 } from "@/lib/tools/queries";
 import { recordToolView } from "@/lib/telemetry";
+import { Suspense } from "react";
+import { getAdminSession } from "@/lib/admin/guard";
+import { ProfileRecommendations } from "@/components/recommend/profile-recommendations";
+import { RecommendationsSkeleton } from "@/components/recommend/recommendations";
+import { RecommendationTracker } from "@/components/recommend/recommendation-tracker";
 
 /*
   The public tool profile.
@@ -143,20 +147,26 @@ function Logo({ tool }: { tool: ToolProfile }) {
 
 export default async function ToolPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ debug?: string }>;
 }) {
   const { slug } = await params;
   const tool = await getToolProfile(slug);
   if (!tool) notFound();
 
-  const [viewer, reviews, breakdown, related, developer] = await Promise.all([
+  const [viewer, reviews, breakdown, developer] = await Promise.all([
     getViewerState(tool.id, tool.developer_id),
     getToolReviews(tool.id),
     getRatingBreakdown(tool.id),
-    getRelatedTools(tool),
     getDeveloperCard(tool.developer_id, tool.id),
   ]);
+
+  /* ?debug=1 shows how the recommendations were made, to admins only; anyone
+     else asking gets the ordinary page (the Explore and Compare gate). */
+  const debugRequested = (await searchParams)?.debug === "1";
+  const debug = debugRequested && viewer.signedIn ? (await getAdminSession()) !== null : false;
 
   /*
     Record the view, after the page has already resolved.
@@ -596,50 +606,20 @@ export default async function ToolPage({
           </Section>
         )}
 
-        {/* ----------------------------------------------------------- related */}
+        {/* --------------------------------------------- recommendations (4BK) */}
 
-        {related.length > 0 ? (
-          <Section title="Related tools">
-            <p className="-mt-2 mb-3 text-[13px] text-muted">
-              Tools tagged like this one. Not a recommendation, just an overlap.
-            </p>
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {related.map((r) => (
-                <li key={r.slug}>
-                  <Link
-                    href={`/tools/${r.slug}`}
-                    className="flex h-full items-start gap-3 rounded-xl border border-border p-4 transition-colors duration-200 ease-out hover:bg-surface"
-                  >
-                    {r.logo_url ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={r.logo_url}
-                        alt=""
-                        loading="lazy"
-                        className="size-9 shrink-0 rounded-lg border border-border object-contain"
-                      />
-                    ) : (
-                      <span
-                        aria-hidden
-                        className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface font-display text-[14px] font-semibold text-muted"
-                      >
-                        {r.name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                    <span className="min-w-0">
-                      <span className="block font-medium">{r.name}</span>
-                      {r.tagline ? (
-                        <span className="mt-0.5 block text-[13px] leading-relaxed text-muted">
-                          {r.tagline}
-                        </span>
-                      ) : null}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Section>
-        ) : null}
+        <Suspense fallback={<RecommendationsSkeleton title={`Alternatives to ${tool.name}`} />}>
+          <ProfileRecommendations
+            type="tool"
+            id={tool.id}
+            slug={tool.slug}
+            name={tool.name}
+            viewerId={viewer.userId}
+            signedIn={viewer.signedIn}
+            debug={debug}
+          />
+        </Suspense>
+        <RecommendationTracker />
       </Container>
     </AppShell>
   );

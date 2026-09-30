@@ -192,14 +192,10 @@ export function ModelResult({
 
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
-          {/*
-            There is no model page yet, so the primary link runs the search for
-            the model's own name rather than pointing at a route that would 404.
-            A link that goes nowhere is defect F4 in the other direction: the
-            control looks real and fails when pressed.
-          */}
+          {/* The model's own page (4BK). It used to run a search for the name,
+              when there was no page to link to. */}
           <Link
-            href={`/search?q=${encodeURIComponent(m.name)}`}
+            href={`/models/${m.slug}`}
             className={`${PRIMARY} text-[16px]`}
           >
             {m.name}

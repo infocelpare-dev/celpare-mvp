@@ -45,6 +45,10 @@ import { formatScenario, formatWeights, parseScenario, parseWeights } from "@/li
 import { debugAllowed } from "@/lib/compare/intelligence/debug-gate";
 import { loadCompareData, runCompareOn } from "@/lib/compare/intelligence/server/engine";
 import { buildDebug } from "@/lib/compare/intelligence/server/debug";
+import { Suspense } from "react";
+import { MAX_ITEMS } from "@/lib/compare/types";
+import { RecommendationsSkeleton, ToolModelRecommendations } from "@/components/recommend/recommendations";
+import { RecommendationTracker } from "@/components/recommend/recommendation-tracker";
 
 export const metadata: Metadata = {
   title: "Compare",
@@ -403,6 +407,33 @@ export default async function ComparePage({
               )}
 
               {debug ? <CompareDebugPanel debug={debug} /> : null}
+
+              {/* 4BK: what else is worth adding. The engine suggests; nothing is
+                  ranked, no column moves, and adding one is the person's choice. */}
+              <Suspense fallback={<RecommendationsSkeleton title={`Other ${nouns} worth comparing`} />}>
+                <ToolModelRecommendations
+                  request={{
+                    surface: "compare",
+                    strategy: "contextual",
+                    entityTypes: [noun],
+                    seeds: items.map((i) => ({ type: i.type, id: i.id })),
+                    limit: 4,
+                    section: "worth-comparing",
+                    debug: Boolean(debug),
+                  }}
+                  viewerId={userId}
+                  signedIn={signedIn}
+                  title={`Other ${nouns} worth comparing`}
+                  blurb={`Close to the ${nouns} above. Suggestions, not a ranking.`}
+                  addToComparison={(e) =>
+                    refs.length >= MAX_ITEMS
+                      ? null
+                      : compareHref([...allRefs, { type: e.type, slug: e.slug }], goal, view, { w: wParam, scenario: scenarioParam })
+                  }
+                  debug={Boolean(debug)}
+                />
+              </Suspense>
+              <RecommendationTracker />
 
               <div data-compare-section="end">
                 <EndOfList

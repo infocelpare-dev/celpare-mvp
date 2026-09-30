@@ -18,7 +18,8 @@ import { runDeepResearch } from "./research";
 import { smallTalkReply } from "./small-talk";
 import { getProvider, models, providerName } from "./providers";
 import { checkIdentityLimits, countIdentityMessage, countIdentityTokens } from "./ratelimit";
-import { loadToolCards, searchTools, type ToolCard } from "./tool-search";
+import { loadToolCards, type ToolCard } from "./tool-search";
+import { askCandidates, recordAskImpressions, type AskCandidates } from "./recommend-candidates";
 import { evidenceIntent, evidenceSources, loadModelEvidence } from "./model-evidence";
 import { estimateTokens, recordUsage } from "./usage";
 import { recordAiCall } from "./observability";
@@ -423,9 +424,15 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
         }
         if (doWebSearch) searchCalls += 1;
 
+        /* The engine picks which catalogue tools the model sees (4BK); the
+           keyword search is one of its sources and the fallback. */
+        let candidates: AskCandidates | null = null;
         const [tools, searched, evidence] = await Promise.all([
           doToolSearch
-            ? searchTools(classification.topic)
+            ? askCandidates(cleaned.text, classification.topic, identity.userId).then((c) => {
+                candidates = c;
+                return c.citations;
+              })
             : Promise.resolve([] as ToolCitation[]),
           doWebSearch
             ? webSearch(classification.topic)
@@ -479,6 +486,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
         if (tools.length > 0) {
           const cards = await loadToolCards(tools.map((t) => t.slug));
           emit(controller, { t: "cards", citations: tools, cards });
+          if (candidates) void recordAskImpressions(candidates, identity.userId, cards.map((c) => c.slug));
         }
 
         /* The benchmark sources go in the same strip as web sources, so a
