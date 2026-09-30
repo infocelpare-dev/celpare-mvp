@@ -115,11 +115,16 @@ export async function identify(): Promise<Identity> {
     } = await supabase.auth.getUser();
 
     if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("plan, bio, interests, skills, ask_settings")
-        .eq("id", user.id)
-        .maybeSingle();
+      /* Own account fields come through my_profile_private(): plan and
+         ask_settings are not readable from the table by anybody (D194). */
+      const { data } = await supabase.rpc("my_profile_private");
+      const profile = data as {
+        plan: string | null;
+        bio: string | null;
+        interests: string[] | null;
+        skills: string[] | null;
+        ask_settings: unknown;
+      } | null;
 
       const plan = (profile?.plan ?? "free") as Plan;
       return {

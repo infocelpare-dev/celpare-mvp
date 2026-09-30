@@ -13,11 +13,11 @@ import { Field, FormAlert } from "@/components/ui/field";
 
 const initial: AuthState = { status: "idle", message: "" };
 
-function Submit() {
+function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending} className="mt-6 w-full">
-      {pending ? "Checking..." : "Confirm email"}
+      {pending ? "Checking..." : label}
       {!pending && <ArrowRight className="h-4 w-4" aria-hidden />}
     </Button>
   );
@@ -36,7 +36,14 @@ function ResendButton() {
   );
 }
 
-export function VerifyForm({ email }: { email: string }) {
+export function VerifyForm({
+  email,
+  mode = "signup",
+}: {
+  email: string;
+  /* "login" is step two of password then code (D188). */
+  mode?: "signup" | "login";
+}) {
   const [state, formAction] = useActionState(verifyCode, initial);
   const [resendState, resendAction] = useActionState(resendCode, initial);
   const codeId = useId();
@@ -52,6 +59,7 @@ export function VerifyForm({ email }: { email: string }) {
 
       <form action={formAction} noValidate>
         <input type="hidden" name="email" value={email} />
+        <input type="hidden" name="mode" value={mode} />
         <Field
           id={codeId}
           name="code"
@@ -68,13 +76,14 @@ export function VerifyForm({ email }: { email: string }) {
           className="[&_input]:text-center [&_input]:font-mono [&_input]:text-[20px] [&_input]:tracking-[0.4em]"
           invalid={state.field === "code"}
         />
-        <Submit />
+        <Submit label={mode === "login" ? "Log in" : "Confirm email"} />
       </form>
 
       <div className="mt-6 border-t border-border pt-5 text-center text-[14px] text-muted">
         <p>Did not get it? Check spam, then</p>
         <form action={resendAction} className="mt-1">
           <input type="hidden" name="email" value={email} />
+          <input type="hidden" name="mode" value={mode} />
           <ResendButton />
         </form>
       </div>

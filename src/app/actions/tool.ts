@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
+import { emailReport } from "@/lib/email/dispatch";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 /*
@@ -215,6 +217,18 @@ export async function reportTool(_prev: ToolState, formData: FormData): Promise<
     }
     return refused(error);
   }
+
+  /* A copy to reports@celpare.com (D191). Never the reporter's name. */
+  const reported = parsed.data;
+  after(() =>
+    emailReport({
+      entityType: "tool",
+      entityId: reported.toolId,
+      toolSlug: reported.slug,
+      reason: reported.reason,
+      note: (reported.note ?? "").trim() || null,
+    }),
+  );
 
   revalidatePath(`/tools/${parsed.data.slug}`);
   return { status: "success", message: "Reported. Celpare will look at it." };

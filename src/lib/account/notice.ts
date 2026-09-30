@@ -90,11 +90,8 @@ export async function getNotices(): Promise<Notice[]> {
   if (!user) return notices;
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("profiles")
-    .select("account_status, status_reason, suspended_until")
-    .eq("id", user.id)
-    .maybeSingle();
+  /* Your own status and its reason, which nobody else may read (D194). */
+  const { data } = await supabase.rpc("my_profile_private");
 
   if (data) {
     const notice = accountNotice(data as StatusRow);

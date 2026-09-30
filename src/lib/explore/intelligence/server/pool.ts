@@ -488,12 +488,24 @@ export async function loadExplorePool(req: PoolRequest): Promise<ExplorePool> {
         "people rows",
         own
           .from("profiles")
-          .select("id, username, full_name, avatar_url, bio, is_developer, follower_count, created_at, account_status")
+          .select("id, username, full_name, avatar_url, is_developer, follower_count, created_at, account_status")
           .in("id", missing.slice(0, 50))
           .eq("account_status", "active"),
       ),
     );
-    for (const r of extra.ok ? extra.value : []) if (r.username) people.set(String(r.id), personFromRow(r, "explore"));
+    const extraRows = extra.ok ? extra.value : [];
+    /* The bio is not readable from the table (D194): it comes from
+       profile_written_fields(), blank for a private account. */
+    const bios = new Map<string, string | null>();
+    if (extraRows.length) {
+      const { data: written } = await own.rpc("profile_written_fields", {
+        p_ids: extraRows.map((r) => String(r.id)),
+      });
+      for (const w of (written as { id: string; bio: string | null }[] | null) ?? []) bios.set(w.id, w.bio);
+    }
+    for (const r of extraRows) {
+      if (r.username) people.set(String(r.id), personFromRow({ ...r, bio: bios.get(String(r.id)) ?? null }, "explore"));
+    }
   }
   const following = mine && mine.ok ? new Set(mine.value.following) : new Set<string>();
   for (const [id, p] of people) {

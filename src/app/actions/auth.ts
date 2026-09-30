@@ -1,9 +1,30 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
+import { afterLogin } from "@/lib/auth/after-login";
+import { withinBurst } from "@/lib/security/burst";
+import { newPassword } from "@/lib/auth/password-rules";
+import {
+  LOGIN_PENDING_COOKIE,
+  LOGIN_PENDING_TTL_S,
+  SECOND_FACTOR_COOKIE,
+  SECOND_FACTOR_TTL_S,
+  readPendingLogin,
+  secondFactorEnabled,
+  sessionClaims,
+  signPendingLogin,
+  signSecondFactor,
+} from "@/lib/auth/second-factor";
+import {
+  MAX_WRONG_CODES,
+  countWrongCode,
+  resetWrongCodes,
+  wrongCodes,
+} from "@/lib/auth/code-attempts";
 import { isEnabled } from "@/lib/platform/settings";
 import { clientIp, recordSecurityEvent } from "@/lib/telemetry";
 
@@ -81,28 +102,8 @@ const signUpSchema = z.object({
     token against Cloudflare, so an attacker cannot forge one.
   */
   captchaToken: z.string(),
-  password: z
-    .string()
-    .min(10, "Use at least 10 characters.")
-    .max(72, "Passwords are limited to 72 characters.")
-    .regex(/[a-z]/, "Include a lowercase letter.")
-    .regex(/[A-Z]/, "Include an uppercase letter.")
-    .regex(/[0-9]/, "Include a number.")
-    .refine(
-      (v) => !COMMON_PASSWORDS.has(v.toLowerCase()),
-      "That password is too common. Pick something harder to guess.",
-    ),
+  password: newPassword,
 });
-
-/* A short deny list of the passwords that show up first in every credential
-   stuffing list. Not a substitute for length, but it stops the worst choices
-   at zero cost. */
-const COMMON_PASSWORDS = new Set([
-  "password", "password1", "password123", "passw0rd", "p@ssw0rd", "p@ssword1",
-  "qwerty123", "qwertyuiop", "welcome123", "admin123", "letmein123",
-  "iloveyou1", "abc123456", "123456789", "1234567890", "changeme1",
-  "football1", "monkey123", "dragon123", "sunshine1", "princess1",
-]);
 
 const signInSchema = z.object({
   email: z.string().trim().min(1, "Enter your email address.").email("That does not look like a valid email address."),
@@ -127,6 +128,55 @@ const verifySchema = z.object({
     .trim()
     .regex(/^\d{6}$/, "Enter the 6 digit code from your email."),
 });
+
+/*
+  The client that sends codes. The service role skips Supabase captcha (G36),
+  which matters because the person already passed Turnstile on the form that led
+  here and a token cannot be spent twice. It only ever sends a code to an
+  address that just proved its password, or to an unconfirmed signup. D188.
+*/
+async function codeSender() {
+  return hasServiceRole() ? createAdminClient() : await createClient();
+}
+
+function isRateLimited(message: string) {
+  return /rate limit|too many|security purposes/i.test(message);
+}
+
+/* "you can only request this after 80 seconds" to 80, so the person is told
+   how long to wait instead of being told they hit a limit. */
+function waitSeconds(message: string): number | null {
+  const m = /after (\d+) seconds?/i.exec(message);
+  return m ? Number(m[1]) : null;
+}
+
+function lockedMessage(login: boolean): string {
+  return login
+    ? "Too many wrong codes, so this one is locked. Log in again to get a new code."
+    : "Too many wrong codes, so this one is locked. Send a new code below.";
+}
+
+async function setAuthCookie(name: string, value: string, maxAge: number) {
+  (await cookies()).set(name, value, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge,
+  });
+}
+
+/* Marks the session the code step just created, so the middleware keeps it. */
+async function grantSecondFactor(accessToken: string | undefined) {
+  if (!secondFactorEnabled()) return;
+  const claims = sessionClaims(accessToken);
+  if (!claims) return;
+  await setAuthCookie(
+    SECOND_FACTOR_COOKIE,
+    await signSecondFactor(claims.userId, claims.sessionId),
+    SECOND_FACTOR_TTL_S,
+  );
+}
 
 function firstIssue(err: z.ZodError, fallback: string): AuthState {
   const issue = err.issues[0];
@@ -165,6 +215,14 @@ async function signUpImpl(formData: FormData): Promise<AuthState> {
   }
 
   const { fullName, email, password, captchaToken } = parsed.data;
+
+  /* Signup sends a code email: the same shared quota as every auth email (D194). */
+  if (!(await withinBurst("auth_email"))) {
+    return {
+      status: "error",
+      message: "Too many sign ups from this network. Wait a few minutes, then try again.",
+    };
+  }
 
   // Enforced only when Turnstile is actually configured, so a missing key is a
   // dev convenience and never a silent hole in production.
@@ -305,7 +363,17 @@ async function signInImpl(formData: FormData): Promise<AuthState> {
   });
 
   if (error) {
+    /* Nothing sends a code on this path by itself, so the person used to land on
+       /verify waiting for an email that never came. Send the signup code first. */
     if (/email not confirmed/i.test(error.message)) {
+      const { error: sendError } = await (await codeSender()).auth.resend({
+        type: "signup",
+        email,
+      });
+      if (sendError && !isRateLimited(sendError.message)) {
+        console.error("[auth] confirmation resend failed", sendError.message);
+      }
+      if (!sendError) await resetWrongCodes("signup", email);
       redirect(`/verify?email=${encodeURIComponent(email)}`);
     }
     /*
@@ -356,7 +424,35 @@ async function signInImpl(formData: FormData): Promise<AuthState> {
     };
   }
 
-  redirect("/app");
+  /* Without the secret there is nothing to sign the steps with, so local
+     development without Supabase secrets keeps the old one step login. */
+  if (!secondFactorEnabled()) redirect("/app");
+
+  /*
+    The password was right. That session is revoked on the auth server now, so
+    it is worth nothing even if it leaked, and the real one comes from the code.
+  */
+  await supabase.auth.signOut({ scope: "local" });
+
+  const { error: sendError } = await (await codeSender()).auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: false },
+  });
+  /* Rate limited means a code went out moments ago, which still works. */
+  if (sendError && !isRateLimited(sendError.message)) {
+    console.error("[auth] login code failed", sendError.message);
+    return {
+      status: "error",
+      message:
+        "Your password was right, but the login code could not be sent. Try again in a minute.",
+    };
+  }
+
+  if (!sendError) await resetWrongCodes("login", email);
+  await setAuthCookie(LOGIN_PENDING_COOKIE, await signPendingLogin(email), LOGIN_PENDING_TTL_S);
+  redirect(
+    `/verify?mode=login&email=${encodeURIComponent(email)}${sendError ? "&sent=recent" : ""}`,
+  );
 }
 
 export async function verifyCode(
@@ -371,22 +467,60 @@ export async function verifyCode(
   if (!isSupabaseConfigured()) return notConfigured;
 
   const { email, code } = parsed.data;
+  const login = formData.get("mode") === "login";
+
+  /* A code alone is not a login: the password step must have passed for this
+     address, in this browser, in the last 15 minutes. */
+  if (login && secondFactorEnabled()) {
+    const pending = await readPendingLogin((await cookies()).get(LOGIN_PENDING_COOKIE)?.value);
+    if (pending !== email.toLowerCase()) {
+      return {
+        status: "error",
+        field: "code",
+        message: "This login step has expired. Go back and enter your password again.",
+      };
+    }
+  }
+
+  /* Checked before Supabase is asked, so a locked code cannot be guessed at. */
+  const mode = login ? "login" : "signup";
+  if ((await wrongCodes(mode, email)) >= MAX_WRONG_CODES) {
+    if (login) (await cookies()).delete(LOGIN_PENDING_COOKIE);
+    return { status: "error", field: "code", message: lockedMessage(login) };
+  }
+
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.verifyOtp({
+  /*
+    The type is exact on purpose. "signup" only accepts a confirmation code, so a
+    login code requested straight from the API cannot finish a signup here and
+    skip the password. "magiclink" is the code the login step sends.
+  */
+  const { data, error } = await supabase.auth.verifyOtp({
     email,
     token: code,
-    type: "email",
+    type: login ? "magiclink" : "signup",
   });
 
   if (error) {
+    const wrong = await countWrongCode(mode, email);
+    if (wrong >= MAX_WRONG_CODES) {
+      if (login) (await cookies()).delete(LOGIN_PENDING_COOKIE);
+      return { status: "error", field: "code", message: lockedMessage(login) };
+    }
+    const left = MAX_WRONG_CODES - wrong;
     return {
       status: "error",
       field: "code",
-      message: "That code is wrong or has expired. Ask for a new one.",
+      message: `That code is not right, or it has expired. ${left} ${left === 1 ? "try" : "tries"} left.`,
     };
   }
 
+  await resetWrongCodes(mode, email);
+  await grantSecondFactor(data.session?.access_token);
+  /* Known browser check (New login email), and Welcome after a signup (D192). */
+  if (data.user) await afterLogin(data.user, { welcome: !login });
+  if (login) (await cookies()).delete(LOGIN_PENDING_COOKIE);
   redirect("/app");
 }
 
@@ -398,19 +532,53 @@ export async function resendCode(
   if (!email) return { status: "error", message: "Missing email address." };
   if (!isSupabaseConfigured()) return notConfigured;
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.resend({ type: "signup", email });
+  const login = formData.get("mode") === "login";
 
-  if (error) {
-    if (/rate limit|too many|security purposes/i.test(error.message)) {
+  /* This path sends with the service role, which skips Supabase captcha, and
+     the signup mode accepts any address: it must be limited here (D194). */
+  if (!(await withinBurst("auth_email"))) {
+    return {
+      status: "error",
+      message: "Too many codes were asked for from this network. Wait a few minutes, then try again.",
+    };
+  }
+  const sender = await codeSender();
+
+  let error: { message: string } | null = null;
+  if (login) {
+    /* Only for the address whose password just passed, or this would email a
+       login code to anyone on request. */
+    const pending = secondFactorEnabled()
+      ? await readPendingLogin((await cookies()).get(LOGIN_PENDING_COOKIE)?.value)
+      : email.toLowerCase();
+    if (pending !== email.toLowerCase()) {
       return {
         status: "error",
-        message:
-          "A code was just sent, or the hourly email limit was reached. Check spam, then try again later.",
+        message: "This login step has expired. Go back and enter your password again.",
+      };
+    }
+    ({ error } = await sender.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false },
+    }));
+  } else {
+    ({ error } = await sender.auth.resend({ type: "signup", email }));
+  }
+
+  if (error) {
+    if (isRateLimited(error.message)) {
+      const wait = waitSeconds(error.message);
+      return {
+        status: "error",
+        message: wait
+          ? `A code was sent a moment ago and still works. You can ask for another in ${wait} seconds.`
+          : "The hourly email limit was reached. Check spam for the last code, or try again later.",
       };
     }
     return { status: "error", message: "Could not send a new code." };
   }
+  /* A fresh code gets fresh tries. */
+  await resetWrongCodes(login ? "login" : "signup", email);
   return { status: "success", message: "New code sent. Check your inbox." };
 }
 

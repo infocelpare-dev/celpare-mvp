@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { afterLogin } from "@/lib/auth/after-login";
 
 /*
   Where to go after sign in. Only a path on this site is accepted.
@@ -37,11 +38,18 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
     console.error("[auth] code exchange failed", error.message);
     return NextResponse.redirect(`${origin}/login?error=google`);
+  }
+
+  /* Google has no signup step, so an account made in the last ten minutes is a
+     new one and gets Welcome; the send itself is once per account (D192). */
+  if (data.user) {
+    const created = Date.parse(data.user.created_at);
+    await afterLogin(data.user, { welcome: Date.now() - created < 10 * 60_000 });
   }
 
   return NextResponse.redirect(`${origin}${next}`);

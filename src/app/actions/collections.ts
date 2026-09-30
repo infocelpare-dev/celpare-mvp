@@ -116,7 +116,8 @@ export async function loadSaveTargets(
       p_entity_type: parsed.data.entityType,
       p_entity_id: parsed.data.entityId,
     }),
-    s.db.from("profiles").select("plan").eq("id", s.user.id).maybeSingle(),
+    /* Own plan: not readable from the table (D194). */
+    s.db.rpc("my_profile_private"),
   ]);
 
   if (collections.error) {

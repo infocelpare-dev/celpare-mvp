@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { z } from "zod";
+import { emailToolSubmitted } from "@/lib/email/dispatch";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { isEnabled } from "@/lib/platform/settings";
 import {
@@ -932,6 +934,13 @@ export async function sendForReview(
   revalidatePath("/developer/tools");
   revalidatePath("/developer/models");
   revalidatePath("/developer");
+
+  /* "We received your submission", from submission@ (D191). */
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  after(() => emailToolSubmitted(user?.email, kind, id));
+
   return { status: "success", message: "Sent for review." };
 }
 

@@ -16,6 +16,12 @@ import { createClient } from "@supabase/supabase-js";
   ones, and the alternative, an insert policy for authenticated users, would let
   anybody write whatever numbers they liked into their own billing record.
 
+  Second narrow use, D188: sending an email code from the auth actions, and only
+  to an address that just proved its password or is an unconfirmed signup. The
+  service role is what lets that call skip Supabase captcha, because the
+  person's Turnstile token was already spent on the step before. It reads
+  nothing and returns nothing to the browser.
+
   Never NEXT_PUBLIC_. The pre-commit scan fails a commit that makes it public,
   which is CLAUDE.md rule 4 enforced by a hook rather than by memory.
 */

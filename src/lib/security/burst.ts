@@ -24,7 +24,8 @@ export type BurstName =
   | "demo"
   | "dm_send"
   | "trending"
-  | "notifications";
+  | "notifications"
+  | "auth_email";
 
 const PER_MINUTE: Record<BurstName, number> = {
   /* A beacon carries up to 60 events; a busy tab sends a few a minute. */
@@ -40,6 +41,14 @@ const PER_MINUTE: Record<BurstName, number> = {
   trending: 60,
   /* The bell: on focus and once a minute per tab; a few tabs stay well under. */
   notifications: 30,
+  /* Anything that makes Supabase send an auth email (codes, reset and change
+     links). A person needs one or two. Also capped per hour below, because
+     the email quota is shared by every account (D194). */
+  auth_email: 4,
+};
+
+const PER_HOUR: Partial<Record<BurstName, number>> = {
+  auth_email: 12,
 };
 
 export async function withinBurst(name: BurstName): Promise<boolean> {
@@ -47,7 +56,11 @@ export async function withinBurst(name: BurstName): Promise<boolean> {
     const who = hashIp(await clientIp());
     const window = Math.floor(Date.now() / 60_000);
     const count = await bump(`burst:${name}:${who}:${window}`, 1, 90);
-    return count <= PER_MINUTE[name];
+    if (count > PER_MINUTE[name]) return false;
+    const hourly = PER_HOUR[name];
+    if (hourly === undefined) return true;
+    const hour = Math.floor(Date.now() / 3_600_000);
+    return (await bump(`burst:${name}:${who}:h${hour}`, 1, 3_700)) <= hourly;
   } catch (err) {
     console.error("[burst] check failed, allowing", err);
     return true;

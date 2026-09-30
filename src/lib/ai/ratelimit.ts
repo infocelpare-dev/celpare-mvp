@@ -104,6 +104,17 @@ export async function bump(key: string, by: number, ttlSeconds: number): Promise
   return next;
 }
 
+/* Drops a counter, for limits that restart on an event rather than a clock
+   (wrong login codes restart when a new code is sent, D189). */
+export async function clearCounter(key: string): Promise<void> {
+  const r = redis();
+  if (!r) {
+    memory.delete(key);
+    return;
+  }
+  await r.del(key);
+}
+
 export type LimitVerdict =
   | { allowed: true }
   | { allowed: false; message: string; resetsAt: string };

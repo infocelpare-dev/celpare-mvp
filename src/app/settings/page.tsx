@@ -21,6 +21,7 @@ import { NotificationForm } from "@/components/settings/notification-form";
 import type { NotificationPreferences } from "@/lib/notifications/shared";
 import { ClearRecent } from "@/components/profile/clear-recent";
 import { ThemeChoice } from "@/components/ui/theme-choice";
+import { AccountSecurity } from "@/components/settings/account-security";
 import type { PrivacyValues } from "@/app/actions/settings";
 import type { Plan } from "@/lib/ai/types";
 
@@ -84,13 +85,20 @@ export default async function SettingsPage() {
   // so send them to the gate rather than showing a form that cannot save.
   if (!user) redirect("/get-started");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(
-      "plan, ask_settings, is_developer, username, full_name, avatar_url, role, created_at, account_status, is_private, show_replies, show_follows, show_saved_tools, show_saved_models",
-    )
-    .eq("id", user.id)
-    .maybeSingle();
+  /* plan and ask_settings are not readable from the table (D194); they come
+     from my_profile_private(), which answers for the caller only. */
+  const [{ data: row }, { data: own }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(
+        "is_developer, username, full_name, avatar_url, role, created_at, account_status, is_private, show_replies, show_follows, show_saved_tools, show_saved_models",
+      )
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase.rpc("my_profile_private"),
+  ]);
+  const ownPrivate = own as { plan?: string | null; ask_settings?: unknown } | null;
+  const profile = row ? { ...row, plan: ownPrivate?.plan ?? null, ask_settings: ownPrivate?.ask_settings ?? null } : null;
 
   const plan = (profile?.plan ?? "free") as Plan;
   const limits = PLAN_LIMITS[plan];
@@ -159,10 +167,8 @@ export default async function SettingsPage() {
           2026-09-18: somebody who opens Settings and touches Profile should
           find their actual account details there, not a link away from them.
 
-          Everything in the facts list is read only. The email cannot be
-          changed here because changing an email means re-verifying it, which
-          is an auth flow that does not exist yet, and a field that looks
-          editable and is not is worse than no field.
+          Everything in the facts list is read only. Password and email are
+          changed in the section below it, by emailed link (D193).
         */}
         <section className="mt-12 border-t border-border pt-10">
           <h2 className="font-display text-[17px] font-semibold">Profile and account</h2>
@@ -210,6 +216,15 @@ export default async function SettingsPage() {
             your account is. The email is yours alone: it is never shown on your
             profile and is not readable by anybody else.
           </p>
+        </section>
+
+        {/* Password and email (D193): both change by an emailed link. */}
+        <section className="mt-12 border-t border-border pt-10">
+          <h2 className="font-display text-[17px] font-semibold">Password and email</h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-muted">
+            Changes to how you log in. Each one is confirmed by email first.
+          </p>
+          <AccountSecurity email={email} />
         </section>
 
         {/*

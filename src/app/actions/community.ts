@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { after } from "next/server";
+import { emailReport } from "@/lib/email/dispatch";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
@@ -618,6 +619,17 @@ export async function reportItem(
     console.error("[community] report failed", error.code, error.message);
     return { status: "error", message: "Could not send that report." };
   }
+
+  /* A copy to reports@celpare.com (D191). Never the reporter's name. */
+  const reported = parsed.data;
+  after(() =>
+    emailReport({
+      entityType: reported.entityType,
+      entityId: reported.entityId,
+      reason: reported.reason,
+      note: reported.note ? reported.note : null,
+    }),
+  );
 
   return {
     status: "success",

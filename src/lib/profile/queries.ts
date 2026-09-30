@@ -12,9 +12,50 @@ import { POST_SELECT, type FeedPost } from "@/lib/community/queries";
   must never reach a page: `email`, and anything from auth.users.
 */
 
-/* The public columns. This list is the whole public surface of a person. */
+/*
+  The public columns. What a person WROTE about themselves (bio, location,
+  website, interests, skills) is not here: those are not readable from the table
+  at all (D194), because a column grant cannot say "unless the account is
+  private". They come from profile_written_fields(), which blanks them for a
+  private account unless the reader is its owner. The plan is not public.
+*/
 const PUBLIC_COLUMNS =
-  "id, username, full_name, avatar_url, bio, location, website_url, interests, skills, is_developer, plan, created_at, follower_count, following_count, is_private, show_replies, show_follows, show_saved_tools, show_saved_models, developer_profiles(handle)";
+  "id, username, full_name, avatar_url, is_developer, created_at, follower_count, following_count, is_private, show_replies, show_follows, show_saved_tools, show_saved_models, developer_profiles(handle)";
+
+type WrittenFields = Pick<Profile, "bio" | "location" | "website_url" | "interests" | "skills">;
+
+const NOTHING_WRITTEN: WrittenFields = {
+  bio: null,
+  location: null,
+  website_url: null,
+  interests: [],
+  skills: [],
+};
+
+/* Adds the written fields to a profile row, or blanks them if the read fails:
+   an empty bio is a better failure than a leaked one. */
+async function withWrittenFields(
+  db: SupabaseClient,
+  row: Omit<Profile, keyof WrittenFields> | null,
+): Promise<Profile | null> {
+  if (!row) return null;
+  const { data, error } = await db.rpc("profile_written_fields", { p_ids: [row.id] });
+  if (error) console.error("[profile] written fields failed", error.code, error.message);
+  const w = (Array.isArray(data) ? data[0] : null) as (WrittenFields & { id: string }) | null;
+  return {
+    ...row,
+    ...NOTHING_WRITTEN,
+    ...(w
+      ? {
+          bio: w.bio,
+          location: w.location,
+          website_url: w.website_url,
+          interests: w.interests ?? [],
+          skills: w.skills ?? [],
+        }
+      : {}),
+  };
+}
 
 export type Profile = {
   id: string;
@@ -27,7 +68,6 @@ export type Profile = {
   interests: string[];
   skills: string[];
   is_developer: boolean;
-  plan: "free" | "pro" | "premium";
   created_at: string;
   follower_count: number;
   following_count: number;
@@ -149,7 +189,7 @@ export async function getProfileByUsername(
     console.error("[profile] lookup failed", error.code, error.message);
     return null;
   }
-  return (data as Profile | null) ?? null;
+  return withWrittenFields(db, data as Omit<Profile, keyof WrittenFields> | null);
 }
 
 export async function getProfileById(
@@ -166,7 +206,7 @@ export async function getProfileById(
     console.error("[profile] lookup failed", error.code, error.message);
     return null;
   }
-  return (data as Profile | null) ?? null;
+  return withWrittenFields(db, data as Omit<Profile, keyof WrittenFields> | null);
 }
 
 /* Does this person follow the viewer (4BA). Through my_follow_state, which

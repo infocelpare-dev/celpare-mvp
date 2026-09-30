@@ -1,5 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  RECOVERY_COOKIE,
+  SECOND_FACTOR_COOKIE,
+  hasRecovery,
+  hasSecondFactor,
+  needsSecondFactor,
+  secondFactorEnabled,
+  sessionClaims,
+} from "@/lib/auth/second-factor";
 
 /*
   Refreshes the auth session on every request and writes the rotated cookies
@@ -35,7 +44,40 @@ export async function middleware(request: NextRequest) {
 
   // Must be getUser, not getSession. getUser revalidates the token with the
   // auth server; getSession trusts whatever is in the cookie.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  /*
+    Password then code (D188). An email based session without the code step's
+    mark is signed out: a password only session minted straight from the public
+    API, or one from before the code step existed. getSession is safe to read
+    here because getUser just validated the same token. Google is exempt.
+  */
+  if (user && secondFactorEnabled()) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const claims = sessionClaims(session?.access_token);
+    /* A reset link's session may reach the new password form, nothing else (D193). */
+    const onResetForm =
+      claims !== null &&
+      request.nextUrl.pathname.startsWith("/reset-password") &&
+      (await hasRecovery(request.cookies.get(RECOVERY_COOKIE)?.value, claims.userId, claims.sessionId));
+    if (
+      claims &&
+      needsSecondFactor(claims.methods) &&
+      !onResetForm &&
+      !(await hasSecondFactor(
+        request.cookies.get(SECOND_FACTOR_COOKIE)?.value,
+        claims.userId,
+        claims.sessionId,
+      ))
+    ) {
+      await supabase.auth.signOut({ scope: "local" });
+      response.cookies.delete(SECOND_FACTOR_COOKIE);
+    }
+  }
 
   return response;
 }

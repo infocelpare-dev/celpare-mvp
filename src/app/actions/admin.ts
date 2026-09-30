@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
+import { emailDeveloperVerified, emailToolDecision } from "@/lib/email/dispatch";
 import { adminActionSession } from "@/lib/admin/guard";
 import type { Capability } from "@/lib/admin/capabilities";
 import type { AdminState } from "@/lib/admin/action-state";
@@ -384,13 +386,20 @@ export async function reviewSubmission(
     restore: "Restored.",
   };
 
-  return run(
+  const result = await run(
     "submissions.review",
     "admin_review_submission",
     { p_kind: kind, p_id: id, p_decision: decision, p_reason: parsed.data.reason ?? null },
     ["/admin/submissions", `/admin/${kind}s`, `/admin/${kind}s/${id}`, "/admin"],
     said[decision] ?? "Done.",
   );
+  /* The developer hears the decision, with the reason, from submission@ (D191).
+     Only after the RPC succeeded, so a refused decision never emails anyone. */
+  if (result.status === "success") {
+    const why = parsed.data.reason ?? null;
+    after(() => emailToolDecision(kind, id, decision, why));
+  }
+  return result;
 }
 
 export async function setToolVerified(
@@ -479,7 +488,7 @@ export async function setDeveloperVerified(
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the form." };
   }
 
-  return run(
+  const result = await run(
     "developers.manage",
     "admin_set_developer_verified",
     {
@@ -490,6 +499,11 @@ export async function setDeveloperVerified(
     ["/admin/developers", `/admin/developers/${parsed.data.id}`],
     parsed.data.verified === "yes" ? "Developer verified." : "Verification removed.",
   );
+  if (result.status === "success" && parsed.data.verified === "yes") {
+    const developerId = parsed.data.id;
+    after(() => emailDeveloperVerified(developerId));
+  }
+  return result;
 }
 
 /* -------------------------------------------------------------- settings */

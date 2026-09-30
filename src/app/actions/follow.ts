@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
+import { emailNewFollower } from "@/lib/email/dispatch";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export type FollowState = {
@@ -84,6 +86,12 @@ export async function toggleFollow(
     if (error && error.code !== "23505") {
       console.error("[follow] insert failed", error.code, error.message);
       return { status: "error", following: false, message: "Could not follow." };
+    }
+    /* A new follow only: a repeat (23505) is not news. D191. */
+    if (!error) {
+      const followerId = user.id;
+      const targetId = parsed.data.targetId;
+      after(() => emailNewFollower(followerId, targetId));
     }
   } else {
     const { error } = await supabase

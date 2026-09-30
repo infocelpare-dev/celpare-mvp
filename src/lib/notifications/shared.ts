@@ -55,6 +55,13 @@ export const NOTIFICATION_PREFERENCES = [
     on: "You hear when a post picks up or passes a number of views. At most three per post.",
     off: "Post performance is not notified. Insights on each post still show it.",
   },
+  /* An email, not the bell (D191). Default on, at most five a day. */
+  {
+    key: "email_follows",
+    label: "Email me about new followers",
+    on: "An email when somebody follows you. At most one per person a day, five a day in all.",
+    off: "No follower emails. The bell still shows them if New followers is on.",
+  },
 ] as const;
 
 export type NotificationPreferenceKey = (typeof NOTIFICATION_PREFERENCES)[number]["key"];
