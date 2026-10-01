@@ -38,6 +38,13 @@
   --accent: var(--celpare-lime);
   --on-accent: var(--celpare-ink);
   --ring: var(--celpare-ink);
+  /* Analytics charts (2026-10-01). One measure per chart, so no categorical
+     palette: the line is ink on light and lime on dark, both over 3:1 against
+     the surface (dataviz validator), with a lime wash under it. The previous
+     period is muted AND dashed, so it never relies on colour alone. */
+  --chart-line: #0c0c0c;
+  --chart-area: color-mix(in oklab, var(--celpare-lime) 42%, transparent);
+  --chart-prev: #8a8985;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -54,6 +61,9 @@
     --accent: var(--celpare-lime);
     --on-accent: var(--celpare-ink);
     --ring: var(--celpare-lime);
+    --chart-line: var(--celpare-lime);
+    --chart-area: color-mix(in oklab, var(--celpare-lime) 14%, transparent);
+    --chart-prev: #6f6e6b;
   }
 }
 
@@ -70,6 +80,9 @@
   --accent: var(--celpare-lime);
   --on-accent: var(--celpare-ink);
   --ring: var(--celpare-lime);
+  --chart-line: var(--celpare-lime);
+  --chart-area: color-mix(in oklab, var(--celpare-lime) 14%, transparent);
+  --chart-prev: #6f6e6b;
 }
 
 @theme inline {

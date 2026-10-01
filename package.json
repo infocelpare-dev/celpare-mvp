@@ -11,7 +11,8 @@
     "scan:history": "node scripts/security-scan.mjs --history",
     "test:email": "node --import ./scripts/test-loader.mjs --test \"src/lib/email/__tests__/*.test.ts\"",
     "test:auth": "node --import ./scripts/test-loader.mjs --test \"src/lib/auth/__tests__/*.test.ts\"",
-    "test:algorithms": "node --import ./scripts/test-loader.mjs --test \"src/lib/community/intelligence/__tests__/*.test.ts\" \"src/lib/explore/intelligence/__tests__/*.test.ts\" \"src/lib/compare/intelligence/__tests__/*.test.ts\" \"src/lib/recommend/__tests__/*.test.ts\""
+    "test:algorithms": "node --import ./scripts/test-loader.mjs --test \"src/lib/community/intelligence/__tests__/*.test.ts\" \"src/lib/explore/intelligence/__tests__/*.test.ts\" \"src/lib/compare/intelligence/__tests__/*.test.ts\" \"src/lib/recommend/__tests__/*.test.ts\"",
+    "test:analytics": "node --import ./scripts/test-loader.mjs --test \"src/lib/analytics/__tests__/*.test.ts\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

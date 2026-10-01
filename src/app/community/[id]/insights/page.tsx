@@ -5,7 +5,11 @@ import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { Container } from "@/components/ui/container";
 import { BackLink } from "@/components/ui/back-link";
-import { ShareBar, TimeSeries, type SeriesPoint } from "@/components/ui/charts";
+import { KpiCard, KpiGrid } from "@/components/analytics/kpi";
+import { TrendChart } from "@/components/analytics/trend-chart";
+import { Benchmark, Breakdown, Funnel, InsightList, Panel } from "@/components/analytics/breakdown";
+import { concentrationInsight, rank, rateInsight, type Insight } from "@/lib/analytics/insights";
+import { delta, percent, resampleCumulative } from "@/lib/analytics/series";
 import { relativeTime } from "@/lib/format";
 import { createClient, getCurrentUser, isSupabaseConfigured } from "@/lib/supabase/server";
 import { RULE_WORDS, STAGE_WORDS, type Stage } from "@/lib/community/intelligence/lifecycle";
@@ -18,7 +22,10 @@ export const metadata: Metadata = {
 };
 
 /*
-  How a post travelled, for its author only (D148).
+  How a post travelled, for its author only (D148). Rebuilt as an analytics
+  board on 2026-10-01 (founder: insight like Google Analytics, not only
+  characters and numbers): headline numbers, written insights, a reach chart,
+  breakdowns, a benchmark against the author's usual and a watch funnel.
 
   my_post_insights() answers only for the post's author and returns null for
   anybody else, and this page turns that null into a 404 rather than a refusal,
@@ -80,23 +87,22 @@ const SOURCE_LABELS: Record<string, string> = {
   other: "Topics and links",
 };
 
-function dailyNewViewers(history: Insights["history"]): SeriesPoint[] {
-  const byDay = new Map<string, number>();
-  for (const h of history) {
-    const day = h.at.slice(0, 10);
-    byDay.set(day, Math.max(byDay.get(day) ?? 0, h.viewers));
-  }
-  const days = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
-  let before = 0;
-  return days.map(([day, cumulative]) => {
-    const value = Math.max(0, cumulative - before);
-    before = Math.max(before, cumulative);
-    return { day, value };
-  });
-}
-
-function pct(n: number): string {
-  return `${(n * 100).toFixed(n < 0.1 ? 1 : 0)}%`;
+/*
+  Reach as it grew: the stored snapshots of the cumulative viewer count, read
+  off hourly for a post under three days old and daily after that, so the x
+  axis is even time. Cumulative never falls, so a dip in the snapshots (a
+  viewer row removed) is held level rather than drawn as people un-seeing it.
+*/
+const HOUR = 3_600_000;
+function reach(createdAt: string, history: Insights["history"]) {
+  const ageHours = (Date.now() - new Date(createdAt).getTime()) / HOUR;
+  const hourly = ageHours < 72;
+  const points = resampleCumulative(
+    createdAt,
+    history.map((h) => ({ at: h.at, value: h.viewers })),
+    hourly ? HOUR : 24 * HOUR,
+  );
+  return { points, hourly };
 }
 
 export default async function PostInsightsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -117,162 +123,213 @@ export default async function PostInsightsPage({ params }: { params: Promise<{ i
   const viewers = t?.viewers ?? 0;
   const isVideo = insights.kind === "video";
   const usual = insights.baseline && insights.baseline.posts_used >= MIN_POSTS_FOR_USUAL ? insights.baseline : null;
-  const series = dailyNewViewers(insights.history);
+  const canRate = viewers >= MIN_VIEWERS_FOR_RATES;
+
+  const interactions = t ? t.likes + t.comments + t.reposts + t.saves + t.shares : 0;
+  const engagementPerView = t && viewers > 0 ? t.units / viewers : 0;
+
+  const { points, hourly } = reach(insights.created_at, insights.history);
+
   const sources = Object.entries(insights.sources ?? {})
     .filter(([, v]) => v > 0)
     .map(([k, v]) => ({ label: SOURCE_LABELS[k] ?? k, value: v }));
 
-  const compare =
-    t && usual && viewers >= MIN_VIEWERS_FOR_RATES
+  const interactionRows = t
+    ? [
+        { label: "Likes", value: t.likes },
+        { label: "Comments", value: t.comments },
+        { label: "Reposts", value: t.reposts },
+        { label: "Saves", value: t.saves },
+        { label: "Shares", value: t.shares },
+        { label: "Profile visits", value: t.profile_visits },
+        { label: "Link clicks", value: t.link_clicks },
+        { label: "Follows", value: t.follows },
+      ]
+    : [];
+
+  const benchmark =
+    t && usual && canRate
       ? [
-          { label: "Engagement per view", mine: t.units / viewers, theirs: usual.engagement_rate, unit: "units" },
-          { label: "Comments per view", mine: t.comments / viewers, theirs: usual.comment_rate, unit: "rate" },
-          { label: "Saves per view", mine: t.saves / viewers, theirs: usual.save_rate, unit: "rate" },
-          { label: "Shares per view", mine: t.shares / viewers, theirs: usual.share_rate, unit: "rate" },
-        ].filter((r) => r.theirs !== null)
+          { label: "Engagement per view", mine: engagementPerView, usual: usual.engagement_rate, format: (n: number) => n.toFixed(2) },
+          { label: "Comments per view", mine: t.comments / viewers, usual: usual.comment_rate },
+          { label: "Saves per view", mine: t.saves / viewers, usual: usual.save_rate },
+          { label: "Shares per view", mine: t.shares / viewers, usual: usual.share_rate },
+        ].flatMap((r) => (r.usual !== null ? [{ ...r, usual: r.usual }] : []))
       : [];
+
+  const found: Insight[] = [];
+  if (t && usual?.engagement_rate && canRate) {
+    const ratio = engagementPerView / usual.engagement_rate;
+    if (ratio >= 1.25 || ratio <= 0.8) {
+      found.push({
+        kind: ratio >= 1 ? "up" : "down",
+        title: ratio >= 1 ? `Engagement is ${ratio.toFixed(1)} times your usual` : "Engagement is below your usual",
+        detail: `Per view, against the average of your last ${usual.posts_used} settled posts.`,
+        weight: 95,
+      });
+    }
+  }
+  if (t) {
+    found.push(
+      ...rateInsight({
+        numerator: t.saves,
+        denominator: viewers,
+        sentence: (r) => `${r} of viewers saved it`,
+        before: usual?.save_rate,
+        beforeLabel: "your usual",
+      }).filter(() => t.saves > 0),
+      ...rateInsight({
+        numerator: t.follows,
+        denominator: viewers,
+        sentence: (r) => `${r} of viewers followed you from it`,
+        beforeLabel: "",
+      }).filter(() => t.follows > 0),
+    );
+    if (isVideo && t.video_starts >= MIN_VIEWERS_FOR_RATES) {
+      found.push({
+        kind: "rate",
+        title: `${percent(t.completions / t.video_starts)} of plays were watched to the end`,
+        detail: t.watch_avg !== null ? `On average people watched ${Math.round(t.watch_avg)}% of it.` : undefined,
+        weight: 85,
+      });
+    }
+  }
+  found.push(...concentrationInsight({ rows: sources, noun: "views", verb: "brought" }));
+  if (insights.state && insights.state.wave > 1) {
+    found.push({
+      kind: "first",
+      title: `Shown to wave ${insights.state.wave} of readers`,
+      detail: "It did well enough with earlier audiences to be shown to a wider one.",
+      weight: 65,
+    });
+  }
+  const ranked = rank(found);
 
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />} signedIn>
-      <Container className="max-w-[640px] py-5 sm:py-8">
+      <Container className="max-w-[960px] py-5 sm:py-8">
         <BackLink href={`/community/${id}`} label="Back to the post" className="mb-5" />
 
-        <h1 className="text-[24px] font-medium tracking-tight">Post insights</h1>
-        <p className="mt-1 text-[14px] text-muted">
-          Posted {relativeTime(insights.created_at)}. Only you can see this page.
-        </p>
-
-        <section aria-labelledby="stage" className="mt-6 rounded-2xl border border-border p-4">
-          <h2 id="stage" className="text-[13px] text-muted">
-            Where it is now
-          </h2>
-          <p className="mt-1 flex items-center gap-2 text-[16px] font-medium">
-            <span aria-hidden className="size-2 shrink-0 rounded-full bg-accent" />
-            {insights.state ? STAGE_WORDS[insights.state.stage] : "Getting ready"}
-          </p>
-          {insights.state ? (
-            <p className="mt-1 text-[13px] text-muted">
-              Since {relativeTime(insights.state.stage_since)}. Updated {relativeTime(insights.state.computed_at)}.
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-[24px] font-medium tracking-tight">Post insights</h1>
+            <p className="mt-1 text-[14px] text-muted">
+              Posted {relativeTime(insights.created_at)}. Only you can see this page.
             </p>
-          ) : null}
-        </section>
+          </div>
+          <p className="inline-flex items-center gap-2 rounded-full border border-border bg-elevated px-3 py-1.5 text-[13px]">
+            <span aria-hidden className="size-2 shrink-0 rounded-full bg-accent" />
+            <span className="font-medium">{insights.state ? STAGE_WORDS[insights.state.stage] : "Getting ready"}</span>
+            {insights.state ? <span className="text-muted">since {relativeTime(insights.state.stage_since)}</span> : null}
+          </p>
+        </div>
 
-        <section aria-labelledby="numbers" className="mt-6">
-          <h2 id="numbers" className="text-[15px] font-medium">
-            So far
-          </h2>
-          <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {[
-              ["Views", viewers],
-              ["Likes", t?.likes ?? 0],
-              ["Comments", t?.comments ?? 0],
-              ["Reposts", t?.reposts ?? 0],
-              ["Saves", t?.saves ?? 0],
-              ["Shares", t?.shares ?? 0],
-              ["Follows from this post", t?.follows ?? 0],
-              ["Profile visits", t?.profile_visits ?? 0],
-              ["Link clicks", t?.link_clicks ?? 0],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-xl border border-border px-3 py-2.5">
-                <dt className="text-[12px] text-muted">{label}</dt>
-                <dd className="tnum mt-0.5 text-[18px] font-medium">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
+        <KpiGrid className="mt-6">
+          <KpiCard label="Views" value={viewers.toLocaleString("en-GB")} caption="People who saw it" />
+          <KpiCard
+            label="Engagement rate"
+            value={viewers > 0 ? percent(interactions / viewers) : "None yet"}
+            delta={usual?.engagement_rate && canRate ? delta(engagementPerView, usual.engagement_rate) : undefined}
+            against="your usual"
+            caption={usual && canRate ? "Interactions per view, change against your usual" : "Interactions per view"}
+          />
+          <KpiCard label="Interactions" value={interactions.toLocaleString("en-GB")} caption="Likes, comments, reposts, saves, shares" />
+          <KpiCard
+            label="Follows from it"
+            value={(t?.follows ?? 0).toLocaleString("en-GB")}
+            caption={`${(t?.profile_visits ?? 0).toLocaleString("en-GB")} profile visits`}
+          />
+        </KpiGrid>
 
-        {isVideo ? (
-          <section aria-labelledby="watching" className="mt-6">
-            <h2 id="watching" className="text-[15px] font-medium">
-              Watching
-            </h2>
-            {t && t.video_starts > 0 ? (
-              <p className="mt-2 text-[14px]">
-                {t.video_starts} {t.video_starts === 1 ? "person" : "people"} started it,{" "}
-                {pct(t.completions / t.video_starts)} finished it
-                {t.watch_avg !== null ? `, and on average people watched ${Math.round(t.watch_avg)}%` : ""}.
-                {t.rewatches > 0 ? ` ${t.rewatches} watched it again.` : ""}
-              </p>
-            ) : (
-              <p className="mt-2 text-[14px] text-muted">Nobody has played it yet.</p>
-            )}
-          </section>
-        ) : null}
+        <InsightList className="mt-5" insights={ranked} />
 
-        <section aria-labelledby="over-time" className="mt-6">
-          <h2 id="over-time" className="sr-only">
-            New viewers by day
-          </h2>
-          {series.length > 0 ? (
-            <TimeSeries points={series} label="New viewers by day" windowDays={7} />
+        <Panel className="mt-5" title="Reach over time" lead="Everyone who has seen it, counted as it grew.">
+          {points.length > 1 ? (
+            <TrendChart current={points} noun="viewers" xFormat={hourly ? "time" : "day"} height={220} />
           ) : (
-            <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted">
+            <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-[13px] text-muted">
               The first numbers appear within a few minutes of posting.
             </p>
           )}
-        </section>
+        </Panel>
 
-        <section aria-labelledby="usual" className="mt-6">
-          <h2 id="usual" className="text-[15px] font-medium">
-            Compared with your usual
-          </h2>
-          {compare.length > 0 ? (
-            <ul className="mt-3 divide-y divide-border rounded-xl border border-border">
-              {compare.map((r) => {
-                const better = r.theirs !== null && r.mine > r.theirs * 1.1;
-                const worse = r.theirs !== null && r.mine < r.theirs * 0.9;
-                return (
-                  <li key={r.label} className="flex flex-wrap items-baseline justify-between gap-x-4 px-3 py-2.5 text-[14px]">
-                    <span>{r.label}</span>
-                    <span className="tnum text-muted">
-                      {r.unit === "rate" ? pct(r.mine) : r.mine.toFixed(2)} this post, {r.unit === "rate" ? pct(r.theirs ?? 0) : (r.theirs ?? 0).toFixed(2)} usually
-                      <span className="ms-2 text-foreground">{better ? "higher" : worse ? "lower" : "about the same"}</span>
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="mt-2 text-[14px] text-muted">
-              {viewers < MIN_VIEWERS_FOR_RATES
-                ? "Too few people have seen this post to compare it yet."
-                : "Your usual appears once you have a few posts that are a day old or more."}
-            </p>
-          )}
-        </section>
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+          <Panel title="What people did" lead="Every interaction with this post.">
+            <Breakdown dimension="Interaction" measure="Count" rows={interactionRows} empty="No interactions yet." />
+          </Panel>
+          <Panel title="Where views came from" lead="The surface each viewer found it on.">
+            <Breakdown dimension="Source" measure="Views" rows={sources} empty="No views recorded yet." />
+          </Panel>
+        </div>
 
-        <section aria-labelledby="journey" className="mt-6">
-          <h2 id="journey" className="text-[15px] font-medium">
-            What happened
-          </h2>
-          {insights.events.length > 0 ? (
-            <ol className="mt-3 space-y-3 border-s border-border ps-4">
-              {insights.events.map((e, i) => (
-                <li key={`${e.at}-${i}`} className="text-[14px]">
-                  <p className="font-medium">{STAGE_WORDS[e.to] ?? e.to}</p>
-                  <p className="text-[13px] text-muted">
-                    {e.rule && RULE_WORDS[e.rule] ? `${RULE_WORDS[e.rule]}. ` : ""}
-                    {relativeTime(e.at)}
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+          <Panel title="Compared with your usual" lead="This post per view. The tick is your usual.">
+            {benchmark.length > 0 ? (
+              <Benchmark rows={benchmark} />
+            ) : (
+              <p className="text-[13px] text-muted">
+                {!canRate
+                  ? "Too few people have seen this post to compare it yet."
+                  : "Your usual appears once you have a few posts that are a day old or more."}
+              </p>
+            )}
+          </Panel>
+
+          {isVideo ? (
+            <Panel title="Watching" lead="From seeing it to finishing it.">
+              {t && t.video_starts > 0 ? (
+                <>
+                  <Funnel
+                    steps={[
+                      { label: "Saw it", value: viewers },
+                      { label: "Played it", value: t.video_starts },
+                      { label: "Finished it", value: t.completions },
+                    ]}
+                  />
+                  <p className="mt-3 text-[12px] text-muted">
+                    {t.watch_avg !== null ? `Average watched: ${Math.round(t.watch_avg)}%. ` : ""}
+                    {t.rewatches > 0 ? `${t.rewatches} watched it again.` : ""}
                   </p>
-                </li>
-              ))}
-            </ol>
+                </>
+              ) : (
+                <p className="text-[13px] text-muted">Nobody has played it yet.</p>
+              )}
+            </Panel>
           ) : (
-            <p className="mt-2 text-[14px] text-muted">Nothing yet.</p>
+            <Panel title="What happened" lead="Each step it took through distribution.">
+              <Journey events={insights.events} />
+            </Panel>
           )}
-        </section>
+        </div>
 
-        <section aria-labelledby="sources" className="mt-6 mb-4">
-          <h2 id="sources" className="text-[15px] font-medium">
-            Where views came from
-          </h2>
-          {sources.length > 0 ? (
-            <ShareBar parts={sources} className="mt-3" />
-          ) : (
-            <p className="mt-2 text-[14px] text-muted">No views recorded yet.</p>
-          )}
-        </section>
+        {isVideo ? (
+          <Panel className="mt-5" title="What happened" lead="Each step it took through distribution.">
+            <Journey events={insights.events} />
+          </Panel>
+        ) : null}
       </Container>
     </AppShell>
+  );
+}
+
+function Journey({ events }: { events: Insights["events"] }) {
+  if (events.length === 0) return <p className="text-[13px] text-muted">Nothing yet.</p>;
+  return (
+    <ol className="relative space-y-4 ps-5 before:absolute before:inset-y-1 before:start-[5px] before:w-px before:bg-border">
+      {events.map((e, i) => (
+        <li key={`${e.at}-${i}`} className="relative text-[14px]">
+          <span
+            aria-hidden
+            className="absolute -start-5 top-1.5 size-[11px] rounded-full border-2 border-elevated bg-[var(--chart-line)]"
+          />
+          <p className="font-medium">{STAGE_WORDS[e.to] ?? e.to}</p>
+          <p className="text-[13px] text-muted">
+            {e.rule && RULE_WORDS[e.rule] ? `${RULE_WORDS[e.rule]}. ` : ""}
+            {relativeTime(e.at)}
+            {e.viewers != null ? `, at ${e.viewers.toLocaleString("en-GB")} viewers` : ""}
+          </p>
+        </li>
+      ))}
+    </ol>
   );
 }

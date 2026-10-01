@@ -415,3 +415,21 @@ export async function getToolAnalytics(
      error. An empty board is the honest render for that. */
   return (data as ToolAnalytics | null) ?? { ...EMPTY_ANALYTICS, days };
 }
+
+/*
+  Daily views over twice a window, for the chart that draws this period against
+  the one before it (2026-10-01). Same function, read only for by_day: the
+  function clamps at 90 days, and 30 doubled is inside that. Null on failure,
+  which costs the comparison line and nothing else.
+*/
+export async function getToolViewsByDay(
+  db: SupabaseClient,
+  days: number,
+): Promise<{ day: string; value: number }[] | null> {
+  const { data, error } = await db.rpc("developer_tool_analytics", { p_days: Math.min(90, days) });
+  if (error) {
+    console.error("[developer] views by day failed", error.code, error.message);
+    return null;
+  }
+  return (data as ToolAnalytics | null)?.by_day ?? null;
+}

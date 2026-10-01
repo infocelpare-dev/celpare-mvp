@@ -15,7 +15,8 @@ import { cn } from "@/lib/utils";
 
   There is no third form and no library. Every series here is a single measure,
   or a measure with a failure share, so a categorical palette never arises: the
-  bars are the lime accent the brand already has, and the only second colour is
+  bars are --chart-line (ink on light, lime on dark: lime on white was 1.2:1,
+  under the 3:1 a mark needs, fixed 2026-10-01), and the only second colour is
   the reserved danger red used for exactly what it means, something failing.
   That sidesteps the usual chart colour problem rather than solving it.
 
@@ -169,7 +170,7 @@ export function TimeSeries({
                     <span className="block h-px w-full bg-border" />
                   ) : (
                     <span
-                      className="flex w-full flex-col justify-end overflow-hidden rounded-[2px] bg-accent"
+                      className="flex w-full flex-col justify-end overflow-hidden rounded-[2px] bg-[var(--chart-line)]"
                       style={{ height: `${Math.max(height, 2)}%` }}
                     >
                       {failedShare > 0 ? (
@@ -197,7 +198,7 @@ export function TimeSeries({
       {anyFailed ? (
         <div className="mt-3 flex flex-wrap items-center gap-4 text-[12px] text-muted">
           <span className="inline-flex items-center gap-1.5">
-            <span className="size-2.5 rounded-[2px] bg-accent" aria-hidden />
+            <span className="size-2.5 rounded-[2px] bg-[var(--chart-line)]" aria-hidden />
             {label}
           </span>
           <span className="inline-flex items-center gap-1.5">
@@ -281,7 +282,7 @@ export function RankedBars({
                 <div
                   className={cn(
                     "h-full rounded-full",
-                    row.tone === "danger" ? "bg-danger" : "bg-accent",
+                    row.tone === "danger" ? "bg-danger" : "bg-[var(--chart-line)]",
                   )}
                   style={{ width: `${Math.max(width, 1.5)}%` }}
                 />
@@ -317,10 +318,10 @@ export function ShareBar({
     );
   }
 
-  /* Opacity steps of one accent rather than several hues. The parts are ordered
+  /* Opacity steps of one chart colour rather than several hues. The parts are ordered
      and related, so a single hue light to dark is the right encoding, and it
      keeps the palette at one colour. */
-  const shades = ["bg-accent", "bg-accent/70", "bg-accent/45", "bg-accent/25"];
+  const shades = ["bg-[var(--chart-line)]", "bg-[var(--chart-line)]/70", "bg-[var(--chart-line)]/45", "bg-[var(--chart-line)]/25"];
 
   return (
     <div className={cn("rounded-xl border border-border p-4", className)}>
