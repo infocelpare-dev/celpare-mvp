@@ -8,6 +8,7 @@ import { SaveToCollection } from "@/components/collections/save-to-collection";
 import { formatCount } from "@/lib/format";
 import { toggleLike, toggleRepost } from "@/app/actions/community";
 import { ReportForm } from "./post-controls";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   The action row under a post: like, comment, save.
@@ -362,8 +363,9 @@ function ActionButton({
 }
 
 /*
-  The signed out version. A link rather than a disabled button, because the
-  answer to "you need an account" is a way to get one, not a dead control.
+  The signed out version. It opens the sign in prompt rather than being a
+  disabled button, because the answer to "you need an account" is a way to get
+  one, not a dead control.
 */
 function SignInAction({
   label,
@@ -377,15 +379,14 @@ function SignInAction({
   children: React.ReactNode;
 }) {
   return (
-    <Link
-      href="/get-started"
+    <SignInButton
       className="inline-flex h-11 min-w-8 shrink-0 sm:min-w-11 items-center justify-center gap-1 sm:gap-1.5 rounded-full px-1 sm:px-3 text-[13px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
     >
       {children}
       <span className="sr-only">{label}, sign in first</span>
       {count > 0 ? <span className="tabular-nums">{formatCount(count)}</span> : null}
       <span className="sr-only">{tone === "like" ? "likes" : tone === "repost" ? "reposts" : "saves"}</span>
-    </Link>
+    </SignInButton>
   );
 }
 

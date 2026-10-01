@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { reviewTool, deleteReview, type ToolState } from "@/app/actions/tool";
 import type { ToolReview } from "@/lib/tools/queries";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   Ratings and reviews.
@@ -165,9 +166,9 @@ export function ReviewComposer({
     return (
       <div className="rounded-2xl border border-border p-5">
         <p className="text-[14px] leading-relaxed text-muted">
-          <a href="/get-started" className="underline underline-offset-2">
+          <SignInButton className="underline underline-offset-2">
             Sign in
-          </a>{" "}
+          </SignInButton>{" "}
           to rate this tool. One rating per person, and you can change yours
           later.
         </p>

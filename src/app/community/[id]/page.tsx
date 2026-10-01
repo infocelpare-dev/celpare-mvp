@@ -5,7 +5,8 @@ import { ChartNoAxesColumn, Link2 } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
-import { ButtonLink } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Container } from "@/components/ui/container";
 import { BackLink } from "@/components/ui/back-link";
 import { Avatar } from "@/components/ui/avatar";
@@ -30,6 +31,7 @@ import {
 import { CommentForm } from "@/components/community/comment-form";
 import { CommentThread } from "@/components/community/comment-thread";
 import { buildThread } from "@/lib/community/thread";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 export const dynamic = "force-dynamic";
 
@@ -251,9 +253,9 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
                   Reading needs no account. Commenting does, so a comment has an
                   author.
                 </p>
-                <ButtonLink href="/get-started" size="sm" className="mt-3">
+                <SignInButton className={cn(buttonVariants({ size: "sm" }), "mt-3")}>
                   Create an account
-                </ButtonLink>
+                </SignInButton>
               </div>
             )}
           </div>

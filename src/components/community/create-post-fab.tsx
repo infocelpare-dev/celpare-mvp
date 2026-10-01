@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   The one floating action: write a post.
@@ -23,20 +24,31 @@ import { Plus } from "lucide-react";
   Ink on lime is 14.52:1. White on lime is 1.17:1 and is never used (D2).
 */
 export function CreatePostFab({ signedIn }: { signedIn: boolean }) {
-  const href = signedIn ? "/community/new" : "/get-started";
   const label = signedIn ? "Create post" : "Sign in to post";
-
-  return (
-    <Link
-      href={href}
-      title={label}
-      className="fixed end-4 z-30 inline-flex size-14 items-center justify-center rounded-full bg-primary text-on-primary transition-colors duration-200 ease-out hover:bg-primary-hover sm:end-6"
-      style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
-    >
+  const className =
+    "fixed end-4 z-30 inline-flex size-14 items-center justify-center rounded-full bg-primary text-on-primary transition-colors duration-200 ease-out hover:bg-primary-hover sm:end-6";
+  const style = { bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" };
+  const content = (
+    <>
       <Plus className="size-6" aria-hidden strokeWidth={2.25} />
       {/* Real text in the DOM rather than aria-label, so it survives
           translation and reads the same to every assistive technology. */}
       <span className="sr-only">{label}</span>
+    </>
+  );
+
+  /* Signed out, the same button opens the sign in prompt in place. */
+  if (!signedIn) {
+    return (
+      <SignInButton title={label} className={className} style={style}>
+        {content}
+      </SignInButton>
+    );
+  }
+
+  return (
+    <Link href="/community/new" title={label} className={className} style={style}>
+      {content}
     </Link>
   );
 }

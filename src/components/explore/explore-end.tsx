@@ -1,8 +1,9 @@
 import { ArrowUp, PenLine, Search } from "lucide-react";
-import { ButtonLink } from "@/components/ui/button";
+import { ButtonLink, buttonVariants } from "@/components/ui/button";
 import { EndOfList } from "@/components/ui/end-of-list";
 import { SparkIcon } from "@/components/ui/spark-icon";
 import { EXPLORE_TABS, TAB_LABELS, type ExploreTab } from "@/lib/explore/types";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   The bottom of Explore.
@@ -54,13 +55,17 @@ export function ExploreEnd({
         Ask Celpare
       </ButtonLink>
 
-      <ButtonLink
-        href={signedIn ? "/community/new" : "/get-started"}
-        variant="outline"
-      >
-        <PenLine className="size-4" aria-hidden />
-        {signedIn ? "Write a post" : "Sign in to post"}
-      </ButtonLink>
+      {signedIn ? (
+        <ButtonLink href="/community/new" variant="outline">
+          <PenLine className="size-4" aria-hidden />
+          Write a post
+        </ButtonLink>
+      ) : (
+        <SignInButton className={buttonVariants({ variant: "outline" })}>
+          <PenLine className="size-4" aria-hidden />
+          Sign in to post
+        </SignInButton>
+      )}
 
       {/*
         The remaining tabs, as plain links rather than buttons. They are a

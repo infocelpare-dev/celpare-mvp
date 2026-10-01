@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createComment, type CommentState } from "@/app/actions/community";
 import { loadCommentThread, type ThreadResult } from "@/app/actions/comments";
 import { CommentThread } from "../comment-thread";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   Comments, inside the video viewer.
@@ -180,9 +180,9 @@ export function VideoComments({
           />
         ) : (
           <p className="text-[13px] text-white/70">
-            <Link href="/get-started" className="underline underline-offset-4">
+            <SignInButton className="underline underline-offset-4">
               Sign in
-            </Link>{" "}
+            </SignInButton>{" "}
             to join the conversation.
           </p>
         )}

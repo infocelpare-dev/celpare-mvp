@@ -10,6 +10,7 @@ import {
   reportTool,
   type ToolState,
 } from "@/app/actions/tool";
+import { SignInButton, openSignInPrompt } from "@/components/auth/sign-in-prompt";
 
 /*
   Like, dislike, save, share, report.
@@ -28,6 +29,13 @@ import {
 
 const IDLE: ToolState = { status: "idle", message: "" };
 
+/* Signed out, Like and Dislike stay live and open the sign in prompt instead of
+   submitting, rather than sitting disabled with no way forward. */
+function askToSignIn(e: React.MouseEvent<HTMLButtonElement>) {
+  e.preventDefault();
+  openSignInPrompt();
+}
+
 function ActionButton({
   active,
   disabled,
@@ -39,7 +47,7 @@ function ActionButton({
 }: {
   active?: boolean;
   disabled?: boolean;
-  onClick?: () => void;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
   label: string;
   count?: number;
   children: React.ReactNode;
@@ -124,7 +132,8 @@ export function ToolActions({
             count={likeCount}
             active={reaction === 1}
             pressed={reaction === 1}
-            disabled={reactPending || !signedIn}
+            disabled={reactPending}
+            onClick={signedIn ? undefined : askToSignIn}
           >
             <ThumbsUp className="size-4" aria-hidden />
           </ActionButton>
@@ -138,7 +147,8 @@ export function ToolActions({
             label="Dislike"
             active={reaction === -1}
             pressed={reaction === -1}
-            disabled={reactPending || !signedIn}
+            disabled={reactPending}
+            onClick={signedIn ? undefined : askToSignIn}
           >
             <ThumbsDown className="size-4" aria-hidden />
           </ActionButton>
@@ -182,9 +192,9 @@ export function ToolActions({
 
       {!signedIn ? (
         <p className="mt-2 text-[13px] text-muted">
-          <a href="/get-started" className="underline underline-offset-2">
+          <SignInButton className="underline underline-offset-2">
             Sign in
-          </a>{" "}
+          </SignInButton>{" "}
           to like, save or review this tool.
         </p>
       ) : null}

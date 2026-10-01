@@ -1,15 +1,16 @@
 "use client";
 
 import { useActionState, useEffect, useOptimistic, useRef } from "react";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { toggleFollow, type FollowState } from "@/app/actions/follow";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   Optimistic with rollback, the same rule 10-community.md sets for like and
   save: the button changes immediately, and if the server disagrees it goes
   back to what the server says rather than to what we guessed.
 
-  A signed out visitor gets a link to the gate rather than a button that
+  A signed out visitor gets the sign in prompt rather than a button that
   cannot work. The server refuses them anyway, but offering a control that is
   guaranteed to fail is the shape of defect F4.
 */
@@ -46,9 +47,9 @@ export function FollowButton({
 
   if (!signedIn) {
     return (
-      <ButtonLink href="/get-started" variant="primary" size="sm">
+      <SignInButton className={buttonVariants({ variant: "primary", size: "sm" })}>
         Follow
-      </ButtonLink>
+      </SignInButton>
     );
   }
 

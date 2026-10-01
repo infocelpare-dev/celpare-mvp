@@ -1,6 +1,7 @@
 import { MessagesSquare, UserPlus } from "lucide-react";
-import { ButtonLink } from "@/components/ui/button";
+import { ButtonLink, buttonVariants } from "@/components/ui/button";
 import type { FeedScope } from "@/lib/community/queries";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   The empty state, which at launch is the state most visitors will see. It gets
@@ -46,7 +47,7 @@ export function FeedEmpty({
         {signedIn ? (
           <Action href="/community/new" label="Write a post" />
         ) : (
-          <Action href="/get-started" label="Create an account" />
+          <SignInAction label="Create an account" />
         )}
       </Shell>
     );
@@ -91,7 +92,7 @@ export function FeedEmpty({
         <Action href="/community/new" label="Write the first post" />
       ) : (
         <>
-          <Action href="/get-started" label="Create an account" />
+          <SignInAction label="Create an account" />
           <p className="mt-4 text-[13px] text-muted">
             You can read the feed without one. Posting needs an account so a
             post has an author.
@@ -137,6 +138,14 @@ function Action({ href, label }: { href: string; label: string }) {
   return (
     <div className="mt-6">
       <ButtonLink href={href}>{label}</ButtonLink>
+    </div>
+  );
+}
+
+function SignInAction({ label }: { label: string }) {
+  return (
+    <div className="mt-6">
+      <SignInButton className={buttonVariants()}>{label}</SignInButton>
     </div>
   );
 }

@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { PanelLeft, Search } from "lucide-react";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { SparkIcon } from "@/components/ui/spark-icon";
 import { Logo } from "@/components/ui/logo";
 import { AppSidebar } from "./app-sidebar";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   The frame every page inside Celpare sits in: a thin bar across the top, the
@@ -123,9 +124,9 @@ export function AppShell({
               find it on and no settings page to reach.
             */}
             {signedIn ? null : (
-              <ButtonLink href="/get-started" variant="outline" size="sm">
+              <SignInButton className={buttonVariants({ variant: "outline", size: "sm" })}>
                 Sign in
-              </ButtonLink>
+              </SignInButton>
             )}
           </div>
         </header>

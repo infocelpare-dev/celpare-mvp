@@ -10,6 +10,7 @@ import type { VideoPost } from "@/lib/community/video";
 import { VideoCaption } from "./video-caption";
 import { VideoMoreMenu } from "./video-more-menu";
 import { VideoComments } from "./video-comments";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   What sits on top of a video: the actions down the right, the creator and the
@@ -295,13 +296,12 @@ export function VideoOverlay({
                 Follow
               </button>
             ) : (
-              <Link
-                href="/get-started"
+              <SignInButton
                 className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-white/70 px-3 text-[13px] font-medium text-white transition-colors duration-200 ease-out hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <UserPlus className="size-3.5" aria-hidden />
                 Follow
-              </Link>
+              </SignInButton>
             )
           ) : null}
         </div>
@@ -334,7 +334,7 @@ export function VideoOverlay({
   One control in the rail: the icon, its count under it, and a name only a screen
   reader sees. 44px minimum in both directions.
 
-  A signed out visitor gets a link to the gate rather than a button that the
+  A signed out visitor gets the sign in prompt rather than a button that the
   server would refuse, which is the rule the feed's action row already follows.
 */
 function RailButton({
@@ -359,7 +359,7 @@ function RailButton({
 
   if (!signedIn) {
     return (
-      <Link href="/get-started" className={shell}>
+      <SignInButton className={shell}>
         {children}
         <span className="sr-only">{label}, sign in first</span>
         {count > 0 ? (
@@ -367,7 +367,7 @@ function RailButton({
             {formatCount(count)}
           </span>
         ) : null}
-      </Link>
+      </SignInButton>
     );
   }
 

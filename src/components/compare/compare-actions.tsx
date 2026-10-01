@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Bookmark, Check, Share2, X } from "lucide-react";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink, buttonVariants } from "@/components/ui/button";
 import { SparkIcon } from "@/components/ui/spark-icon";
 import { useCompare } from "@/components/compare/compare-provider";
 import { saveComparison } from "@/app/actions/collections";
 import { compareHref } from "@/lib/compare/params";
 import { GOALS, type CompareItemType } from "@/lib/compare/types";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   Share, Save and Ask, for a comparison.
@@ -63,10 +64,10 @@ export function CompareActions({ items, signedIn }: { items: Item[]; signedIn: b
           Save comparison
         </Button>
       ) : (
-        <ButtonLink href="/get-started" variant="outline" size="sm">
+        <SignInButton className={buttonVariants({ variant: "outline", size: "sm" })}>
           <Bookmark className="size-4" aria-hidden />
           Sign in to save
-        </ButtonLink>
+        </SignInButton>
       )}
 
       <span aria-live="polite" className="sr-only">

@@ -10,6 +10,7 @@ import { personName, relativeTime } from "@/lib/format";
 import { createComment, deleteComment, type CommentState } from "@/app/actions/community";
 import type { CommentNode } from "@/lib/community/thread";
 import { CommentLike } from "./post-actions";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   A comment thread, to any depth.
@@ -416,9 +417,9 @@ function ReplyForm({
   if (!signedIn) {
     return (
       <p className={cn("mt-2 text-[13px]", dark ? "text-white/70" : "text-muted")}>
-        <Link href="/get-started" className="underline underline-offset-4">
+        <SignInButton className="underline underline-offset-4">
           Sign in
-        </Link>{" "}
+        </SignInButton>{" "}
         to reply.
       </p>
     );

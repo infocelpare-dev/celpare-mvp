@@ -1,7 +1,8 @@
 import { ArrowDown, ArrowUp, CheckCheck, PenLine } from "lucide-react";
-import { ButtonLink } from "@/components/ui/button";
+import { ButtonLink, buttonVariants } from "@/components/ui/button";
 import { EndOfList } from "@/components/ui/end-of-list";
 import type { FeedScope } from "@/lib/community/queries";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   The bottom of the feed.
@@ -74,10 +75,17 @@ export function FeedEnd({
         </ButtonLink>
       ) : null}
 
-      <ButtonLink href={signedIn ? "/community/new" : "/get-started"}>
-        <PenLine className="size-4" aria-hidden />
-        {signedIn ? "Write a post" : "Sign in to post"}
-      </ButtonLink>
+      {signedIn ? (
+        <ButtonLink href="/community/new">
+          <PenLine className="size-4" aria-hidden />
+          Write a post
+        </ButtonLink>
+      ) : (
+        <SignInButton className={buttonVariants()}>
+          <PenLine className="size-4" aria-hidden />
+          Sign in to post
+        </SignInButton>
+      )}
 
       {/*
         A plain anchor to the top of the document, not a scroll handler. The

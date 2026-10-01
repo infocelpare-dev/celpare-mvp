@@ -1,16 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Bookmark, Check, Library, Lock, Globe, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   createCollectionWith,
   loadSaveTargets,
   toggleInCollection,
 } from "@/app/actions/collections";
 import { NO_TARGETS, type SaveEntity, type SaveTargets } from "@/lib/collections/types";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   Save to a collection.
@@ -204,8 +204,7 @@ export function SaveToCollection({
        way to fix that rather than a button that refuses. */
     if (variant === "menu") {
       return (
-        <Link
-          href="/get-started"
+        <SignInButton
           role="menuitem"
           className={cn(
             "flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-start text-[14px]",
@@ -216,22 +215,22 @@ export function SaveToCollection({
         >
           <Bookmark className="size-[18px] shrink-0 text-muted" aria-hidden />
           <span className="min-w-0 flex-1 truncate">Save</span>
-        </Link>
+        </SignInButton>
       );
     }
     return variant === "icon" ? (
-      <ButtonLink href="/get-started" variant="ghost" size="sm" className={className}>
+      <SignInButton className={cn(buttonVariants({ variant: "ghost", size: "sm" }), className)}>
         <Bookmark className="size-[18px]" aria-hidden />
         <span className="sr-only">Sign in to save</span>
         {count !== undefined && count > 0 ? (
           <span className="tabular-nums text-[13px]">{count}</span>
         ) : null}
-      </ButtonLink>
+      </SignInButton>
     ) : (
-      <ButtonLink href="/get-started" variant="outline" size="sm" className={className}>
+      <SignInButton className={cn(buttonVariants({ variant: "outline", size: "sm" }), className)}>
         <Bookmark className="size-4" aria-hidden />
         Save
-      </ButtonLink>
+      </SignInButton>
     );
   }
 

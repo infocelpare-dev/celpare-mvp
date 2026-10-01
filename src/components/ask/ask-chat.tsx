@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -15,6 +14,7 @@ import { RichText } from "./rich-text";
 import { ToolCards, type ToolCitation } from "./tool-cards";
 import { Composer, type Grants, type ModeKey, type Modes } from "./composer";
 import { useNewChatToken } from "./new-chat";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 type WebSource = { title: string; url: string; snippet: string };
 
@@ -354,9 +354,9 @@ export function AskChat({
           {!signedIn ? (
             <p className="mt-3 text-center text-[13px] text-muted">
               This conversation is not saved.{" "}
-              <Link href="/get-started" className="underline underline-offset-2 hover:text-foreground">
+              <SignInButton className="underline underline-offset-2 hover:text-foreground">
                 Create an account
-              </Link>{" "}
+              </SignInButton>{" "}
               to keep your chats.
             </p>
           ) : null}

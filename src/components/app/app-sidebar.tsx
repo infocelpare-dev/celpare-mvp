@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { SparkIcon } from "@/components/ui/spark-icon";
 import { cn } from "@/lib/utils";
+import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
   The product sidebar: the six places a person can go inside Celpare.
@@ -108,6 +109,22 @@ export function AppSidebar({
               const active =
                 pathname === link.href || pathname.startsWith(`${link.href}/`);
               const Icon = link.icon;
+
+              /* Signed out, Profile has no page to show, so it opens the sign
+                 in prompt in place rather than redirecting to the gate. */
+              if (link.href === "/profile" && !signedIn) {
+                return (
+                  <li key={link.href}>
+                    <SignInButton
+                      onClick={onClose}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start text-[15px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
+                    >
+                      <Icon className="size-4 shrink-0" />
+                      {link.label}
+                    </SignInButton>
+                  </li>
+                );
+              }
 
               return (
                 <li key={link.href}>
