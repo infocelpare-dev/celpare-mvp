@@ -311,6 +311,15 @@ export function PostMediaUpload() {
 }
 
 /*
+  createObjectURL always returns blob:<origin>/<id>, made by the browser. Checked
+  anyway so a media element's src can only ever be that, which also keeps the
+  CodeQL DOM to HTML rule (js/xss-through-dom) satisfied.
+*/
+function isBlobUrl(url: string): boolean {
+  return url.startsWith(`blob:${window.location.origin}/`);
+}
+
+/*
   A video's size and length from its metadata, read locally before the post is
   written, so distribution knows how long "finished watching" is. Null after
   five seconds or on any error: a missing length costs nothing but precision.
@@ -318,6 +327,12 @@ export function PostMediaUpload() {
 function videoMeta(file: File): Promise<{ width: number; height: number; durationMs: number | null } | null> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
+    // Only a browser made blob: URL ever reaches src, never text from the page.
+    if (!isBlobUrl(url)) {
+      URL.revokeObjectURL(url);
+      resolve(null);
+      return;
+    }
     const video = document.createElement("video");
     let done = false;
     const finish = (value: { width: number; height: number; durationMs: number | null } | null) => {
@@ -350,6 +365,11 @@ function videoMeta(file: File): Promise<{ width: number; height: number; duratio
 function imageSize(file: File): Promise<{ width: number; height: number } | null> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
+    if (!isBlobUrl(url)) {
+      URL.revokeObjectURL(url);
+      resolve(null);
+      return;
+    }
     const img = new Image();
     img.onload = () => {
       resolve({ width: img.naturalWidth, height: img.naturalHeight });
