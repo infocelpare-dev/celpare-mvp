@@ -4,9 +4,8 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Field, FormAlert } from "@/components/ui/field";
-import { TextareaField } from "@/components/ui/textarea-field";
 import { createPost, type ComposerState } from "@/app/actions/community";
-import { PostMediaUpload } from "./post-media-upload";
+import { PostComposer } from "./post-composer";
 import { CHOOSABLE_KINDS } from "@/lib/community/kinds";
 import type { Topic } from "@/lib/community/queries";
 import { useState } from "react";
@@ -79,18 +78,11 @@ export function ComposerForm({
         <FormAlert>{state.message}</FormAlert>
       ) : null}
 
-      <TextareaField
-        id="post-body"
-        label="Your post"
-        limit={2000}
-        defaultValue={state.values.body}
-        name="body"
-        rows={6}
-        required
-        autoFocus
-        placeholder="What did you find, ship, or get stuck on?"
+      <PostComposer
+        defaultBody={state.values.body}
         invalid={state.status === "error"}
-        className="mb-5"
+        limit={2000}
+        className="mb-6"
       />
 
       {/*
@@ -113,10 +105,6 @@ export function ComposerForm({
         hint="Optional. The tool, the repository, or whatever you are pointing at. No need to type https."
         className="mb-5"
       />
-
-      <div className="mb-5">
-        <PostMediaUpload />
-      </div>
 
       <div className="mb-5">
         <label
