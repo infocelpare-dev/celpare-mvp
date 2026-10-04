@@ -99,7 +99,7 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     savesHistory: true,
     savedTools: 5,
     savedModels: 5,
-    collections: 0, // Free has no collections at all, per the pricing page.
+    collections: 1, // Founder decision 4AM.2; matches plan_limits.
   },
   pro: {
     // Interpolated, midway between Free and Premium. Notion has no GLM row for
