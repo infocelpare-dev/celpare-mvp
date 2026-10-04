@@ -8,6 +8,7 @@ import { SparkIcon } from "@/components/ui/spark-icon";
 import { Logo } from "@/components/ui/logo";
 import { AppSidebar } from "./app-sidebar";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { UpgradeIcon } from "./upgrade-icon";
 import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
@@ -106,6 +107,9 @@ export function AppShell({
               means the second.
             */}
             {/* Signed in only: a visitor has nobody to be notified about (4BH). */}
+            {/* Upgrade shows only on the Free plan, so it renders nothing for a
+                paid account; signed out it is not mounted at all (PRICE.3). */}
+            {signedIn ? <UpgradeIcon /> : null}
             {signedIn ? <NotificationBell /> : null}
             <BarIcon href="/search" label="Search Celpare">
               <Search className="size-[18px]" aria-hidden />

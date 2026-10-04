@@ -25,6 +25,7 @@ export type BurstName =
   | "dm_send"
   | "trending"
   | "notifications"
+  | "plan"
   | "auth_email";
 
 const PER_MINUTE: Record<BurstName, number> = {
@@ -41,6 +42,8 @@ const PER_MINUTE: Record<BurstName, number> = {
   trending: 60,
   /* The bell: on focus and once a minute per tab; a few tabs stay well under. */
   notifications: 30,
+  /* The top bar asks for the plan once per page load. */
+  plan: 60,
   /* Anything that makes Supabase send an auth email (codes, reset and change
      links). A person needs one or two. Also capped per hour below, because
      the email quota is shared by every account (D194). */
