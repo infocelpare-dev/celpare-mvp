@@ -3,6 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
+import { objectUrl } from "@/components/community/post-media-upload";
 import { uploadAvatar, removeAvatar, type AvatarState } from "@/app/actions/avatar";
 
 /*
@@ -63,7 +64,9 @@ export function AvatarUpload({
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                setPreview(URL.createObjectURL(file));
+                /* Through objectUrl, like every file preview (js/xss-through-dom). */
+                const url = objectUrl(file);
+                if (url) setPreview(url);
                 e.target.form?.requestSubmit();
               }}
               id="avatar-file"

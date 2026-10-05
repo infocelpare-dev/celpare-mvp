@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { launchToolFeature, type DeveloperState } from "@/app/actions/developer";
 import { Button, ButtonLink } from "@/components/ui/button";
-import { imageSize, isBlobUrl, videoMeta } from "@/components/community/post-media-upload";
+import { imageSize, objectUrl, videoMeta } from "@/components/community/post-media-upload";
 import { createClient } from "@/lib/supabase/client";
 import {
   CONTENT_TYPE,
@@ -213,8 +213,8 @@ export function LaunchComposer({
       );
     }
 
-    const preview = URL.createObjectURL(file);
-    if (!isBlobUrl(preview)) return setMediaError("That file could not be previewed.");
+    const preview = objectUrl(file);
+    if (!preview) return setMediaError("That file could not be previewed.");
     const video = isVideo ? await videoMeta(file) : null;
     const size = isVideo ? video : await imageSize(file);
     setMedia({

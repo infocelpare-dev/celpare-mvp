@@ -364,12 +364,27 @@ export function MediaGrid({
 }
 
 /*
-  createObjectURL always returns blob:<origin>/<id>, made by the browser. Checked
-  anyway so a media element's src can only ever be that, which also keeps the
-  CodeQL DOM to HTML rule (js/xss-through-dom) satisfied.
+  A preview URL for a file the person picked, or null.
+
+  createObjectURL always returns blob:<this origin>/<uuid>, made by the
+  browser. The URL is accepted only in exactly that shape, and rebuilt from
+  this page's origin and the id passed through encodeURIComponent, so nothing
+  that came from the file input reaches a src unescaped. CodeQL's DOM to HTML
+  rule (js/xss-through-dom) treats input.files as page text and did not count
+  a startsWith check as a sanitizer (alerts 2 to 4). A uuid is hex and
+  hyphens, so the rebuilt URL is the same string and revokeObjectURL still
+  matches it.
 */
-export function isBlobUrl(url: string): boolean {
-  return url.startsWith(`blob:${window.location.origin}/`);
+const BLOB_ID = /^blob:(.+)\/([0-9a-fA-F-]{36})$/;
+
+export function objectUrl(file: Blob): string | null {
+  const raw = URL.createObjectURL(file);
+  const m = BLOB_ID.exec(raw);
+  if (!m || m[1] !== window.location.origin) {
+    URL.revokeObjectURL(raw);
+    return null;
+  }
+  return `blob:${window.location.origin}/${encodeURIComponent(m[2])}`;
 }
 
 /*
@@ -379,10 +394,9 @@ export function isBlobUrl(url: string): boolean {
 */
 export function videoMeta(file: File): Promise<{ width: number; height: number; durationMs: number | null } | null> {
   return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
     // Only a browser made blob: URL ever reaches src, never text from the page.
-    if (!isBlobUrl(url)) {
-      URL.revokeObjectURL(url);
+    const url = objectUrl(file);
+    if (!url) {
       resolve(null);
       return;
     }
@@ -417,9 +431,8 @@ export function videoMeta(file: File): Promise<{ width: number; height: number; 
 */
 export function imageSize(file: File): Promise<{ width: number; height: number } | null> {
   return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    if (!isBlobUrl(url)) {
-      URL.revokeObjectURL(url);
+    const url = objectUrl(file);
+    if (!url) {
       resolve(null);
       return;
     }
