@@ -4,6 +4,7 @@ import { explainReason } from "@/lib/recommend/reasons";
 import { getRecommendations, type CardEntity, type RecommendationView } from "@/lib/recommend/server/engine";
 import type { RecItem, RecommendationRequest } from "@/lib/recommend/types";
 import { RecSlot } from "./recommendation-tracker";
+import { providerLogo } from "@/lib/models/provider-logo";
 
 /*
   A tool and model recommendation section (4BK, guide 17).
@@ -135,9 +136,10 @@ function RecCard({ entity: e, item, compareLink }: { entity: CardEntity; item: R
   return (
     <div className="flex h-full flex-col rounded-xl border border-border transition-colors duration-200 ease-out hover:bg-surface">
       <Link href={e.href} className="flex min-h-11 flex-1 items-start gap-3 p-4">
-        {e.logoUrl ? (
+        {/* A model shows its maker's logo (D199), drawn here only: logoUrl on the entity is a ranking input. */}
+        {(e.logoUrl ?? (e.type === "model" ? providerLogo(e.provider) : null)) ? (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={e.logoUrl} alt="" loading="lazy" className="size-9 shrink-0 rounded-lg border border-border object-contain" />
+          <img src={(e.logoUrl ?? providerLogo(e.provider))!} alt="" loading="lazy" className="size-9 shrink-0 rounded-lg border border-border object-contain p-0.5" />
         ) : (
           <span
             aria-hidden

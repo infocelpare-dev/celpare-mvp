@@ -22,6 +22,7 @@ import {
 } from "@/components/compare/sections";
 import { money, tokens } from "@/lib/compare/present";
 import type { ModelItem } from "@/lib/compare/types";
+import { providerLogo } from "@/lib/models/provider-logo";
 
 /*
   The Models tab, laid out the way OpenRouter's model compare is: one column per
@@ -104,9 +105,15 @@ function ModelHeads({ models }: { models: ModelItem[] }) {
             <div className="flex items-center gap-3">
               <span
                 aria-hidden
-                className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-surface font-display text-[15px] font-semibold"
+                className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-surface p-1 font-display text-[15px] font-semibold"
               >
-                {(m.provider ?? m.name).slice(0, 1).toUpperCase()}
+                {providerLogo(m.provider) ? (
+                  /* The maker's logo (D199). */
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={providerLogo(m.provider)!} alt="" loading="lazy" className="size-full rounded-lg object-contain" />
+                ) : (
+                  (m.provider ?? m.name).slice(0, 1).toUpperCase()
+                )}
               </span>
               <div className="min-w-0">
                 <p className="truncate font-semibold">{m.name}</p>

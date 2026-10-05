@@ -17,6 +17,7 @@ import type {
   Scored,
   ToolCandidate,
 } from "@/lib/search/types";
+import { providerLogo } from "@/lib/models/provider-logo";
 
 /*
   The result cards.
@@ -186,8 +187,14 @@ export function ModelResult({
       data-result-id={m.id}
       data-result-position={position}
     >
-      <span className="flex size-12 shrink-0 items-center justify-center rounded-full border border-border text-[18px] font-semibold text-muted sm:size-14">
-        <span aria-hidden>{m.name.slice(0, 1).toUpperCase()}</span>
+      <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border p-1.5 text-[18px] font-semibold text-muted sm:size-14">
+        {providerLogo(m.provider) ? (
+          /* The maker's logo (D199). */
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={providerLogo(m.provider)!} alt="" loading="lazy" className="size-full rounded-full object-contain" />
+        ) : (
+          <span aria-hidden>{m.name.slice(0, 1).toUpperCase()}</span>
+        )}
       </span>
 
       <span className="min-w-0 flex-1">

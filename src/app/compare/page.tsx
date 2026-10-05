@@ -49,6 +49,7 @@ import { Suspense } from "react";
 import { MAX_ITEMS } from "@/lib/compare/types";
 import { RecommendationsSkeleton, ToolModelRecommendations } from "@/components/recommend/recommendations";
 import { RecommendationTracker } from "@/components/recommend/recommendation-tracker";
+import { providerLogo } from "@/lib/models/provider-logo";
 
 export const metadata: Metadata = {
   title: "Compare",
@@ -219,7 +220,7 @@ export default async function ComparePage({
           name: s.item.name,
           sublabel: s.item.type === "model" ? s.item.provider : (s.item.categories[0] ?? null),
           description: s.item.type === "tool" ? (s.item.tagline ?? s.item.description) : s.item.description,
-          logoUrl: s.item.type === "tool" ? s.item.logoUrl : null,
+          logoUrl: s.item.type === "tool" ? s.item.logoUrl : providerLogo(s.item.provider),
           href: s.item.href,
           saved: saved.has(`${s.item.type}:${s.item.id}`),
         }

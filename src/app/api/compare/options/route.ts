@@ -5,6 +5,7 @@ import { runSearch } from "@/lib/search/engine";
 import { loadRecommendations } from "@/lib/search/recommendations";
 import type { OptionGroups, OptionRow } from "@/lib/compare/types";
 import { withinBurst } from "@/lib/security/burst";
+import { providerLogo } from "@/lib/models/provider-logo";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -66,7 +67,7 @@ function modelRow(r: Row): OptionRow {
     slug: String(r.slug),
     name: String(r.name),
     sublabel: (r.provider as string | null) ?? null,
-    logoUrl: null,
+    logoUrl: providerLogo(r.provider as string | null),
   };
 }
 
@@ -132,7 +133,7 @@ export async function GET(request: NextRequest) {
         slug: s.candidate.slug,
         name: s.candidate.name,
         sublabel: s.candidate.provider,
-        logoUrl: null,
+        logoUrl: providerLogo(s.candidate.provider),
       }));
       out.results = [...tools, ...models];
     } else if (parsed.data.category) {
@@ -228,7 +229,7 @@ export async function GET(request: NextRequest) {
           slug: s.candidate.slug,
           name: s.candidate.name,
           sublabel: s.candidate.provider,
-          logoUrl: null,
+          logoUrl: providerLogo(s.candidate.provider),
         }));
       }
 

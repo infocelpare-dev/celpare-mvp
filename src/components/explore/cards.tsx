@@ -21,6 +21,7 @@ import type { ExploreTopic } from "@/lib/explore/types";
 import type { ModelCandidate, PersonCandidate, ToolCandidate } from "@/lib/search/types";
 import type { VideoPost } from "@/lib/community/video";
 import type { FeedPost } from "@/lib/community/queries";
+import { providerLogo } from "@/lib/models/provider-logo";
 
 /*
   The Explore cards.
@@ -205,6 +206,20 @@ export function ToolCard({
   decision the search result card took, and for the same reason: a link that
   looks real and fails when pressed is defect F4.
 */
+/* The maker's logo (D199), in the same circle as a tool's; the letter when the provider has none. */
+function ModelLogo({ provider, name }: { provider: string | null; name: string }) {
+  const logo = providerLogo(provider);
+  return (
+    <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border p-1.5 text-[16px] font-semibold text-muted">
+      {logo ? (
+        <Image src={logo} alt="" width={44} height={44} className="size-full rounded-full object-contain" unoptimized />
+      ) : (
+        <span aria-hidden>{name.slice(0, 1).toUpperCase()}</span>
+      )}
+    </span>
+  );
+}
+
 export function ModelCard({
   model,
   reason,
@@ -221,9 +236,7 @@ export function ModelCard({
   return (
     <Root className={CARD}>
       <div className="flex items-start gap-3">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-[16px] font-semibold text-muted">
-          <span aria-hidden>{model.name.slice(0, 1).toUpperCase()}</span>
-        </span>
+        <ModelLogo provider={model.provider} name={model.name} />
 
         <span className="min-w-0 flex-1">
           <Link

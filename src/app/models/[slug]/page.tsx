@@ -18,6 +18,7 @@ import { money, shortDate, tokens } from "@/lib/compare/present";
 import type { Attribute, Evaluation, ModelItem } from "@/lib/compare/types";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { recordModelView } from "@/lib/telemetry";
+import { providerLogo } from "@/lib/models/provider-logo";
 
 /*
   The lean model page (4BK, founder decision 2026-09-28).
@@ -141,6 +142,11 @@ export default async function ModelPage({
 
         {/* ------------------------------------------------------------ header */}
         <header className="mt-4">
+          {providerLogo(m.provider) ? (
+            /* The maker's logo (D199). */
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={providerLogo(m.provider)!} alt="" className="mb-4 size-16 rounded-full border border-border object-contain p-2" />
+          ) : null}
           <h1 className="font-display text-[32px] leading-tight font-semibold tracking-[-0.022em] sm:text-[40px]">{m.name}</h1>
           <p className="mt-2 text-[15px] text-muted">
             {[m.provider, m.family, m.lifecycle ? LIFECYCLE[m.lifecycle] : null, m.releaseDate ? `Released ${shortDate(m.releaseDate)}` : null]

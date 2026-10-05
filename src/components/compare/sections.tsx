@@ -42,6 +42,7 @@ import type {
   ToolItem,
 } from "@/lib/compare/types";
 import { GOALS } from "@/lib/compare/types";
+import { providerLogo } from "@/lib/models/provider-logo";
 
 /*
   The comparison, section by section.
@@ -258,7 +259,8 @@ export function CompareSection({
 }
 
 function ItemMark({ item, size = 40 }: { item: CompareItem; size?: number }) {
-  const logo = item.type === "tool" ? item.logoUrl : null;
+  /* A model shows its maker's logo (D199). */
+  const logo = item.type === "tool" ? item.logoUrl : providerLogo(item.provider);
   return (
     <span
       className="flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-background p-1"
