@@ -75,6 +75,12 @@ function explain(error: { code?: string; message: string }): string {
   if (m.includes("name_and_provider_required")) return "Name and provider are both required.";
   if (m.includes("invalid_context_window")) return "A context window cannot be negative.";
   if (m.includes("invalid_price")) return "A price cannot be negative.";
+  if (m.includes("elite_required"))
+    return "This developer is not on the Elite plan, so the tool cannot be verified. Decline the request instead.";
+  if (m.includes("request_not_pending")) return "That request has already been decided or was cancelled.";
+  if (m.includes("request_not_found")) return "That request no longer exists.";
+  if (m.includes("tool_not_live")) return "The tool is not published, so it cannot be verified.";
+  if (m.includes("not_owner")) return "The tool no longer belongs to the developer who asked.";
   if (m.startsWith("invalid_")) return "That value is not one of the allowed options.";
 
   console.error("[admin action] unmapped error", error.code, m);
@@ -504,6 +510,67 @@ export async function setDeveloperVerified(
     after(() => emailDeveloperVerified(developerId));
   }
   return result;
+}
+
+/* Developer plans are their own ladder, separate from profiles.plan. Elite
+   verifies the developer and their tools in the database (D200), so this only
+   sets the plan. Until payments exist an admin sets it, with a reason. */
+export async function setDeveloperPlan(
+  _prev: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const parsed = z
+    .object({ id: uuid, plan: z.enum(["free", "pro", "elite"]), reason })
+    .safeParse({
+      id: formData.get("id"),
+      plan: formData.get("plan"),
+      reason: formData.get("reason"),
+    });
+  if (!parsed.success) {
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the form." };
+  }
+
+  return run(
+    "developers.manage",
+    "admin_set_developer_plan",
+    { p_id: parsed.data.id, p_plan: parsed.data.plan, p_reason: parsed.data.reason },
+    ["/admin/developers", `/admin/developers/${parsed.data.id}`, "/admin/tools"],
+    "Developer plan changed.",
+  );
+}
+
+/* Accept or decline a developer's request for the blue tick (D201).
+   admin_decide_tool_verification checks the Elite plan again on accept. */
+export async function decideToolVerification(
+  _prev: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const parsed = z
+    .object({
+      id: uuid,
+      decision: z.enum(["approve", "reject"]),
+      reason: optionalReason,
+    })
+    .safeParse({
+      id: formData.get("id"),
+      decision: formData.get("decision"),
+      reason: formData.get("reason") ?? undefined,
+    });
+  if (!parsed.success) {
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the form." };
+  }
+
+  return run(
+    "submissions.review",
+    "admin_decide_tool_verification",
+    {
+      p_request: parsed.data.id,
+      p_decision: parsed.data.decision,
+      p_reason: parsed.data.reason ?? null,
+    },
+    ["/admin/verifications", "/admin/tools"],
+    parsed.data.decision === "approve" ? "Tool verified." : "Request declined.",
+  );
 }
 
 /* -------------------------------------------------------------- settings */

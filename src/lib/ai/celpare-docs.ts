@@ -54,7 +54,7 @@ export const CELPARE_DOCS: DocSection[] = [
     id: "plans",
     title: "Plans and pricing",
     keywords: ["pricing", "price", "plan", "plans", "cost", "subscription", "free", "pro", "premium", "how much", "upgrade", "limits", "quota"],
-    body: `There are three user plans. Free includes the assistant, tool pages, community access, trending tools and up to 5 saved tools. Pro at 7.99 a month adds more messages, up to 15 saved tools, 10 collections, advanced filters, advanced comparison and priority recommendations. Premium at 19.99 a month adds research mode, unlimited saved tools and collections, and exclusive AI ranking. Developer plans are separate: Free with up to 2 tools, Pro at 20 a month with up to 5 tools and better placement, and Elite at 50 a month with unlimited tools and a verified badge. Payments are not built yet, so everybody is on the free plan today.`,
+    body: `There are three user plans. Free includes the assistant, tool pages, community access, trending tools and up to 5 saved tools. Pro at 7.99 a month adds more messages, up to 15 saved tools, 10 collections, advanced filters, advanced comparison and priority recommendations. Premium at 19.99 a month adds research mode, unlimited saved tools and collections, and exclusive AI ranking. Developer plans are separate: Free with up to 2 tools, Pro at 20 a month with up to 5 tools and better placement, and Elite at 50 a month with unlimited tools, the developer badge, and the right to request a verified blue tick for their tools, which Celpare reviews before granting. Payments are not built yet, so everybody is on the free plan today.`,
   },
   {
     id: "ask-limits",

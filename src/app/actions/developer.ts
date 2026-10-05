@@ -944,6 +944,66 @@ export async function sendForReview(
   return { status: "success", message: "Sent for review." };
 }
 
+/* ------------------------------------------------- verification request */
+
+/*
+  An Elite developer asks for the blue tick on a live tool (D201). An admin
+  accepts it in /admin/verifications. request_tool_verification checks the
+  owner, the live state and the Elite plan in SQL; the tool page only decides
+  what to show.
+*/
+export async function requestToolVerification(
+  _prev: DeveloperState,
+  formData: FormData,
+): Promise<DeveloperState> {
+  if (!isSupabaseConfigured()) return { status: "error", message: "Not connected." };
+
+  const parsed = z
+    .object({
+      toolId: z.string().uuid(),
+      slug: z.string().min(1).max(200),
+      message: z.string().trim().max(1000, "Keep it under 1,000 characters.").optional(),
+    })
+    .safeParse({
+      toolId: formData.get("toolId"),
+      slug: formData.get("slug"),
+      message: formData.get("message") ?? undefined,
+    });
+  if (!parsed.success) {
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "That did not work." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("request_tool_verification", {
+    p_tool: parsed.data.toolId,
+    p_message: parsed.data.message || null,
+  });
+
+  if (error) {
+    console.error("[developer] verification request failed", error.code, error.message);
+    if (error.message.includes("elite_required")) {
+      return { status: "error", field: "elite", message: "Get the Elite plan first." };
+    }
+    if (error.message.includes("already_requested")) {
+      return { status: "error", message: "You have already asked. An admin will look at it." };
+    }
+    if (error.message.includes("already_verified")) {
+      return { status: "error", message: "This tool is already verified." };
+    }
+    if (error.message.includes("tool_not_live")) {
+      return { status: "error", message: "Only a published tool can be verified." };
+    }
+    if (error.code === "42501") {
+      return { status: "error", message: "That is not yours to verify." };
+    }
+    return { status: "error", message: "Could not send the request." };
+  }
+
+  revalidatePath(`/tools/${parsed.data.slug}`);
+  revalidatePath("/admin/verifications");
+  return { status: "success", message: "Request sent. An admin will review it." };
+}
+
 /* ------------------------------------------------- becoming a developer */
 
 /*

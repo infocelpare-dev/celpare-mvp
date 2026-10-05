@@ -233,7 +233,7 @@ export async function getTool(db: SupabaseClient, id: string) {
   const { data, error } = await db
     .from("tools")
     .select(
-      `${TOOL_COLUMNS}, description, website_url, docs_url, pricing, tags, features, platforms, updated_at, tool_categories(categories(name, slug))`,
+      `${TOOL_COLUMNS}, verified_via, description, website_url, docs_url, pricing, tags, features, platforms, updated_at, tool_categories(categories(name, slug))`,
     )
     .eq("id", id)
     .maybeSingle();

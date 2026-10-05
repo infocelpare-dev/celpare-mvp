@@ -6,8 +6,8 @@ import {
   listSubmissions,
   profilesByIds,
 } from "@/lib/admin/queries";
-import { setDeveloperVerified } from "@/app/actions/admin";
-import { ActionForm } from "@/components/admin/action-form";
+import { setDeveloperPlan, setDeveloperVerified } from "@/app/actions/admin";
+import { ActionForm, ActionSelectForm } from "@/components/admin/action-form";
 import {
   EmptyState,
   Field,
@@ -29,6 +29,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const PLAN_LABEL = { free: "Free", pro: "Pro", elite: "Elite" } as const;
+
 type DeveloperRecord = {
   id: string;
   handle: string;
@@ -41,6 +43,8 @@ type DeveloperRecord = {
   expertise: string[];
   logo_url: string | null;
   verified: boolean;
+  verified_via: "admin" | null;
+  plan: "free" | "pro" | "elite";
   accepted_terms_at: string | null;
   terms_version: string | null;
   created_at: string;
@@ -66,7 +70,7 @@ export default async function AdminDeveloperDetailPage({
   const { data } = await session.db
     .from("developer_profiles")
     .select(
-      "id, handle, display_name, bio, company, website_url, github_url, description, expertise, logo_url, verified, accepted_terms_at, terms_version, created_at",
+      "id, handle, display_name, bio, company, website_url, github_url, description, expertise, logo_url, verified, verified_via, plan, accepted_terms_at, terms_version, created_at",
     )
     .eq("id", id)
     .maybeSingle();
@@ -113,6 +117,11 @@ export default async function AdminDeveloperDetailPage({
         {dev.verified ? (
           <span className="rounded-full bg-ok-surface px-2 py-0.5 text-[12px] font-medium text-ok-text">
             Verified
+          </span>
+        ) : null}
+        {dev.plan !== "free" ? (
+          <span className="rounded-full border border-border px-2 py-0.5 text-[12px] font-medium text-muted">
+            {PLAN_LABEL[dev.plan]} plan
           </span>
         ) : null}
         {dev.accepted_terms_at ? (
@@ -286,6 +295,23 @@ export default async function AdminDeveloperDetailPage({
                 <When iso={dev.created_at} time />
               </Field>
             </FieldList>
+          </Section>
+
+          <Section title="Developer plan">
+            <ActionSelectForm
+              action={setDeveloperPlan}
+              fields={{ id: dev.id }}
+              name="plan"
+              legend="Change the developer plan"
+              hint="Elite lets this developer request the blue tick for their tools, which you accept in Verification requests. Leaving Elite removes the ticks granted on request and cancels open requests. There is no billing integration yet, so this does not charge or refund anybody."
+              current={dev.plan}
+              submitLabel="Change plan"
+              options={[
+                { value: "free", label: PLAN_LABEL.free },
+                { value: "pro", label: PLAN_LABEL.pro },
+                { value: "elite", label: PLAN_LABEL.elite, description: "Can request verified tools" },
+              ]}
+            />
           </Section>
 
           <Section title="Verification">

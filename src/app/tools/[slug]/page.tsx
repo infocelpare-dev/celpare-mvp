@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { VerifiedTick } from "@/components/ui/verified-tick";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
@@ -11,7 +12,6 @@ import {
   MessageCircle,
   Play,
   Plus,
-  Sparkles,
 } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { ButtonLink } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { ToolActions } from "@/components/tools/tool-actions";
+import { VerificationRequest } from "@/components/tools/verification-request";
 import { CompareLink } from "@/components/compare/compare-link";
 import {
   RatingSummary,
@@ -32,6 +33,7 @@ import {
   getToolProfile,
   getToolReviews,
   getViewerState,
+  getVerificationRequestState,
   type ToolProfile,
 } from "@/lib/tools/queries";
 import { recordToolView } from "@/lib/telemetry";
@@ -162,6 +164,11 @@ export default async function ToolPage({
     getRatingBreakdown(tool.id),
     getDeveloperCard(tool.developer_id, tool.id),
   ]);
+  /* Only the owner sees Request verification, so only the owner pays for it. */
+  const verification =
+    viewer.isOwner && viewer.userId && !tool.verified
+      ? await getVerificationRequestState(tool.id, viewer.userId)
+      : null;
 
   /* ?debug=1 shows how the recommendations were made, to admins only; anyone
      else asking gets the ordinary page (the Explore and Compare gate). */
@@ -228,10 +235,7 @@ export default async function ToolPage({
               {tool.name}
             </h1>
             {tool.verified ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-0.5 text-[12px] font-medium text-on-accent">
-                <Sparkles className="size-3" aria-hidden />
-                Verified
-              </span>
+              <VerifiedTick label="Verified tool" className="size-6" />
             ) : null}
           </div>
 
@@ -305,9 +309,9 @@ export default async function ToolPage({
               what the listing claims, so unlike Edit tool it does not send a
               live tool back for review.
 
-              Plus, not Sparkles, founder instruction 2026-09-18. Sparkles is
-              already the Verified badge eight lines up, so the same mark meant
-              two different things on one screen. A plus says "add one of
+              Plus, not Sparkles, founder instruction 2026-09-18. Sparkles was
+              then the Verified badge (now a blue tick, D201), so the same mark
+              meant two different things on one screen. A plus says "add one of
               these", which is what the control does. */}
           {viewer.isOwner ? (
             <ButtonLink
@@ -318,6 +322,17 @@ export default async function ToolPage({
               <Plus className="size-4" aria-hidden />
               Launch a new feature
             </ButtonLink>
+          ) : null}
+
+          {/* Elite only, an admin accepts it (D201). */}
+          {verification ? (
+            <VerificationRequest
+              toolId={tool.id}
+              slug={tool.slug}
+              toolName={tool.name}
+              verified={tool.verified}
+              state={verification}
+            />
           ) : null}
         </div>
 
@@ -566,9 +581,7 @@ export default async function ToolPage({
                       <span className="font-medium">{developer.full_name ?? "Developer"}</span>
                     )}
                     {developer.verified ? (
-                      <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-on-accent">
-                        Verified developer
-                      </span>
+                      <VerifiedTick label="Verified developer" />
                     ) : null}
                   </div>
 

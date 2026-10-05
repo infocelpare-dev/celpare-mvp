@@ -123,7 +123,6 @@ export const DEVELOPER_PLANS: PricingPlan[] = [
       "Basic tool listing",
       "Up to 10 promotional videos",
       "Basic performance analytics",
-      "Developer badge",
       "Access to community discussions",
     ],
   },
@@ -153,7 +152,8 @@ export const DEVELOPER_PLANS: PricingPlan[] = [
     includesFrom: "Pro",
     features: [
       "Unlimited AI tools",
-      "Verified developer and tool badge",
+      "Developer badge",
+      "Request the blue verified tick for your tools",
       "Unlimited promotional content",
       "Top search priority",
       "Faster approval queue",
@@ -221,8 +221,10 @@ export const DEVELOPER_COMPARE: CompareGroup[] = [
   {
     title: "Trust and reach",
     rows: [
-      { label: "Developer badge", cells: [true, true, true] },
-      { label: "Verified developer and tool badge", cells: [false, false, true] },
+      /* Elite only. The tick is requested from the tool page and accepted by
+         an admin (D201); Free and Pro are told to get Elite first. */
+      { label: "Developer badge", cells: [false, false, true] },
+      { label: "Verified tool badge (blue tick)", cells: [false, false, "On request"] },
       { label: "Social media promotion", cells: [false, false, true] },
       { label: "Early access to new features", cells: [false, false, true] },
       { label: "Priority customer support", cells: [false, false, true] },

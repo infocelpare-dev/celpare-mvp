@@ -1,4 +1,5 @@
 "use client";
+import { VerifiedTick } from "@/components/ui/verified-tick";
 
 import Link from "next/link";
 import { useActionState } from "react";
@@ -88,7 +89,7 @@ export function SubmissionList({
                   <span className="font-medium">{row.name}</span>
                   <Badge tone={TONE[row.status]}>{LABEL[row.status]}</Badge>
                   {kind === "tool" && (row as DeveloperTool).verified ? (
-                    <Badge tone="accent">Verified</Badge>
+                    <VerifiedTick label="Verified tool" />
                   ) : null}
                 </div>
 

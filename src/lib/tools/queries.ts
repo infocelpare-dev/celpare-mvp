@@ -208,6 +208,44 @@ export async function getViewerState(toolId: string, developerId: string | null)
   };
 }
 
+/*
+  What the owner's Request verification control needs (D201): their developer
+  plan and the latest request on this tool. A failed read leaves plan null,
+  which shows the request button anyway; the database then answers with the
+  real reason, so a read error never reads as "you are not Elite".
+*/
+export type VerificationRequestState = {
+  plan: "free" | "pro" | "elite" | null;
+  latest: {
+    status: "pending" | "approved" | "rejected" | "cancelled";
+    decision_reason: string | null;
+    created_at: string;
+  } | null;
+};
+
+export async function getVerificationRequestState(
+  toolId: string,
+  userId: string,
+): Promise<VerificationRequestState> {
+  const db: SupabaseClient = await createClient();
+  const [dev, latest] = await Promise.all([
+    db.from("developer_profiles").select("plan").eq("id", userId).maybeSingle(),
+    db
+      .from("tool_verification_requests")
+      .select("status, decision_reason, created_at")
+      .eq("tool_id", toolId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (dev.error) console.error("[tools] developer plan read failed", dev.error.message);
+  if (latest.error) console.error("[tools] verification request read failed", latest.error.message);
+  return {
+    plan: (dev.data?.plan as VerificationRequestState["plan"]) ?? null,
+    latest: (latest.data as VerificationRequestState["latest"]) ?? null,
+  };
+}
+
 export type DeveloperCard = {
   id: string;
   username: string | null;

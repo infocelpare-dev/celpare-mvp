@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowUpRight, BadgeCheck, Eye, Users } from "lucide-react";
+import { ArrowUpRight, Eye, Users } from "lucide-react";
+import { VerifiedTick } from "@/components/ui/verified-tick";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
@@ -97,10 +98,7 @@ export function ToolResult({
             {t.name}
           </Link>
           {t.verified ? (
-            <BadgeCheck
-              className="size-4 shrink-0 text-foreground"
-              aria-label="Verified tool"
-            />
+            <VerifiedTick label="Verified tool" />
           ) : null}
         </span>
 
@@ -328,10 +326,7 @@ export function PersonResult({
             {name}
           </Link>
           {p.developerVerified ? (
-            <BadgeCheck
-              className="size-4 shrink-0 text-foreground"
-              aria-label="Verified developer"
-            />
+            <VerifiedTick label="Verified developer" />
           ) : null}
         </span>
 

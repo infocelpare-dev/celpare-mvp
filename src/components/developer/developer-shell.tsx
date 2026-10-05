@@ -1,9 +1,9 @@
 import { Container } from "@/components/ui/container";
+import { VerifiedTick } from "@/components/ui/verified-tick";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { DeveloperNav } from "@/components/developer/developer-nav";
-import { Badge } from "@/components/ui/card";
 import { BackLink } from "@/components/ui/back-link";
 
 /*
@@ -45,7 +45,7 @@ export function DeveloperShell({
                 {title}
               </h1>
               {/* Granted by an admin, never self set. See developer_profiles.verified. */}
-              {verified ? <Badge tone="accent">Verified</Badge> : null}
+              {verified ? <VerifiedTick label="Verified developer" className="size-5" /> : null}
             </div>
             {lead ? (
               <p className="mt-3 text-[15px] leading-relaxed text-muted">{lead}</p>

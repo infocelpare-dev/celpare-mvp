@@ -45,6 +45,10 @@
   --chart-line: #0c0c0c;
   --chart-area: color-mix(in oklab, var(--celpare-lime) 42%, transparent);
   --chart-prev: #8a8985;
+  /* The verified tick (D201): the one blue in the system, founder instruction
+     2026-10-05. 3.6:1 against paper, over the 3:1 a graphic needs; the tick is
+     always labelled, so it never relies on colour alone. */
+  --verified: #1a8cd8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -64,6 +68,7 @@
     --chart-line: var(--celpare-lime);
     --chart-area: color-mix(in oklab, var(--celpare-lime) 14%, transparent);
     --chart-prev: #6f6e6b;
+    --verified: #1d9bf0;
   }
 }
 
@@ -83,6 +88,7 @@
   --chart-line: var(--celpare-lime);
   --chart-area: color-mix(in oklab, var(--celpare-lime) 14%, transparent);
   --chart-prev: #6f6e6b;
+  --verified: #1d9bf0;
 }
 
 @theme inline {
@@ -98,6 +104,7 @@
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);
   --color-ring: var(--ring);
+  --color-verified: var(--verified);
 
   --font-sans: var(--font-inter);
   --font-display: var(--font-inter);

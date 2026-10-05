@@ -1,8 +1,8 @@
 import Link from "next/link";
+import { VerifiedTick } from "@/components/ui/verified-tick";
 import Image from "next/image";
 import {
   ArrowUpRight,
-  BadgeCheck,
   Eye,
   Heart,
   Image as ImageIcon,
@@ -123,10 +123,7 @@ export function ToolCard({
               {tool.name}
             </Link>
             {tool.verified ? (
-              <BadgeCheck
-                className="size-4 shrink-0 text-foreground"
-                aria-label="Verified tool"
-              />
+              <VerifiedTick label="Verified tool" />
             ) : null}
           </span>
           {tool.categories[0] ? (
@@ -363,10 +360,7 @@ export function PersonCard({
               {name}
             </Link>
             {person.developerVerified ? (
-              <BadgeCheck
-                className="size-4 shrink-0 text-foreground"
-                aria-label="Verified developer"
-              />
+              <VerifiedTick label="Verified developer" />
             ) : null}
           </span>
           {showHandle ? (

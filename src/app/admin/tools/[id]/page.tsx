@@ -40,6 +40,7 @@ type ToolRecord = {
   platforms: string[];
   status: string;
   verified: boolean;
+  verified_via: "admin" | "request" | null;
   source: string;
   rating: number | null;
   rating_count: number;
@@ -121,7 +122,7 @@ export default async function AdminToolDetailPage({
         <Status value={tool.status} />
         {tool.verified ? (
           <span className="rounded-full bg-ok-surface px-2 py-0.5 text-[12px] font-medium text-ok-text">
-            Verified
+            {tool.verified_via === "request" ? "Verified on request" : "Verified"}
           </span>
         ) : null}
         <span className="rounded-full border border-border px-2 py-0.5 text-[12px] text-muted">
@@ -433,9 +434,15 @@ export default async function AdminToolDetailPage({
             <div className="rounded-xl border border-border p-4">
               <p className="text-[13px] leading-relaxed text-muted">
                 A verified tool is one Celpare has confirmed is operated by the developer who
-                submitted it. It is granted here and can never be self set: the column is absent
+                submitted it. It is granted here, or by accepting an Elite developer&apos;s request
+                in Verification requests (D201), and can never be self set: the column is absent
                 from every client grant.
               </p>
+              {tool.verified_via === "request" ? (
+                <p className="mt-2 text-[13px] leading-relaxed text-muted">
+                  Granted on the developer&apos;s request. It comes off if they leave Elite.
+                </p>
+              ) : null}
               <div className="mt-3">
                 <ActionForm
                   action={setToolVerified}
