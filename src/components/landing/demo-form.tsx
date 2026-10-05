@@ -43,7 +43,7 @@ export function DemoForm() {
           autoComplete="email"
           placeholder="you@example.com"
           aria-invalid={state.status === "error" || undefined}
-          className="h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-4 text-[15px] text-foreground placeholder:text-muted"
+          className="h-11 w-full min-w-0 shrink-0 rounded-xl border border-border bg-background px-4 text-[15px] text-foreground placeholder:text-muted sm:w-auto sm:flex-1"
         />
         <Submit />
       </div>

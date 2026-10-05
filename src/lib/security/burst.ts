@@ -26,7 +26,8 @@ export type BurstName =
   | "trending"
   | "notifications"
   | "plan"
-  | "auth_email";
+  | "auth_email"
+  | "waitlist";
 
 const PER_MINUTE: Record<BurstName, number> = {
   /* A beacon carries up to 60 events; a busy tab sends a few a minute. */
@@ -48,6 +49,8 @@ const PER_MINUTE: Record<BurstName, number> = {
      links). A person needs one or two. Also capped per hour below, because
      the email quota is shared by every account (D194). */
   auth_email: 4,
+  /* A person joins the waitlist once (D198). */
+  waitlist: 5,
 };
 
 const PER_HOUR: Partial<Record<BurstName, number>> = {
