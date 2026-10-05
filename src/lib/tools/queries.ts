@@ -248,6 +248,37 @@ export async function getVerificationRequestState(
   };
 }
 
+/*
+  The owner's sponsorship for one tool (D204): the latest row, so the tool page
+  can say Sponsored until a date, Requested, or show the last decline. A failed
+  read returns null and the button still renders; the server decides.
+*/
+export type SponsorshipState = {
+  status: "pending" | "active" | "rejected" | "cancelled" | "ended";
+  decision_reason: string | null;
+  ends_at: string | null;
+  created_at: string;
+} | null;
+
+export async function getSponsorshipState(toolId: string): Promise<SponsorshipState> {
+  if (!isSupabaseConfigured()) return null;
+  const db: SupabaseClient = await createClient();
+  const { data, error } = await db
+    .from("tool_sponsorships")
+    .select("status, decision_reason, ends_at, created_at")
+    .eq("tool_id", toolId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) console.error("[tools] sponsorship read failed", error.message);
+  const row = (data as SponsorshipState) ?? null;
+  /* A run past its end date is over even before anything marks it so. */
+  if (row?.status === "active" && row.ends_at && new Date(row.ends_at).getTime() <= Date.now()) {
+    return { ...row, status: "ended" };
+  }
+  return row;
+}
+
 export type DeveloperCard = {
   id: string;
   username: string | null;

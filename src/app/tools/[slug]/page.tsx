@@ -19,6 +19,7 @@ import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { ToolActions } from "@/components/tools/tool-actions";
 import { VerificationRequest } from "@/components/tools/verification-request";
+import { SponsorLink } from "@/components/tools/sponsor-link";
 import { LaunchFeatureButton } from "@/components/tools/launch-feature";
 import { CompareLink } from "@/components/compare/compare-link";
 import {
@@ -34,6 +35,7 @@ import {
   getToolReviews,
   getViewerState,
   getVerificationRequestState,
+  getSponsorshipState,
   type ToolProfile,
 } from "@/lib/tools/queries";
 import { recordToolView } from "@/lib/telemetry";
@@ -169,6 +171,12 @@ export default async function ToolPage({
     viewer.isOwner && viewer.userId && !tool.verified
       ? await getVerificationRequestState(tool.id, viewer.userId)
       : null;
+  /* Owner only too (D204). Formatted here, with the zone pinned, so the
+     server and the browser print the same date. */
+  const sponsorship = viewer.isOwner ? await getSponsorshipState(tool.id) : undefined;
+  const sponsorEnds = sponsorship?.ends_at
+    ? new Date(sponsorship.ends_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+    : null;
 
   /* ?debug=1 shows how the recommendations were made, to admins only; anyone
      else asking gets the ordinary page (the Explore and Compare gate). */
@@ -333,6 +341,11 @@ export default async function ToolPage({
               verified={tool.verified}
               state={verification}
             />
+          ) : null}
+
+          {/* Goes to the Sponsored page in Pricing (D204). */}
+          {viewer.isOwner ? (
+            <SponsorLink state={sponsorship ?? null} endsLabel={sponsorEnds} />
           ) : null}
         </div>
 

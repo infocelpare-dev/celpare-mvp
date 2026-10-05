@@ -16,6 +16,7 @@ import { SegmentedLinks } from "@/components/pricing/segmented-links";
 import { PlanCard, type PlanAction } from "@/components/pricing/plan-card";
 import { CompareTable } from "@/components/pricing/compare-table";
 import { PricingFaq } from "@/components/pricing/pricing-faq";
+import { SponsoredAddon } from "@/components/pricing/sponsored-addon";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import {
   bestYearlyPercent,
@@ -155,6 +156,9 @@ export default async function PricingPage({
             />
           ))}
         </div>
+
+        {/* Per tool, with any developer plan (D204). */}
+        {audience === "developers" ? <SponsoredAddon /> : null}
 
         <p
           id="payments-note"
