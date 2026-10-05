@@ -26,7 +26,7 @@ import type { PostKind } from "./kinds";
 /* Matches the client SELECT grant on posts. Do not add a column to this
    string without adding it to the grant first. */
 const POST_COLUMNS =
-  "id, author_id, body, link_url, topic_id, created_at, like_count, comment_count, save_count, repost_count, view_count, status, kind, tool_id, model_id";
+  "id, author_id, body, link_url, topic_id, created_at, like_count, comment_count, save_count, repost_count, view_count, status, kind, tool_id, model_id, posted_as";
 
 const AUTHOR_COLUMNS = "id, username, full_name, avatar_url";
 
@@ -43,7 +43,7 @@ export const POST_SELECT =
   ", author:profiles!posts_author_id_fkey(" +
   AUTHOR_COLUMNS +
   "), topic:topics!posts_topic_id_fkey(id, slug, name)" +
-  ", tool:tools!posts_tool_id_fkey(id, slug, name, tagline, logo_url, pricing)" +
+  ", tool:tools!posts_tool_id_fkey(id, slug, name, tagline, logo_url, pricing, verified)" +
   ", model:models!posts_model_id_fkey(id, slug, name, provider)" +
   ", media:post_media(id, media_kind, url, width, height, sort_order)";
 
@@ -83,6 +83,8 @@ export type AttachedTool = {
   tagline: string | null;
   logo_url: string | null;
   pricing: string | null;
+  /* The blue tick (D201), shown when the tool is the byline (D203). */
+  verified: boolean;
 };
 
 export type AttachedModel = {
@@ -114,6 +116,10 @@ export type FeedPost = {
   kind: PostKind;
   tool_id: string | null;
   model_id: string | null;
+  /* Whose name the post is published under (D203). 'tool' shows the tool's
+     name, logo and page instead of the person; author_id stays the developer,
+     who still owns it. Only launch_tool_feature can set it. */
+  posted_as: "person" | "tool" | "model";
   author: Author | null;
   topic: Pick<Topic, "id" | "slug" | "name"> | null;
   tool: AttachedTool | null;

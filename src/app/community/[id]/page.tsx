@@ -9,9 +9,11 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Container } from "@/components/ui/container";
 import { BackLink } from "@/components/ui/back-link";
-import { Avatar } from "@/components/ui/avatar";
+import { IdentityAvatar } from "@/components/community/identity-avatar";
+import { IdentityMarks } from "@/components/community/identity-marks";
+import { postIdentity } from "@/lib/community/identity";
 import { Badge } from "@/components/ui/card";
-import { hostOf, personName, relativeTime } from "@/lib/format";
+import { hostOf, relativeTime } from "@/lib/format";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import {
   getComments,
@@ -55,7 +57,7 @@ export async function generateMetadata({
     return { title: "Post", robots: { index: false, follow: false } };
   }
 
-  const who = post.author ? personName(post.author) : "Someone";
+  const who = postIdentity(post).name;
   /* The body is somebody else's text going into a meta tag. Trimmed to a
      single line so a description cannot carry newlines, and truncated. */
   const summary = post.body.replace(/\s+/g, " ").slice(0, 155);
@@ -111,11 +113,11 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
       : Promise.resolve(new Set<string>()),
   ]);
 
-  const author = post.author;
-  const handle = author?.username ?? null;
   /* The name, not the handle. Founder instruction 2026-09-19: the @username is
-     seen by whoever opens the profile, and nowhere else. */
-  const name = author ? personName(author) : "Someone";
+     seen by whoever opens the profile, and nowhere else. A tool's launch shows
+     the tool (D203). */
+  const who = postIdentity(post);
+  const name = who.name;
   const isOwner = Boolean(viewerId && viewerId === post.author_id);
 
   return (
@@ -129,31 +131,29 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
 
         <article>
           <div className="flex items-center gap-3">
-            <Link href={handle ? `/u/${handle}` : "#"} className="shrink-0">
-              <Avatar
-                fullName={author?.full_name}
-                username={author?.username}
-                avatarUrl={author?.avatar_url}
-                size="md"
-              />
+            <Link href={who.href ?? "#"} className="shrink-0">
+              <IdentityAvatar identity={who} />
             </Link>
 
             <div className="min-w-0">
               {/* The h1 of this page is the person, because a post has no
                   title: `posts` has no title column. Nothing skips a level
                   from here down. */}
-              <h1 className="truncate text-[15px] font-medium">
-                {handle ? (
-                  <Link
-                    href={`/u/${handle}`}
-                    className="hover:underline hover:underline-offset-4"
-                  >
-                    {name}
-                  </Link>
-                ) : (
-                  name
-                )}
-              </h1>
+              <div className="flex min-w-0 items-center gap-2">
+                <h1 className="truncate text-[15px] font-medium">
+                  {who.href ? (
+                    <Link
+                      href={who.href}
+                      className="hover:underline hover:underline-offset-4"
+                    >
+                      {name}
+                    </Link>
+                  ) : (
+                    name
+                  )}
+                </h1>
+                <IdentityMarks identity={who} />
+              </div>
               <p className="text-[13px] text-muted" suppressHydrationWarning>
                 <time dateTime={post.created_at}>
                   {relativeTime(post.created_at)}
@@ -178,7 +178,9 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
 
           <PostMediaGallery media={post.media} postId={post.id} className="mt-4" />
 
-          <PostAttachment tool={post.tool} model={post.model} className="mt-4" />
+          {who.kind === "person" ? (
+            <PostAttachment tool={post.tool} model={post.model} className="mt-4" />
+          ) : null}
 
           {post.link_url ? (
             <a

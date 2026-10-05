@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { toggleLike, toggleRepost } from "@/app/actions/community";
 import { toggleFollow } from "@/app/actions/follow";
 import type { VideoPost } from "@/lib/community/video";
+import { postIdentity } from "@/lib/community/identity";
 import type { VideoSource } from "@/lib/community/video-analytics";
 import { VideoPlayer, type PlaybackState } from "./video-player";
 import { VideoOverlay } from "./video-overlay";
@@ -521,7 +522,7 @@ function Slide({
         onState={onState}
         onProgress={onProgress}
         onEnded={() => track("completed", post.id, { position: index, percentWatched: 100 })}
-        label={`video by ${post.author?.username ?? "someone"}`}
+        label={`video by ${postIdentity(post).name}`}
       />
 
       {/* The double tap's acknowledgement. Without it the gesture is invisible

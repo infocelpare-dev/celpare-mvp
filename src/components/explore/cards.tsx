@@ -11,6 +11,9 @@ import {
   Users,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { IdentityAvatar } from "@/components/community/identity-avatar";
+import { IdentityMarks } from "@/components/community/identity-marks";
+import { postIdentity } from "@/lib/community/identity";
 import { Badge } from "@/components/ui/card";
 import { Stars } from "@/components/tools/tool-reviews";
 import { FollowButton } from "@/components/profile/follow-button";
@@ -483,21 +486,19 @@ export function TopicCard({ topic, as: Root = "li" }: { topic: ExploreTopic; as?
   THE COUNTS ARE REAL AND HIDDEN AT ZERO, which is the post card's own rule.
 */
 export function PostShelfCard({ post, as: Root = "li" }: { post: FeedPost; as?: CardRoot }) {
-  const author = post.author;
-  const name = author ? personName(author) : "Someone";
+  /* A tool's launch shows the tool (D203). */
+  const who = postIdentity(post);
+  const name = who.name;
   const media = post.media[0] ?? null;
 
   return (
     <Root className={CARD}>
       <div className="flex items-center gap-2">
-        <Avatar
-          size="sm"
-          fullName={author?.full_name}
-          username={author?.username}
-          avatarUrl={author?.avatar_url}
-          className="shrink-0"
-        />
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{name}</span>
+        <IdentityAvatar identity={who} size="sm" className="shrink-0" />
+        <span className="flex min-w-0 flex-1 items-center gap-1.5">
+          <span className="truncate text-[13px] font-medium">{name}</span>
+          <IdentityMarks identity={who} />
+        </span>
         {post.topic ? (
           <span className="shrink-0 text-[12px] text-muted">{post.topic.name}</span>
         ) : null}
@@ -585,8 +586,8 @@ export function VideoCard({
   index: number;
   as?: CardRoot;
 }) {
-  const author = post.author;
-  const name = author ? personName(author) : "Someone";
+  const who = postIdentity(post);
+  const name = who.name;
   const caption = post.body.trim();
   const withPoster = index < 2;
 
@@ -638,14 +639,9 @@ export function VideoCard({
         </Link>
 
         <span className="mt-auto flex items-center gap-2 pt-2 text-[12px] text-muted">
-          <Avatar
-            size="sm"
-            fullName={author?.full_name}
-            username={author?.username}
-            avatarUrl={author?.avatar_url}
-            className="size-6 text-[11px]"
-          />
+          <IdentityAvatar identity={who} size="sm" className="size-6 text-[11px]" />
           <span className="truncate">{name}</span>
+          <IdentityMarks identity={who} />
         </span>
       </div>
     </Root>

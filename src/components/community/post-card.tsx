@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { Link2, MessageCircle, Repeat2 } from "lucide-react";
-import { Avatar } from "@/components/ui/avatar";
+import { IdentityAvatar } from "./identity-avatar";
+import { IdentityMarks } from "@/components/community/identity-marks";
+import { postIdentity } from "@/lib/community/identity";
 import { Badge } from "@/components/ui/card";
-import { hostOf, personName, relativeTime } from "@/lib/format";
+import { hostOf, relativeTime } from "@/lib/format";
 import type { FeedPost, ViewerState } from "@/lib/community/queries";
 import { PostActions } from "./post-actions";
 import { PostAttachment, PostKindBadge, PostMediaGallery } from "./post-media";
@@ -47,7 +49,6 @@ export function PostCard({
   socialProof?: SocialProof | null;
 }) {
   const href = `/community/${post.id}`;
-  const author = post.author;
 
   /*
     THE BYLINE IS THE NAME. Founder instruction 2026-09-19, reversing the
@@ -56,9 +57,12 @@ export function PostCard({
     The @username is not repeated here: it is what somebody sees when they open
     the profile. personName falls back to the handle when full_name is empty,
     so a byline is never blank.
+
+    A tool's launch is bylined as the TOOL (D203): its logo, its name, its
+    page. postIdentity makes that call once for every surface.
   */
-  const handle = author?.username ?? null;
-  const name = author ? personName(author) : "Someone";
+  const who = postIdentity(post);
+  const name = who.name;
 
   return (
     <article className="border-b border-border px-4 py-4 sm:px-5 sm:py-5">
@@ -77,13 +81,8 @@ export function PostCard({
         </p>
       ) : null}
       <div className="flex gap-3">
-        <Link href={author ? `/u/${author.username}` : href} className="shrink-0">
-          <Avatar
-            fullName={author?.full_name}
-            username={author?.username}
-            avatarUrl={author?.avatar_url}
-            size="md"
-          />
+        <Link href={who.href ?? href} className="shrink-0">
+          <IdentityAvatar identity={who} />
         </Link>
 
         <div className="min-w-0 flex-1">
@@ -91,9 +90,9 @@ export function PostCard({
               long display name plus a username plus a time does not fit on one
               line, and a name is the one thing here worth a second row. */}
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[14px]">
-            {handle ? (
+            {who.href ? (
               <Link
-                href={`/u/${handle}`}
+                href={who.href}
                 className="font-medium text-foreground hover:underline hover:underline-offset-4"
               >
                 {name}
@@ -101,6 +100,7 @@ export function PostCard({
             ) : (
               <span className="font-medium">{name}</span>
             )}
+            <IdentityMarks identity={who} />
 
             <span className="text-[13px] text-muted" aria-hidden>
               ·
@@ -157,7 +157,10 @@ export function PostCard({
 
           <PostMediaGallery media={post.media} postId={post.id} className="mt-3" />
 
-          <PostAttachment tool={post.tool} model={post.model} className="mt-3" />
+          {/* A tool's own post already names the tool in its byline. */}
+          {who.kind === "person" ? (
+            <PostAttachment tool={post.tool} model={post.model} className="mt-3" />
+          ) : null}
 
           {post.link_url ? (
             <a

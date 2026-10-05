@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { Heart, MessageCircle, Repeat2, Share2, Check, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Avatar } from "@/components/ui/avatar";
-import { formatCount, personName } from "@/lib/format";
+import { IdentityAvatar } from "@/components/community/identity-avatar";
+import { IdentityMarks } from "@/components/community/identity-marks";
+import { postIdentity } from "@/lib/community/identity";
+import { formatCount } from "@/lib/format";
 import type { VideoPost } from "@/lib/community/video";
 import { VideoCaption } from "./video-caption";
 import { VideoMoreMenu } from "./video-more-menu";
@@ -92,8 +94,11 @@ export function VideoOverlay({
       | "repost",
   ) => void;
 }) {
-  const author = post.author;
-  const name = author ? personName(author) : "Someone";
+  /* A tool's launch video is bylined as the tool (D203); there is nobody to
+     follow there, so Follow is a person's control only. */
+  const who = postIdentity(post);
+  const name = who.name;
+  const author = who.kind === "person" ? post.author : null;
   /* Nobody follows themselves, and follows_no_self would refuse it anyway. */
   const isOwnPost = viewerId !== null && viewerId === post.author_id;
   const href = `/community/${post.id}`;
@@ -252,21 +257,17 @@ export function VideoOverlay({
       */}
       <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-4 pe-20 sm:px-5 sm:pe-24">
         <div className="flex items-center gap-2.5">
-          {author ? (
+          {who.href ? (
             <Link
-              href={`/u/${author.username}`}
+              href={who.href}
               onClick={() => onTrack("profile_opened")}
               className="flex min-h-11 items-center gap-2.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
-              <Avatar
-                fullName={author.full_name}
-                username={author.username}
-                avatarUrl={author.avatar_url}
-                size="sm"
-              />
+              <IdentityAvatar identity={who} size="sm" />
               <span className="truncate text-[15px] font-semibold text-white drop-shadow">
                 {name}
               </span>
+              <IdentityMarks identity={who} onMedia />
             </Link>
           ) : (
             <span className="text-[15px] font-semibold text-white drop-shadow">{name}</span>

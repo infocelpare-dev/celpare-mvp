@@ -323,6 +323,9 @@ export async function getTabRows(
         .from("posts")
         .select(POST_SELECT)
         .eq("author_id", profile.id)
+        /* The person's own posts. Their tools' launches are the tools' (D203)
+           and live on the tool page and in the feed under the tool's name. */
+        .eq("posted_as", "person")
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
@@ -351,6 +354,7 @@ export async function getTabRows(
         .from("posts")
         .select(POST_SELECT)
         .eq("author_id", profile.id)
+        .eq("posted_as", "person")
         .is("deleted_at", null)
         .in("kind", ["image", "video"])
         .order("created_at", { ascending: false })
