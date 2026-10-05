@@ -368,7 +368,7 @@ export function MediaGrid({
   anyway so a media element's src can only ever be that, which also keeps the
   CodeQL DOM to HTML rule (js/xss-through-dom) satisfied.
 */
-function isBlobUrl(url: string): boolean {
+export function isBlobUrl(url: string): boolean {
   return url.startsWith(`blob:${window.location.origin}/`);
 }
 
@@ -377,7 +377,7 @@ function isBlobUrl(url: string): boolean {
   written, so distribution knows how long "finished watching" is. Null after
   five seconds or on any error: a missing length costs nothing but precision.
 */
-function videoMeta(file: File): Promise<{ width: number; height: number; durationMs: number | null } | null> {
+export function videoMeta(file: File): Promise<{ width: number; height: number; durationMs: number | null } | null> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     // Only a browser made blob: URL ever reaches src, never text from the page.
@@ -415,7 +415,7 @@ function videoMeta(file: File): Promise<{ width: number; height: number; duratio
   feed does not jump as pictures load. Resolves to null rather than throwing:
   a missing dimension costs a reserved box, not a failed post.
 */
-function imageSize(file: File): Promise<{ width: number; height: number } | null> {
+export function imageSize(file: File): Promise<{ width: number; height: number } | null> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     if (!isBlobUrl(url)) {

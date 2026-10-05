@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { DeveloperShell } from "@/components/developer/developer-shell";
 import { ModeOff } from "@/components/developer/mode-off";
 import { NoticeCard } from "@/components/developer/notice-card";
-import { FeatureUpdateForm } from "@/components/developer/feature-update-form";
+import { LaunchComposer } from "@/components/tools/launch-feature";
 import { gate, getToolForEdit } from "@/lib/developer/queries";
 
 export const metadata: Metadata = {
@@ -68,12 +68,20 @@ export default async function LaunchFeaturePage({
   return (
     <DeveloperShell
       title="Launch a new feature"
-      lead={`Tell people what you shipped on ${name}. It appears in the tool's media and goes live straight away.`}
+      lead={`Tell people what you shipped on ${name}. Once ${name} is published you can also launch from its page and share it to the feed.`}
       verified={g.profile.verified}
       backHref={tool.status === "approved" ? `/tools/${tool.slug}` : "/developer/tools"}
       backLabel={tool.status === "approved" ? "Back to the tool" : "Back to My Tools"}
     >
-      <FeatureUpdateForm toolId={tool.id} slug={tool.slug} toolName={name} />
+      <div className="mt-8 max-w-[560px] rounded-3xl border border-border">
+        <LaunchComposer
+          toolId={tool.id}
+          slug={tool.slug}
+          toolName={name}
+          logoUrl={(tool.values.logoUrl as string) || null}
+          feedChoice={tool.status === "approved"}
+        />
+      </div>
     </DeveloperShell>
   );
 }

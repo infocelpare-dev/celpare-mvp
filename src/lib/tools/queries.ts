@@ -31,6 +31,8 @@ export type ToolMedia = {
      developer announces after the tool is live; they never go through review
      and update_tool never touches them. */
   is_update: boolean;
+  /* The feed post this launch was also shared as (D202), or null. */
+  post_id: string | null;
   sort_order: number;
 };
 
@@ -82,7 +84,7 @@ export async function getToolProfile(slug: string): Promise<ToolProfile | null> 
   const { data, error } = await db
     .from("tools")
     .select(
-      `${TOOL_COLUMNS}, tool_categories(categories(name)), tool_links(kind, url), tool_media(id, kind, url, caption, link_url, is_update, sort_order)`,
+      `${TOOL_COLUMNS}, tool_categories(categories(name)), tool_links(kind, url), tool_media(id, kind, url, caption, link_url, is_update, post_id, sort_order)`,
     )
     .eq("slug", slug)
     .maybeSingle();

@@ -16,6 +16,8 @@ import {
   VIDEO_BUCKET,
 } from "@/lib/tools/media";
 import { DEVELOPER_TERMS_VERSION } from "@/lib/developer/queries";
+import { processPost } from "@/lib/community/intelligence/server/upload";
+import { clampDurationMs } from "@/lib/community/intelligence/upload";
 
 export type DeveloperState = {
   status: "idle" | "success" | "error";
@@ -1115,18 +1117,28 @@ export async function declineDeveloper(): Promise<void> {
   tool is: it has to be a file in our own buckets, in the caller's own folder,
   and the bytes have to be what they claim.
 */
-export async function postToolUpdate(
+
+/*
+  The action itself, from the tool page (D202). The rules above hold (one
+  line, then a video, an image or a link), plus WHERE it appears: the tool page only, or the tool page and the community feed.
+
+  launch_tool_feature writes the update and, when asked, a 'launch' post tied
+  to the tool in one transaction, so a launch is never half published. It
+  refuses the feed for a tool that is not published. The file must still be
+  the caller's own upload in a tool bucket whose bytes match its kind; that is
+  checked here because SQL cannot read storage.
+*/
+export async function launchToolFeature(
   _prev: DeveloperState,
   formData: FormData,
 ): Promise<DeveloperState> {
-  const raw: Record<string, string | string[]> = {
+  const raw: Record<string, string> = {
     caption: String(formData.get("caption") ?? ""),
     linkUrl: String(formData.get("linkUrl") ?? ""),
-    updateVideoUrl: String(formData.get("updateVideoUrl") ?? ""),
-    updateImageUrl: String(formData.get("updateImageUrl") ?? ""),
+    mediaUrl: String(formData.get("mediaUrl") ?? ""),
+    mediaKind: String(formData.get("mediaKind") ?? ""),
+    audience: String(formData.get("audience") ?? "page"),
   };
-  const str = (k: string) => (raw[k] as string) ?? "";
-
   const fail = (message: string, field?: string): DeveloperState => ({
     status: "error",
     message,
@@ -1140,92 +1152,88 @@ export async function postToolUpdate(
   if (!UUID_RE.test(toolId)) return fail("That tool could not be found.");
   if (!isSupabaseConfigured()) return fail("Not connected.");
 
-  const caption = str("caption").trim();
-  if (caption === "") {
-    return fail("Say what you shipped. That line is the announcement.", "caption");
-  }
-  if (caption.length > 200) {
-    return fail("Keep it under 200 characters.", "caption");
-  }
+  const caption = raw.caption.trim();
+  if (caption === "") return fail("Say what you shipped. That line is the announcement.", "caption");
+  if (caption.length > 200) return fail("Keep it under 200 characters.", "caption");
 
-  const link = str("linkUrl").trim();
-  if (link !== "" && !httpsOnly(link)) {
-    return fail("A link must start with https://", "linkUrl");
+  const link = raw.linkUrl.trim();
+  if (link !== "" && !httpsOnly(link)) return fail("A link must start with https://", "linkUrl");
+
+  const url = raw.mediaUrl.trim();
+  const mediaKind = raw.mediaKind === "video" ? "video" : raw.mediaKind === "image" ? "image" : "";
+  if (url !== "" && mediaKind === "") return fail("That file did not attach. Add it again.", "media");
+  if (url === "" && link === "") {
+    return fail("Add a video, an image, or a link. A launch needs one of the three.", "media");
   }
-
-  /*
-    A video, an image, or a link on its own. Founder, 2026-09-17: those three
-    and nothing else, and never an arbitrary file.
-
-    One of them, not two. A video AND an image is two announcements, and which
-    one the profile should lead with is not a question this form should be
-    asking somebody.
-  */
-  const video = str("updateVideoUrl").trim();
-  const image = str("updateImageUrl").trim();
-
-  if (video !== "" && image !== "") {
-    return fail("Post a video or an image, not both. The other can be a second update.", "updateVideoUrl");
-  }
-  if (video === "" && image === "" && link === "") {
-    return fail("Add a video, an image, or a link. An update needs one of the three.", "updateVideoUrl");
-  }
-
-  const kind = video !== "" ? "video" : image !== "" ? "screenshot" : "link";
-  const url = video !== "" ? video : image;
+  if (raw.audience !== "page" && raw.audience !== "feed") return fail("Choose where it appears.");
+  const toFeed = raw.audience === "feed";
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return fail("Sign in first.");
 
-  /* Only when there is something uploaded to check. A link only post has no
-     file of ours, which is the whole point of allowing one. */
-  const bad =
-    kind === "link"
-      ? null
-      : await verifyUploads(
-          [{ url, field: kind === "video" ? "updateVideoUrl" : "updateImageUrl" }],
-          user.id,
-        );
-  if (bad) {
-    return fail(
-      "That upload could not be checked. Remove it and upload it again.",
-      bad.field,
-    );
+  if (url !== "") {
+    /* The bucket must match what the form claims, then the bytes must too. */
+    const parsed = parseStorageUrl(url);
+    if (!parsed || (parsed.bucket === VIDEO_BUCKET) !== (mediaKind === "video")) {
+      return fail("That upload could not be checked. Remove it and add it again.", "media");
+    }
+    const bad = await verifyUploads([{ url, field: "media" }], user.id);
+    if (bad) return fail("That upload could not be checked. Remove it and add it again.", "media");
   }
 
-  const { error } = await supabase.rpc("post_tool_update", {
+  const num = (k: string) => {
+    const n = Number(formData.get(k));
+    return Number.isInteger(n) && n > 0 && n <= 20000 ? n : null;
+  };
+  const durationMs = mediaKind === "video" ? clampDurationMs(formData.get("duration")) : null;
+
+  const { data, error } = await supabase.rpc("launch_tool_feature", {
     p_tool_id: toolId,
-    p_kind: kind,
-    p_url: kind === "link" ? null : url,
+    p_kind: url === "" ? "link" : mediaKind === "video" ? "video" : "screenshot",
+    p_url: url === "" ? null : url,
     p_caption: caption,
     p_link_url: link === "" ? null : link,
+    p_to_feed: toFeed,
+    p_width: mediaKind === "image" ? num("width") : null,
+    p_height: mediaKind === "image" ? num("height") : null,
+    p_duration_ms: durationMs,
   });
 
   if (error) {
-    console.error("[developer] tool update post failed", error.code, error.message);
+    console.error("[developer] launch failed", error.code, error.message);
+    if (error.message.includes("tool_not_live")) {
+      return fail("Only a published tool can be launched to the feed. Choose Tool page only.");
+    }
     if (error.message.includes("tool_not_found")) return fail("That tool no longer exists.");
     if (error.message.includes("wrong_state")) {
       return fail("This submission is closed, so there is nothing to announce about it.");
     }
     if (error.message.includes("not_authorised") || error.code === "42501") {
-      return fail("Only the developer who submitted this tool can post an update.");
+      return fail("Only the developer who submitted this tool can launch on it.");
     }
-    if (error.message.includes("caption_required")) {
-      return fail("Say what you shipped.", "caption");
-    }
-    if (error.message.includes("link_required")) {
-      return fail("A link update needs a link.", "linkUrl");
-    }
-    if (error.message.includes("media_required")) {
-      return fail("Add a video or an image.", "updateVideoUrl");
-    }
-    return fail("Could not post that. Please try again.");
+    if (error.message.includes("caption_required")) return fail("Say what you shipped.", "caption");
+    if (error.message.includes("link_required")) return fail("A link launch needs a link.", "linkUrl");
+    if (error.message.includes("media_required")) return fail("Add a video or an image.", "media");
+    return fail("Could not launch that. Please try again.");
   }
 
+  const postId = (data as { post_id: string | null } | null)?.post_id ?? null;
+  if (postId) {
+    /* Post Intelligence (4BG), as createPost does: language, duplicates, spam. */
+    after(() => processPost(postId, durationMs));
+    revalidatePath("/community");
+  }
   revalidatePath("/developer/tools");
   if (slug) revalidatePath(`/tools/${slug}`);
-  redirect(slug ? `/tools/${slug}` : "/developer/tools");
+
+  return {
+    status: "success",
+    message: postId ? "Launched on your tool page and in the feed." : "Launched on your tool page.",
+    values: { postId: postId ?? "" },
+  };
 }
 
 /* Removing one you posted. The RPC checks it is a launch post and that it is

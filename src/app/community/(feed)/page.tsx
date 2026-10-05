@@ -7,6 +7,7 @@ import { isSort } from "@/lib/community/ranking";
 import {
   countVisiblePosts,
   getFeed,
+  getPost,
   getTopics,
   getViewerState,
   readerFor,
@@ -144,6 +145,26 @@ export default async function CommunityPage({
     posts = ranked.posts;
   } else {
     posts = await getFeed(db, { sort, scope, viewerId, pages });
+  }
+
+  /*
+    ?posted=<id>: the post the viewer has just published (a feature launch,
+    D202) goes first, so "See it in the feed" lands on the feed with it on top.
+    Only their own, only within the hour, only on the first page; anything else
+    is ignored and the feed is exactly what it would have been.
+  */
+  const postedId =
+    typeof params?.posted === "string" && /^[0-9a-f-]{36}$/.test(params.posted) ? params.posted : null;
+  if (postedId && viewerId && pages === 1) {
+    const mine = await getPost(await createClient(), postedId);
+    if (
+      mine &&
+      mine.author_id === viewerId &&
+      mine.status === "visible" &&
+      now - new Date(mine.created_at).getTime() < 60 * 60_000
+    ) {
+      posts = [mine, ...posts.filter((p) => p.id !== mine.id)];
+    }
   }
 
   const complete = ranked ? ranked.complete : posts.length < RANKING.PAGE_SIZE * pages;

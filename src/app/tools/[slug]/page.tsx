@@ -11,7 +11,6 @@ import {
   Link2,
   MessageCircle,
   Play,
-  Plus,
 } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { ButtonLink } from "@/components/ui/button";
@@ -20,6 +19,7 @@ import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { ToolActions } from "@/components/tools/tool-actions";
 import { VerificationRequest } from "@/components/tools/verification-request";
+import { LaunchFeatureButton } from "@/components/tools/launch-feature";
 import { CompareLink } from "@/components/compare/compare-link";
 import {
   RatingSummary,
@@ -307,21 +307,21 @@ export default async function ToolPage({
 
           {/* Owner only, and it is not an edit. Posting news does not change
               what the listing claims, so unlike Edit tool it does not send a
-              live tool back for review.
+              live tool back for review. It opens here as a dialog with the
+              choice of tool page only or tool page and feed (D202), so the
+              developer never leaves the tool to announce something on it.
 
               Plus, not Sparkles, founder instruction 2026-09-18. Sparkles was
               then the Verified badge (now a blue tick, D201), so the same mark
               meant two different things on one screen. A plus says "add one of
               these", which is what the control does. */}
           {viewer.isOwner ? (
-            <ButtonLink
-              href={`/developer/tools/${tool.id}/update`}
-              variant="outline"
-              size="sm"
-            >
-              <Plus className="size-4" aria-hidden />
-              Launch a new feature
-            </ButtonLink>
+            <LaunchFeatureButton
+              toolId={tool.id}
+              slug={tool.slug}
+              toolName={tool.name}
+              logoUrl={tool.logo_url}
+            />
           ) : null}
 
           {/* Elite only, an admin accepts it (D201). */}
@@ -420,6 +420,16 @@ export default async function ToolPage({
                       {u.kind === "link" ? "Take a look" : "More about this"}
                       <ExternalLink className="size-3.5" aria-hidden />
                     </a>
+                  ) : null}
+
+                  {u.post_id ? (
+                    <Link
+                      href={`/community/${u.post_id}`}
+                      className="mt-3 flex w-fit items-center gap-1.5 text-[13px] text-muted transition-colors duration-200 ease-out hover:text-foreground"
+                    >
+                      <span aria-hidden className="size-1.5 rounded-full bg-accent" />
+                      Also in the feed
+                    </Link>
                   ) : null}
                 </li>
               ))}
