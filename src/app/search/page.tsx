@@ -16,6 +16,7 @@ import {
   ModelResult,
   PersonResult,
   PostResult,
+  SponsoredTools,
   ToolResult,
 } from "@/components/search/results";
 import { hydratePosts, runSearch } from "@/lib/search/engine";
@@ -95,7 +96,7 @@ export default async function SearchPage({
      with everything conditional inside it. */
   const [results, recent, recommendations, categories] = await Promise.all([
     hasQuery
-      ? runSearch({ query: q, tab, signedIn, viewerId })
+      ? runSearch({ query: q, tab, page, signedIn, viewerId })
       : Promise.resolve(null),
     loadRecentSearches(viewerId, RECENT_SEARCHES_SHOWN),
     hasQuery
@@ -344,7 +345,12 @@ async function Results({
           .
         </p>
       ) : (
-        <ol className="mt-1">{list.map((item, i) => render(item, offset + i))}</ol>
+        <>
+          {current === 1 && (tab === "all" || tab === "tools") ? (
+            <SponsoredTools items={results.sponsored} requestId={results.sponsoredRequestId} />
+          ) : null}
+          <ol className="mt-1">{list.map((item, i) => render(item, offset + i))}</ol>
+        </>
       )}
 
       <Pagination

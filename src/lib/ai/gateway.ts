@@ -19,6 +19,9 @@ import { smallTalkReply } from "./small-talk";
 import { getProvider, models, providerName } from "./providers";
 import { checkIdentityLimits, countIdentityMessage, countIdentityTokens } from "./ratelimit";
 import { loadToolCards, type ToolCard } from "./tool-search";
+import { getSponsoredCampaigns, serveSponsored, viewerKeyFrom } from "@/lib/sponsored/server";
+import { askSponsoredCandidates } from "@/lib/sponsored/search";
+import { MAX_SPONSORED_TOOLS } from "@/lib/sponsored/config";
 import { askCandidates, recordAskImpressions, type AskCandidates } from "./recommend-candidates";
 import { evidenceIntent, evidenceSources, loadModelEvidence } from "./model-evidence";
 import { estimateTokens, recordUsage } from "./usage";
@@ -74,6 +77,11 @@ type Event =
      gets persisted; `cards` is the public record behind each one, which may
      show more, because the allowlist limits the model and not the reader. */
   | { t: "cards"; citations: ToolCitation[]; cards: ToolCard[] }
+  /* Sponsored tools that match the question (D204, D205), at most
+     MAX_SPONSORED_TOOLS, ranked by the separate sponsored layer. Drawn in
+     their own labelled section; never in the prompt and never saved with the
+     transcript. */
+  | { t: "sponsored"; cards: (ToolCard & { toolId: string })[]; requestId: string | null }
   | { t: "sources"; v: WebResult[] }
   | { t: "text"; v: string }
   | { t: "error"; v: string }
@@ -487,6 +495,39 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
           const cards = await loadToolCards(tools.map((t) => t.slug));
           emit(controller, { t: "cards", citations: tools, cards });
           if (candidates) void recordAskImpressions(candidates, identity.userId, cards.map((c) => c.slug));
+        }
+
+        /* TypeScript narrows `candidates` to null after the closure assigned
+           it, so it is read back through a cast, as recordAskImpressions'
+           guard above relies on at runtime. */
+        const sponsoredCands = (candidates as AskCandidates | null)?.sponsored ?? [];
+        if (sponsoredCands.length > 0) {
+          /* Measured on Search's relevance scale, so Ask clears the same gate
+             Search does (D205). */
+          const sponsoredIds = new Set((await getSponsoredCampaigns()).map((c) => c.toolId));
+          const scored = await askSponsoredCandidates(
+            cleaned.text,
+            sponsoredCands.map((c) => ({ toolId: c.toolId, fit: c.fit })),
+            sponsoredIds,
+          );
+          const serve = await serveSponsored({
+            surface: "ask",
+            query: cleaned.text,
+            candidates: scored,
+            viewer: viewerKeyFrom(identity.userId, identity.anonHash),
+            userId: identity.userId,
+          });
+          const slugOf = new Map(sponsoredCands.map((c) => [c.toolId, c.slug]));
+          const picked = serve.picks.slice(0, MAX_SPONSORED_TOOLS);
+          if (picked.length > 0) {
+            const loaded = await loadToolCards(picked.map((p) => slugOf.get(p.toolId) ?? p.slug));
+            const bySlug = new Map(loaded.map((c) => [c.slug, c]));
+            const cards = picked.flatMap((p) => {
+              const card = bySlug.get(slugOf.get(p.toolId) ?? p.slug);
+              return card ? [{ ...card, toolId: p.toolId }] : [];
+            });
+            if (cards.length > 0) emit(controller, { t: "sponsored", cards, requestId: serve.requestId });
+          }
         }
 
         /* The benchmark sources go in the same strip as web sources, so a

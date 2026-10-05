@@ -23,6 +23,10 @@ type Turn = {
   role: "user" | "assistant";
   content: string;
   citations?: ToolCitation[];
+  /* Sponsored tools that match the question (D204, D205), drawn above the
+     citations. Live only: a reopened chat shows its citations, not old ads. */
+  sponsored?: ToolCitation[];
+  sponsoredRequestId?: string | null;
   /* Deep research announces what it is doing as it does it. Kept on the turn
      rather than in one shared place, so scrolling back up shows what that
      answer was built from rather than what the latest one is doing. */
@@ -193,6 +197,14 @@ export function AskChat({
               const citations = (cards?.length ? cards : event.citations) as ToolCitation[];
               setTurns((prev) =>
                 prev.map((t) => (t.id === replyId ? { ...t, citations } : t)),
+              );
+            }
+
+            if (event.t === "sponsored") {
+              const sponsored = (event.cards as ToolCitation[]) ?? [];
+              const sponsoredRequestId = typeof event.requestId === "string" ? event.requestId : null;
+              setTurns((prev) =>
+                prev.map((t) => (t.id === replyId ? { ...t, sponsored, sponsoredRequestId } : t)),
               );
             }
 
@@ -464,8 +476,8 @@ function Answer({
         </div>
       )}
 
-      {turn.citations && turn.citations.length > 0 ? (
-        <ToolCards tools={turn.citations} />
+      {(turn.citations?.length ?? 0) > 0 || (turn.sponsored?.length ?? 0) > 0 ? (
+        <ToolCards tools={turn.citations ?? []} sponsored={turn.sponsored} sponsoredRequestId={turn.sponsoredRequestId} />
       ) : null}
 
       {turn.sources && turn.sources.length > 0 && !empty ? (

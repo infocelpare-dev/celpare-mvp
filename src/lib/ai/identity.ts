@@ -56,6 +56,20 @@ function verify(raw: string): string | null {
   return value;
 }
 
+/*
+  The anonymous key identify() would give this visitor, read without minting a
+  cookie, for pages that cannot set one (server components). With no cookie
+  it falls back to the hashed address alone, prefixed so it never collides.
+*/
+export async function readAnonHash(): Promise<string> {
+  const jar = await cookies();
+  const existing = jar.get(COOKIE)?.value;
+  const id = existing ? verify(existing) : null;
+  const ipHash = hashIp(await clientIp());
+  const seed = id ? `${id}:${ipHash}` : `nocookie:${ipHash}`;
+  return createHmac("sha256", secret()).update(seed).digest("hex").slice(0, 32);
+}
+
 export function hashIp(ip: string): string {
   return createHmac("sha256", secret()).update(ip).digest("hex").slice(0, 32);
 }

@@ -2,6 +2,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowUpRight, Eye, Users } from "lucide-react";
 import { VerifiedTick } from "@/components/ui/verified-tick";
+import { SponsoredLabel } from "@/components/ui/sponsored-label";
+import { SponsoredSlot } from "@/components/sponsored/sponsored-slot";
+import { MAX_SPONSORED_TOOLS } from "@/lib/sponsored/config";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
@@ -58,21 +61,27 @@ const PRIMARY =
 export function ToolResult({
   item,
   position,
+  sponsored = false,
+  as: Tag = "li",
 }: {
   item: Scored<ToolCandidate>;
   position: number;
+  /* A sponsored slot (D204). It carries the label and NO search tracking
+     attributes: a click on an ad must not teach the organic ranking that the
+     tool is what this query wanted. Its own events go to sponsored_events. */
+  sponsored?: boolean;
+  /* "div" inside a SponsoredSlot, which is the list item. */
+  as?: "li" | "div";
 }) {
   const t = item.candidate;
   const views = t.engagement.viewsTotal;
   const rated = t.ratingCount > 0 && t.rating !== null;
+  const tracking = sponsored
+    ? {}
+    : { "data-result-type": "tool", "data-result-id": t.id, "data-result-position": position };
 
   return (
-    <li
-      className={ROW}
-      data-result-type="tool"
-      data-result-id={t.id}
-      data-result-position={position}
-    >
+    <Tag className={Tag === "div" ? ROW.replace("border-b border-border ", "") : ROW} {...tracking}>
       {/* The logo is a circle, per 4AJ.5, and p-2 with object-contain so a wide
           wordmark does not lose its ends to the clip. */}
       <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border p-2 sm:size-14">
@@ -100,6 +109,7 @@ export function ToolResult({
           {t.verified ? (
             <VerifiedTick label="Verified tool" />
           ) : null}
+          {sponsored ? <SponsoredLabel /> : null}
         </span>
 
         {t.tagline ? (
@@ -141,7 +151,7 @@ export function ToolResult({
 
         {/* Why it matched. Read from the signals, so it states something true or
             nothing at all. */}
-        {item.reason ? (
+        {item.reason && !sponsored ? (
           <span className="mt-2 inline-block">
             <Badge>{item.reason}</Badge>
           </span>
@@ -161,7 +171,7 @@ export function ToolResult({
           </ButtonLink>
         </span>
       </span>
-    </li>
+    </Tag>
   );
 }
 
@@ -430,5 +440,47 @@ export function PostResult({
     >
       <PostCard post={post} viewer={viewer} signedIn={signedIn} />
     </li>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Sponsored
+   --------------------------------------------------------------------------- */
+
+/*
+  The sponsored block above the organic results (D204, D205): at most
+  MAX_SPONSORED_TOOLS, under a Sponsored heading, each row labelled, and a
+  rule before the organic results. Only on page one of All and Tools, the way
+  sponsored results lead a results page rather than every page of it.
+*/
+export function SponsoredTools({
+  items,
+  requestId,
+}: {
+  items: Scored<ToolCandidate>[];
+  requestId: string | null;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <section aria-labelledby="sponsored-heading" className="mt-3 border-b border-border pb-2">
+      <h2 id="sponsored-heading" className="px-1 text-[13px] font-medium text-muted">
+        Sponsored
+      </h2>
+      <ol>
+        {items.slice(0, MAX_SPONSORED_TOOLS).map((item, i) => (
+          <SponsoredSlot
+            key={`sponsored-${item.candidate.id}`}
+            surface="search"
+            toolId={item.candidate.id}
+            name={item.candidate.name}
+            position={i}
+            requestId={requestId}
+            className="border-b border-border last:border-b-0"
+          >
+            <ToolResult item={item} position={i} sponsored as="div" />
+          </SponsoredSlot>
+        ))}
+      </ol>
+    </section>
   );
 }

@@ -13,7 +13,8 @@
     "test:auth": "node --import ./scripts/test-loader.mjs --test \"src/lib/auth/__tests__/*.test.ts\"",
     "test:algorithms": "node --import ./scripts/test-loader.mjs --test \"src/lib/community/intelligence/__tests__/*.test.ts\" \"src/lib/explore/intelligence/__tests__/*.test.ts\" \"src/lib/compare/intelligence/__tests__/*.test.ts\" \"src/lib/recommend/__tests__/*.test.ts\"",
     "test:analytics": "node --import ./scripts/test-loader.mjs --test \"src/lib/analytics/__tests__/*.test.ts\"",
-    "test:pricing": "node --import ./scripts/test-loader.mjs --test \"src/lib/pricing/__tests__/*.test.ts\""
+    "test:pricing": "node --import ./scripts/test-loader.mjs --test \"src/lib/pricing/__tests__/*.test.ts\"",
+    "test:sponsored": "node --import ./scripts/test-loader.mjs --test \"src/lib/sponsored/__tests__/*.test.ts\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

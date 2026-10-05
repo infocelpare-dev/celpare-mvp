@@ -226,6 +226,12 @@ export type SearchResults = {
   query: ParsedQuery;
   tab: SearchTab;
   tools: Scored<ToolCandidate>[];
+  /* At most MAX_SPONSORED_TOOLS sponsored tools that match this query (D204,
+     D205), shown above the organic list and labelled. Ranked by the separate
+     sponsored layer from `tools`, which is not changed. */
+  sponsored: Scored<ToolCandidate>[];
+  /* The sponsored serve these belong to, for its events. Null when none. */
+  sponsoredRequestId: string | null;
   models: Scored<ModelCandidate>[];
   people: Scored<PersonCandidate>[];
   posts: Scored<PostCandidate>[];

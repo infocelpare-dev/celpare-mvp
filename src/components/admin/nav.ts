@@ -45,6 +45,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { href: "/admin/submissions", label: "Submissions", capability: "submissions.review" },
       { href: "/admin/verifications", label: "Verification requests", capability: "submissions.review" },
+      { href: "/admin/sponsorships", label: "Sponsored tools", capability: "users.plan" },
       { href: "/admin/tools", label: "Tools", capability: "submissions.review" },
       { href: "/admin/models", label: "Models", capability: "models.manage" },
     ],

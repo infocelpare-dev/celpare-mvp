@@ -15,6 +15,7 @@ import { NO_AFFINITY, rankCandidates, WEIGHTS, type RankContext } from "./rankin
 import { diversify, interleave } from "./diversity";
 import { searchPreference } from "@/lib/recommend/server/engine";
 import { tieBreak } from "@/lib/recommend/tiebreak";
+import { sponsoredForSearch } from "@/lib/sponsored/search";
 
 import {
   isSearchTab,
@@ -66,6 +67,8 @@ function emptyResults(parsed: ParsedQuery, tab: SearchTab): SearchResults {
     query: parsed,
     tab,
     tools: [],
+    sponsored: [],
+    sponsoredRequestId: null,
     models: [],
     people: [],
     posts: [],
@@ -180,6 +183,18 @@ export async function runSearch(input: SearchInput): Promise<SearchResults> {
     maxRun: WEIGHTS.MAX_PER_PROVIDER_RUN,
   });
   const people = rankCandidates<PersonCandidate>(raw.people, ctx);
+
+  /*
+    Sponsored slots (D204, D205), a separate layer read off the finished tool
+    ranking and never fed back into it: `tools` keeps every tool in the order
+    the formula gave. Only where they are drawn, page one of All and Tools, so
+    an impression is never recorded for an ad nobody was shown; and never for
+    the suggestion endpoint (record false), where a keystroke is not a search.
+  */
+  const sponsoredShown = (input.page ?? 1) <= 1 && (tab === "all" || tab === "tools") && input.record !== false;
+  const sponsored = sponsoredShown
+    ? await sponsoredForSearch({ tools, affinity, parsed, viewerId: input.viewerId, record: true })
+    : { items: [], requestId: null };
   const posts = diversify(rankCandidates<PostCandidate>(raw.posts, ctx));
 
   const counts = {
@@ -228,6 +243,8 @@ export async function runSearch(input: SearchInput): Promise<SearchResults> {
     query: parsed,
     tab,
     tools,
+    sponsored: sponsored.items,
+    sponsoredRequestId: sponsored.requestId,
     models,
     people,
     posts,

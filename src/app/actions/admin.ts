@@ -573,6 +573,65 @@ export async function decideToolVerification(
   );
 }
 
+/* ----------------------------------------------------------- sponsorship */
+
+/*
+  Sponsored tools (D204). Extend adds a month; End stops it today with a
+  reason. users.plan, the capability that sets paid plans. Runs are started by
+  payments when they open (Phase 7); there is no request to accept.
+*/
+export async function changeToolSponsorship(
+  _prev: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const parsed = z
+    .object({ id: uuid, action: z.enum(["extend", "end"]), reason: optionalReason })
+    .safeParse({
+      id: formData.get("id"),
+      action: formData.get("action"),
+      reason: formData.get("reason") ?? undefined,
+    });
+  if (!parsed.success) {
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the form." };
+  }
+  return run(
+    "users.plan",
+    "admin_change_tool_sponsorship",
+    { p_id: parsed.data.id, p_action: parsed.data.action, p_reason: parsed.data.reason ?? null, p_months: 1 },
+    ["/admin/sponsorships"],
+    parsed.data.action === "extend" ? "Extended by one month." : "Sponsorship ended.",
+  );
+}
+
+/*
+  Suspend or restore a sponsorship's PLACEMENT (D205). The paid run keeps its
+  dates; the tool simply stops being served as sponsored until restored.
+  Suspending needs a reason, which goes to the audit log.
+*/
+export async function setSponsorshipPlacement(
+  _prev: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const parsed = z
+    .object({ id: uuid, suspend: z.enum(["true", "false"]), reason: optionalReason })
+    .safeParse({
+      id: formData.get("id"),
+      suspend: formData.get("suspend"),
+      reason: formData.get("reason") ?? undefined,
+    });
+  if (!parsed.success) {
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the form." };
+  }
+  const suspend = parsed.data.suspend === "true";
+  return run(
+    "users.plan",
+    "admin_set_sponsorship_placement",
+    { p_id: parsed.data.id, p_suspend: suspend, p_reason: parsed.data.reason ?? null },
+    ["/admin/sponsorships"],
+    suspend ? "Placement suspended. The run keeps its dates." : "Placement restored.",
+  );
+}
+
 /* -------------------------------------------------------------- settings */
 
 export async function setSetting(_prev: AdminState, formData: FormData): Promise<AdminState> {
