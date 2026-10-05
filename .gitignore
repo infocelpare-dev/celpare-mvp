@@ -61,3 +61,8 @@ docs/
 # Design tool scratch output. 2.9MB of generated canvas files for the tool
 # profile, referenced by nothing in src. Kept on disk, off the public repo.
 /design/
+
+# Videos are never committed (founder, 2026-10-05): the Remotion film sources,
+# their renders and assets, and the cuts the landing page plays.
+/video/
+/public/video/
