@@ -74,7 +74,7 @@ export default withSentryConfig(nextConfig, {
      what makes a trace through a shared lib readable. */
   widenClientFileUpload: true,
 
-  /* See point 2. src/middleware.ts must not intercept this path, and its
+  /* See point 2. src/proxy.ts must not intercept this path, and its
      matcher excludes it. */
   tunnelRoute: "/monitoring",
 

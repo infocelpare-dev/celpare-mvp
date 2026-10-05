@@ -18,7 +18,7 @@ export async function register() {
 }
 
 /*
-  Errors thrown inside Server Components, server actions and middleware. Without
+  Errors thrown inside Server Components, server actions and the proxy. Without
   this hook those are logged to the console and never reach Sentry, which would
   leave the entire admin dashboard and the whole of Ask Celpare unmonitored,
   since both are server rendered.

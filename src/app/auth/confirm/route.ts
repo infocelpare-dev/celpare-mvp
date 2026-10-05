@@ -14,7 +14,7 @@ import {
   a token hash is verified here, server side, with no code verifier cookie.
 
   recovery      "Choose a new password": opens a session that may only reach
-                /reset-password (the recovery cookie, honoured by middleware).
+                /reset-password (the recovery cookie, honoured by the proxy).
   email_change  "Confirm the change": with secure email change on, both the old
                 and the new address get a link and both must be opened. Either
                 way the person logs in again afterwards, with the address now

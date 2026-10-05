@@ -10,7 +10,7 @@
      and lives 15 minutes. The code step refuses to finish a login without it,
      so a code alone (someone with the inbox but not the password) is not enough.
   2. cp_2fa: set when the code was right. It is bound to the Supabase session id,
-     so it cannot be carried to another session. The middleware signs out every
+     so it cannot be carried to another session. The proxy signs out every
      email based session that lacks it, which covers a password only session
      minted straight from the API and every session from before this existed.
 
@@ -20,7 +20,7 @@
   only token used directly against the REST API still passes RLS until it
   expires. Closing that needs Supabase MFA (TOTP) and aal2 policies.
 
-  Web Crypto only, because the middleware imports this too.
+  Web Crypto only, because the proxy imports this too.
 */
 
 export const LOGIN_PENDING_COOKIE = "cp_login_pending";
@@ -136,7 +136,7 @@ export async function hasSecondFactor(
   A reset link (D193) proves the inbox, not the password, so the session it
   opens may reach /reset-password and nothing else. This cookie says the link
   was opened in this browser, for this session, in the last 30 minutes. The
-  middleware honours it on /reset-password only.
+  proxy honours it on /reset-password only.
 */
 export const RECOVERY_COOKIE = "cp_recovery";
 export const RECOVERY_TTL_S = 30 * 60;

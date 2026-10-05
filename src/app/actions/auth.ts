@@ -166,7 +166,7 @@ async function setAuthCookie(name: string, value: string, maxAge: number) {
   });
 }
 
-/* Marks the session the code step just created, so the middleware keeps it. */
+/* Marks the session the code step just created, so the proxy keeps it. */
 async function grantSecondFactor(accessToken: string | undefined) {
   if (!secondFactorEnabled()) return;
   const claims = sessionClaims(accessToken);

@@ -18,7 +18,7 @@ import {
   If Supabase is not configured yet, pass through rather than throwing, so the
   marketing pages still render.
 */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return NextResponse.next({ request });
