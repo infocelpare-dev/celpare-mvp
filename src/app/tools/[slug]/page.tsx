@@ -345,7 +345,7 @@ export default async function ToolPage({
 
           {/* Goes to the Sponsored page in Pricing (D204). */}
           {viewer.isOwner ? (
-            <SponsorLink state={sponsorship ?? null} endsLabel={sponsorEnds} />
+            <SponsorLink state={sponsorship ?? null} endsLabel={sponsorEnds} slug={tool.slug} />
           ) : null}
         </div>
 

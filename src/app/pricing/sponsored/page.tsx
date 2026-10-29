@@ -6,8 +6,9 @@ import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { Container } from "@/components/ui/container";
 import { BackLink } from "@/components/ui/back-link";
-import { Button } from "@/components/ui/button";
 import { SponsoredLabel } from "@/components/ui/sponsored-label";
+import { SponsorToolPicker } from "@/components/pricing/sponsor-tool-picker";
+import { initialChoice, sortChoices, sponsorChoice, type SponsorChoice } from "@/lib/sponsored/choice";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { formatUsd } from "@/lib/pricing/plans";
 import { MAX_SPONSORED_TOOLS as SPONSORED_MAX, SPONSORSHIP_PRICE_CENTS } from "@/lib/sponsored/config";
@@ -77,9 +78,19 @@ const QUESTIONS = [
   },
 ];
 
-export default async function SponsoredPricingPage() {
+/* "1 November 2026", pinned to UTC so the server and the browser agree. */
+function longDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+}
+
+export default async function SponsoredPricingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tool?: string }>;
+}) {
   let signedIn = false;
   let isDeveloper = false;
+  let choices: SponsorChoice[] = [];
 
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
@@ -91,9 +102,58 @@ export default async function SponsoredPricingPage() {
       const { data } = await supabase.from("profiles").select("is_developer").eq("id", user.id).maybeSingle();
       isDeveloper = Boolean(data?.is_developer);
     }
+
+    /*
+      The developer's own tools, and any sponsorship on them, so the picker can
+      say which can be chosen and why not (founder, 2026-10-09). Both reads are
+      the developer's own rows under RLS. A failed read throws rather than
+      showing "you have no tools" (rule 13).
+    */
+    if (user && isDeveloper) {
+      const { data: tools, error: toolsError } = await supabase
+        .from("tools")
+        .select("id, slug, name, logo_url, status, website_url")
+        .eq("developer_id", user.id);
+      if (toolsError) throw new Error(`Your tools could not be read: ${toolsError.message}`);
+
+      const ids = (tools ?? []).map((t) => t.id as string);
+      const { data: runs, error: runsError } = ids.length
+        ? await supabase
+            .from("tool_sponsorships")
+            .select("tool_id, status, ends_at, placement_suspended_at, created_at")
+            .in("tool_id", ids)
+            .order("created_at", { ascending: false })
+        : { data: [], error: null };
+      if (runsError) throw new Error(`Your sponsorships could not be read: ${runsError.message}`);
+
+      /* The newest run per tool is the one that decides. */
+      const latest = new Map<string, { status: string; ends_at: string | null; placement_suspended_at: string | null }>();
+      for (const r of runs ?? []) if (!latest.has(r.tool_id as string)) latest.set(r.tool_id as string, r as never);
+
+      choices = sortChoices(
+        (tools ?? []).map((t) => {
+          const run = latest.get(t.id as string);
+          return sponsorChoice(
+            {
+              slug: String(t.slug),
+              name: String(t.name),
+              logoUrl: (t.logo_url as string | null) ?? null,
+              status: String(t.status),
+              websiteUrl: (t.website_url as string | null) ?? null,
+            },
+            run ? { status: run.status, endsAt: run.ends_at, placementSuspendedAt: run.placement_suspended_at } : null,
+          );
+        }),
+      );
+    }
   }
 
   if (!isDeveloper) redirect("/pricing");
+
+  const wanted = (await searchParams).tool ?? null;
+  const endsFormatted = Object.fromEntries(
+    choices.filter((c) => c.sponsoredUntil).map((c) => [c.slug, longDate(c.sponsoredUntil!)]),
+  );
 
   const price = formatUsd(SPONSORSHIP_PRICE_CENTS);
 
@@ -129,10 +189,12 @@ export default async function SponsoredPricingPage() {
               <span className="text-[13px] leading-tight text-muted">USD per month, per tool</span>
             </p>
             <div className="mt-6">
-              <Button className="w-full" disabled aria-describedby="sponsored-note">
-                Coming soon
-                <span className="sr-only">: sponsorship cannot be bought yet</span>
-              </Button>
+              <SponsorToolPicker
+                choices={choices}
+                initial={initialChoice(choices, wanted)}
+                price={price}
+                endsFormatted={endsFormatted}
+              />
             </div>
             <hr className="my-6 border-border" />
             <ul className="space-y-3">

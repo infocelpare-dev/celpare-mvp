@@ -14,9 +14,12 @@ import type { SponsorshipState } from "@/lib/tools/queries";
 export function SponsorLink({
   state,
   endsLabel,
+  slug,
 }: {
   state: SponsorshipState;
   endsLabel: string | null;
+  /* Opens the Sponsored page with this tool already chosen (2026-10-09). */
+  slug?: string;
 }) {
   if (state?.status === "active") {
     return (
@@ -28,7 +31,7 @@ export function SponsorLink({
   }
 
   return (
-    <ButtonLink href="/pricing/sponsored" variant="outline" size="sm">
+    <ButtonLink href={slug ? `/pricing/sponsored?tool=${encodeURIComponent(slug)}` : "/pricing/sponsored"} variant="outline" size="sm">
       <Megaphone className="size-4" aria-hidden />
       Sponsor this tool
     </ButtonLink>
