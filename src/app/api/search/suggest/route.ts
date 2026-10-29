@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAnonClient, createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { Suggestion } from "@/lib/search/types";
+import { providerLogo } from "@/lib/models/provider-logo";
 import { withinBurst } from "@/lib/security/burst";
 
 export const dynamic = "force-dynamic";
@@ -89,6 +90,69 @@ export async function GET(request: NextRequest) {
       sublabel: (row.sublabel as string | null) ?? null,
       href: String(row.href ?? ""),
     }));
+
+    /*
+      Each suggestion looks like what it opens, as the result rows do: a tool's
+      logo and tick, a model's maker logo, a person's picture and developer
+      tick. Narrow reads by slug and username, through the same reader, so RLS
+      decides what is visible exactly as it did for the suggestion itself.
+    */
+    for (const s of suggestions) {
+      /* A model suggestion's sublabel is its provider (search_suggest). */
+      if (s.kind === "model") s.imageUrl = providerLogo(s.sublabel);
+    }
+
+    const usernames = suggestions
+      .filter((s) => s.kind === "person" && s.href.startsWith("/u/"))
+      .map((s) => s.href.slice("/u/".length));
+    if (usernames.length > 0) {
+      const { data: people, error: peopleError } = await db
+        .from("profiles")
+        .select("username, avatar_url, developer:developer_profiles(verified)")
+        .in("username", usernames);
+      if (peopleError) {
+        console.error("[search] suggest people failed", peopleError.code, peopleError.message);
+      } else {
+        type PersonRow = {
+          username: string;
+          avatar_url: string | null;
+          developer: { verified: boolean | null } | { verified: boolean | null }[] | null;
+        };
+        const byName = new Map(((people as unknown as PersonRow[]) ?? []).map((p) => [p.username, p]));
+        for (const s of suggestions) {
+          if (s.kind !== "person") continue;
+          const p = byName.get(s.href.slice("/u/".length));
+          if (!p) continue;
+          const dev = Array.isArray(p.developer) ? p.developer[0] : p.developer;
+          s.imageUrl = p.avatar_url || null;
+          s.verified = dev?.verified === true;
+        }
+      }
+    }
+
+    const toolSlugs = suggestions
+      .filter((s) => s.kind === "tool" && s.href.startsWith("/tools/"))
+      .map((s) => s.href.slice("/tools/".length));
+    if (toolSlugs.length > 0) {
+      const { data: tools, error: toolError } = await db
+        .from("tools")
+        .select("slug, logo_url, verified")
+        .in("slug", toolSlugs);
+      if (toolError) {
+        console.error("[search] suggest tools failed", toolError.code, toolError.message);
+      } else {
+        const bySlug = new Map(
+          ((tools as { slug: string; logo_url: string | null; verified: boolean | null }[]) ?? []).map((t) => [t.slug, t]),
+        );
+        for (const s of suggestions) {
+          if (s.kind !== "tool") continue;
+          const t = bySlug.get(s.href.slice("/tools/".length));
+          if (!t) continue;
+          s.imageUrl = t.logo_url || null;
+          s.verified = t.verified === true;
+        }
+      }
+    }
 
     const response = NextResponse.json({ suggestions });
     /* Private, because one arm is the caller's own history. A shared cache here

@@ -267,6 +267,11 @@ export type Suggestion = {
   label: string;
   sublabel: string | null;
   href: string;
+  /* What the suggestion looks like: a tool's logo, a model maker's logo, or a
+     person's profile picture. */
+  imageUrl?: string | null;
+  /* The blue tick: a verified tool (D201) or a verified developer. */
+  verified?: boolean;
 };
 
 export type RecentSearch = {
