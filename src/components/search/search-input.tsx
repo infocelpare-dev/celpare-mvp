@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Boxes,
   Hash,
   History,
+  Mic,
   Search,
   User,
   Wrench,
@@ -14,6 +16,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Suggestion } from "@/lib/search/types";
+import { VerifiedTick } from "@/components/ui/verified-tick";
+import { Avatar } from "@/components/ui/avatar";
+import Image from "next/image";
+import { useVoiceSearch } from "./use-voice-search";
+import { VoicePanel } from "./voice-panel";
+import { isBusy, isRecording } from "@/lib/voice/client/machine";
 
 /*
   The search field, and the only client side part of search that matters.
@@ -133,6 +141,26 @@ export function SearchInput({
     setActive(-1);
   }
 
+  /*
+    Voice search (guide 21). An input method, not a search engine: the panel
+    under the field produces text the person can edit, and Search puts that text
+    in THIS field and submits THIS form, so a spoken query takes exactly the path
+    a typed one does (/search?q=, the same results, history, analytics and back
+    button). The typed query is never touched until they press Search.
+  */
+  const voice = useVoiceSearch();
+  const formRef = useRef<HTMLFormElement>(null);
+  const voiceOpen = voice.state.status !== "idle";
+  const recording = isRecording(voice.state);
+
+  function searchSpoken() {
+    const text = voice.submit();
+    if (!text) return;
+    /* The field must hold the text before the form reads it. */
+    flushSync(() => setValue(text));
+    formRef.current?.requestSubmit();
+  }
+
   function choose(suggestion: Suggestion) {
     close();
     /* A suggestion either runs a search or opens a thing. Both are real URLs, so
@@ -175,11 +203,11 @@ export function SearchInput({
   /* Derived, not stored. `open` is the person's intent (focused, not escaped) and
      this is whether there is anything to show for it. */
   const showList =
-    open && suggestions.length > 0 && value.trim().length >= MIN_CHARS;
+    open && !voiceOpen && suggestions.length > 0 && value.trim().length >= MIN_CHARS;
 
   return (
     <div className="relative flex-1">
-      <form action="/search" method="get" role="search" onSubmit={close}>
+      <form ref={formRef} action="/search" method="get" role="search" onSubmit={close}>
         {/*
           A visible label would be a second heading on a page whose whole subject
           is this field, so the name is sr-only text rather than an aria-label:
@@ -227,7 +255,9 @@ export function SearchInput({
           aria-activedescendant={activeId}
           className={cn(
             "h-12 w-full rounded-xl border border-border bg-background",
-            "ps-11 pe-11 text-[16px] text-foreground placeholder:text-muted sm:text-[15px]",
+            "ps-11 text-[16px] text-foreground placeholder:text-muted sm:text-[15px]",
+            /* Room for the clear and microphone buttons that sit inside the field. */
+            voice.available && value.length > 0 ? "pe-[96px]" : "pe-11",
             /* Safari draws its own clear button on type=search and ours is
                already there, so it is removed rather than doubled. */
             "[&::-webkit-search-cancel-button]:hidden",
@@ -245,13 +275,51 @@ export function SearchInput({
             }}
             /* 40px, which clears the 24px WCAG 2.2 target minimum inside a 48px
                field. */
-            className="absolute end-1 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-lg text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
+            className={cn(
+              "absolute top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-lg text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground",
+              voice.available ? "end-[52px]" : "end-1",
+            )}
           >
             <X className="size-[18px]" aria-hidden />
             <span className="sr-only">Clear the search field</span>
           </button>
         ) : null}
+
+        {voice.available ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (recording) {
+                voice.stop();
+                return;
+              }
+              /* A second tap while something is already running does nothing:
+                 one session at a time (the machine enforces it too). */
+              if (isBusy(voice.state)) return;
+              close();
+              void voice.start();
+            }}
+            aria-pressed={recording}
+            aria-expanded={voiceOpen}
+            className={cn(
+              "absolute end-1 top-1/2 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-lg transition-colors duration-200 ease-out",
+              "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground",
+              recording ? "bg-foreground text-background" : "text-muted hover:bg-surface hover:text-foreground",
+            )}
+          >
+            <Mic className="size-[18px]" aria-hidden />
+            {/* Lime marks the live state (brand: accent for active states). */}
+            {recording ? (
+              <span aria-hidden className="absolute end-1.5 top-1.5 size-2 rounded-full bg-accent motion-safe:animate-pulse" />
+            ) : null}
+            <span className="sr-only">{recording ? "Stop recording" : "Search by voice"}</span>
+          </button>
+        ) : null}
       </form>
+
+      {/* The voice panel takes the place of the suggestion list while open,
+          outside the search form so its own small form does not nest. */}
+      {voiceOpen ? <VoicePanel voice={voice} typedQuery={value} onSearch={searchSpoken} /> : null}
 
       {showList ? (
         <ul
@@ -280,9 +348,31 @@ export function SearchInput({
                   i === active ? "bg-surface" : "bg-transparent",
                 )}
               >
-                <Icon className="size-4 shrink-0 text-muted" aria-hidden />
+                {s.kind === "person" ? (
+                  /* A person looks like their profile: picture, or initials. */
+                  <Avatar fullName={s.label} username={s.sublabel?.replace(/^@/, "") ?? null} avatarUrl={s.imageUrl ?? null} size="sm" className="size-7 text-[12px]" />
+                ) : s.kind === "tool" || (s.kind === "model" && s.imageUrl) ? (
+                  /* A tool looks like itself, a model like its maker: the logo in
+                     the same circle the result rows use, or the first letter. */
+                  <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border p-1">
+                    {s.imageUrl ? (
+                      <Image src={s.imageUrl} alt="" width={28} height={28} className="size-full rounded-full object-contain" unoptimized />
+                    ) : (
+                      <span className="text-[12px] font-semibold text-muted" aria-hidden>
+                        {s.label.slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <Icon className="size-4 shrink-0 text-muted" aria-hidden />
+                )}
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px]">{s.label}</span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-[15px]">{s.label}</span>
+                    {s.verified && (s.kind === "tool" || s.kind === "person") ? (
+                      <VerifiedTick label={s.kind === "tool" ? "Verified tool" : "Verified developer"} className="shrink-0" />
+                    ) : null}
+                  </span>
                   {s.sublabel ? (
                     <span className="block truncate text-[13px] text-muted">
                       {s.sublabel}
