@@ -3,6 +3,8 @@ import { cookies, headers } from "next/headers";
 import { after } from "next/server";
 import { emailWelcome, noteLogin } from "@/lib/email/dispatch";
 import { clientIp } from "@/lib/telemetry";
+import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
+import { TERMS_VERSION } from "@/content/legal";
 
 /*
   What happens once a login is complete (D192): the browser gets a long lived
@@ -49,6 +51,25 @@ export async function afterLogin(
 
   after(async () => {
     await noteLogin({ userId: user.id, email: user.email, deviceId, userAgent, ip });
-    if (opts.welcome) await emailWelcome(user.id, user.email, name);
+    if (opts.welcome) {
+      await emailWelcome(user.id, user.email, name);
+      await recordTermsAcceptance(user.id);
+    }
   });
+}
+
+/*
+  The sign up and Google screens say that continuing accepts the Terms and
+  confirms the Privacy Policy was read (phase LEGAL). The version is recorded
+  once, when the account is created, on the service role: the columns are not
+  granted to any client.
+*/
+async function recordTermsAcceptance(userId: string): Promise<void> {
+  if (!hasServiceRole()) return;
+  const { error } = await createAdminClient()
+    .from("profiles")
+    .update({ terms_version: TERMS_VERSION, terms_accepted_at: new Date().toISOString() })
+    .eq("id", userId)
+    .is("terms_version", null);
+  if (error) console.error("[auth] terms acceptance not recorded", error.message);
 }

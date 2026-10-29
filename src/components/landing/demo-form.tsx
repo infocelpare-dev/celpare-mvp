@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useId } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowRight } from "lucide-react";
@@ -47,6 +48,14 @@ export function DemoForm() {
         />
         <Submit />
       </div>
+
+      <p className="mt-3 text-[12px] leading-relaxed text-muted">
+        We use your email only for this, and you can ask us to delete it. See the{" "}
+        <Link href="/legal/privacy" className="underline underline-offset-4 hover:text-foreground">
+          Privacy Policy
+        </Link>
+        .
+      </p>
 
       {/* Honeypot. Hidden from people and screen readers, visible to bots. */}
       <div aria-hidden className="absolute left-[-9999px] h-0 w-0 overflow-hidden">

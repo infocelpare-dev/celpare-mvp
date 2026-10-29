@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SignupForm } from "@/components/auth/signup-form";
 import { GoogleButton, AuthDivider } from "@/components/auth/google-button";
+import { LegalConsent } from "@/components/auth/legal-consent";
 
 export const metadata: Metadata = {
   title: "Create your account",
@@ -26,6 +27,7 @@ export default function SignupPage() {
         <GoogleButton label="Continue with Google" />
         <AuthDivider />
         <SignupForm />
+        <LegalConsent creating="account" />
       </div>
 
       <p className="mt-6 text-center text-[14px] text-muted">

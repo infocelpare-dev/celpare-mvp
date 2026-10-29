@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LoginForm } from "@/components/auth/login-form";
 import { GoogleButton, AuthDivider } from "@/components/auth/google-button";
+import { LegalConsent } from "@/components/auth/legal-consent";
 import { FormAlert } from "@/components/ui/field";
 
 export const metadata: Metadata = {
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 /* Where the account email flows end (D193). Fixed sentences only: the query
    string picks one, it never supplies the words. */
 const NOTICES: Record<string, { tone: "success" | "error"; text: string }> = {
+  "account-deleted": { tone: "success", text: "Your account and its data were deleted. A confirmation is on its way to the address it used." },
   "password-changed": { tone: "success", text: "Your password was changed and every session was logged out. Log in with the new one." },
   "email-changed": { tone: "success", text: "Your email address was changed. Log in with the new address." },
   "email-partial": { tone: "success", text: "One address confirmed. Open the link we sent to the other address to finish the change." },
@@ -60,6 +62,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             Forgot password?
           </Link>
         </p>
+        <LegalConsent creating="google" />
       </div>
 
       <p className="mt-6 text-center text-[14px] text-muted">

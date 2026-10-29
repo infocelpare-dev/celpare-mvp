@@ -30,8 +30,19 @@ const columns = [
   {
     title: "Company",
     links: [
-      { label: "Contact", href: "mailto:infocelpare@gmail.com" },
+      { label: "Help", href: "/help" },
+      { label: "Contact", href: "mailto:info@celpare.com" },
       { label: "Log in", href: "/login" },
+    ],
+  },
+  {
+    title: "Legal",
+    links: [
+      { label: "Terms of Service", href: "/legal/terms" },
+      { label: "Privacy Policy", href: "/legal/privacy" },
+      { label: "Cookie Policy", href: "/legal/cookies" },
+      { label: "Acceptable use", href: "/legal/acceptable-use" },
+      { label: "All policies", href: "/legal" },
     ],
   },
 ];
@@ -40,7 +51,7 @@ export function Footer() {
   return (
     <footer className="mt-auto border-t border-border py-14">
       <Container>
-        <div className="grid grid-cols-2 gap-8 sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(3,1fr)]">
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(4,1fr)]">
           <div className="col-span-2 lg:col-span-1">
             <Logo />
             <p className="mt-3 max-w-[30ch] text-[14px] leading-relaxed text-muted">

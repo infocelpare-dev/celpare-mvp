@@ -79,9 +79,9 @@ const SECTIONS: { heading: string; body: string[] }[] = [
     ],
   },
   {
-    heading: "Honesty about these terms",
+    heading: "The full terms",
     body: [
-      "Celpare has not published full legal terms, a privacy policy or a data policy yet. This page is a plain statement of how the developer area works, and it is the same boundary the database actually enforces. When formal terms exist you will be asked to read and accept those instead.",
+      "This is a summary of the Developer Terms at celpare.com/legal/developer-terms. By agreeing you accept those Developer Terms, together with the Terms of Service and the Privacy Policy at celpare.com/legal. Each page shows its version and what changed.",
     ],
   },
 ];
