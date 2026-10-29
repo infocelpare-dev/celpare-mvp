@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { SparkIcon } from "@/components/ui/spark-icon";
 import { RichText } from "./rich-text";
-import { ToolCards, type ToolCitation } from "./tool-cards";
+import { ModelCards, ToolCards, type ModelCardData, type ToolCitation } from "./tool-cards";
 import { Composer, type Grants, type ModeKey, type Modes } from "./composer";
 import { useNewChatToken } from "./new-chat";
 import { SignInButton } from "@/components/auth/sign-in-prompt";
@@ -23,6 +23,8 @@ type Turn = {
   role: "user" | "assistant";
   content: string;
   citations?: ToolCitation[];
+  /* Models the catalogue search matched (2026-10-07). */
+  models?: ModelCardData[];
   /* Sponsored tools that match the question (D204, D205), drawn above the
      citations. Live only: a reopened chat shows its citations, not old ads. */
   sponsored?: ToolCitation[];
@@ -200,6 +202,13 @@ export function AskChat({
               );
             }
 
+            if (event.t === "models") {
+              const models = (event.models as ModelCardData[]) ?? [];
+              setTurns((prev) =>
+                prev.map((t) => (t.id === replyId ? { ...t, models } : t)),
+              );
+            }
+
             if (event.t === "sponsored") {
               const sponsored = (event.cards as ToolCitation[]) ?? [];
               const sponsoredRequestId = typeof event.requestId === "string" ? event.requestId : null;
@@ -329,7 +338,7 @@ export function AskChat({
             <EmptyState onPick={send} signedIn={signedIn} />
           ) : (
             <ol className="space-y-6">
-              {turns.map((turn) => (
+              {turns.map((turn, i) => (
                 <li key={turn.id}>
                   {turn.role === "user" ? (
                     <div className="flex justify-end">
@@ -338,7 +347,7 @@ export function AskChat({
                       </div>
                     </div>
                   ) : (
-                    <Answer turn={turn} busy={busy} onRetry={retry} />
+                    <Answer turn={turn} busy={busy} onRetry={retry} last={i === turns.length - 1} />
                   )}
                 </li>
               ))}
@@ -382,10 +391,13 @@ function Answer({
   turn,
   busy,
   onRetry,
+  last = false,
 }: {
   turn: Turn;
   busy: boolean;
   onRetry: (turnId: string, question: string) => void;
+  /* The newest answer carries the AI notice, as Claude does under its reply. */
+  last?: boolean;
 }) {
   if (turn.notice) {
     const tone = turn.notice === "limit" ? "border-accent" : "border-border";
@@ -480,6 +492,8 @@ function Answer({
         <ToolCards tools={turn.citations ?? []} sponsored={turn.sponsored} sponsoredRequestId={turn.sponsoredRequestId} />
       ) : null}
 
+      {turn.models?.length ? <ModelCards models={turn.models} /> : null}
+
       {turn.sources && turn.sources.length > 0 && !empty ? (
         <Sources sources={turn.sources} />
       ) : null}
@@ -487,7 +501,7 @@ function Answer({
       {/* Actions appear once the answer is finished. Offering copy halfway
           through a stream copies half an answer. */}
       {!empty && !busy ? (
-        <div className="mt-3 flex items-center gap-1">
+        <div className="mt-3 flex flex-wrap items-center gap-1">
           <CopyButton text={turn.content} />
           {turn.question ? (
             <button
@@ -498,6 +512,12 @@ function Answer({
               <RotateCcw className="size-3.5" aria-hidden />
               Retry
             </button>
+          ) : null}
+          {last ? (
+            /* Phones already have the line under the composer; one is enough there. */
+            <p className="ms-auto hidden px-2 text-[12px] text-muted sm:block">
+              Ask Celpare is AI and can make mistakes. Please double-check responses.
+            </p>
           ) : null}
         </div>
       ) : null}

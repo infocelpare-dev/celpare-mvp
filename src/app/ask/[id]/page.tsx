@@ -60,6 +60,7 @@ export default async function SavedChatPage({
         role: m.role,
         content: m.content,
         citations: m.citations,
+        models: m.models,
         question:
           m.role === "assistant" && conversation.messages[i - 1]?.role === "user"
             ? conversation.messages[i - 1].content

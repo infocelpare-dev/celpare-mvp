@@ -43,6 +43,21 @@ export type ToolCitation = {
   features: string[];
 };
 
+/* A model as the AI is allowed to see it: the return type of public.search_models
+   (2026-10-07), the same kind of boundary as ToolCitation (D39). */
+export type ModelCitation = {
+  slug: string;
+  name: string;
+  provider: string | null;
+  description: string;
+  context_window: number | null;
+  input_price_per_m: number | null;
+  output_price_per_m: number | null;
+  modalities: string[] | null;
+  tags: string[] | null;
+  open_weights: boolean | null;
+};
+
 export type WebResult = {
   title: string;
   url: string;

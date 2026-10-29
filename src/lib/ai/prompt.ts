@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { DocSection } from "./celpare-docs";
 import type { ModelEvidence } from "./model-evidence";
-import type { ToolCitation, WebResult } from "./types";
+import type { ToolCitation, WebResult, ModelCitation } from "./types";
 
 /* Marks a request as the classifier call, so the mock provider can honour the
    contract without guessing. Harmless in a real system prompt. */
@@ -86,6 +86,29 @@ function toolBlock(tools: ToolCitation[]) {
 
   return [
     "CELPARE CATALOGUE, retrieved for this question. Prefer these, and never state a fact about them that is not written here:",
+    ...lines,
+  ].join("\n");
+}
+
+/*
+  Models from the catalogue (2026-10-07). Only in the prompt when the search
+  found some, so a tool question is not told "no models were found".
+*/
+function modelBlock(models: ModelCitation[] | undefined) {
+  if (!models?.length) return "";
+  const price = (n: number | null) => (n === null ? "not recorded" : `$${n}`);
+  const lines = models.map((m) =>
+    [
+      `- ${m.name} (${m.slug}), by ${m.provider ?? "maker not recorded"}`,
+      `  what it is: ${m.description || "not recorded"}`,
+      `  context window: ${m.context_window ? `${m.context_window} tokens` : "not recorded"}`,
+      `  price per million tokens: input ${price(m.input_price_per_m)}, output ${price(m.output_price_per_m)}`,
+      `  inputs: ${m.modalities?.length ? m.modalities.join(", ") : "not recorded"}`,
+      `  open weights: ${m.open_weights === null ? "not recorded" : m.open_weights ? "yes" : "no"}`,
+    ].join("\n"),
+  );
+  return [
+    "CELPARE CATALOGUE MODELS, retrieved for this question. These are AI models, not tools. Prefer them when the question is about models, and never state a fact about them that is not written here:",
     ...lines,
   ].join("\n");
 }
@@ -200,6 +223,7 @@ function profileBlock(
 export function buildSystemPrompt(opts: {
   canary: string;
   tools: ToolCitation[];
+  models?: ModelCitation[];
   evidence?: ModelEvidence | null;
   docs: DocSection[];
   web: WebResult[];
@@ -222,6 +246,7 @@ export function buildSystemPrompt(opts: {
     docsBlock(opts.docs),
     profileBlock(opts.bio, opts.interests, opts.skills),
     toolBlock(opts.tools),
+    modelBlock(opts.models),
     evidenceBlock(opts.evidence),
     webBlock(opts.web),
   ]
@@ -239,7 +264,7 @@ Reply with one JSON object and nothing else:
 
 - conversational: true if the message is a greeting, a thank you, a goodbye, small talk, or a question about the assistant itself, and asks for no information about any other subject. "hi", "thanks", "who are you" and "what can you do" are all conversational. When this is true, set in_scope true and both search flags false.
 - in_scope: true only if the message is about those subjects.
-- needs_tool_search: true if answering means recommending or comparing products.
+- needs_tool_search: true if answering means recommending, comparing or describing products: AI tools, AI models, SaaS or developer technology.
 - needs_web_search: true only if the answer depends on information newer than your training, such as a release from the last few months.
 - topic: two to five words suitable as a product search phrase. Not a sentence. Omit filler words like "best", "tool" and "AI".
 - reason: at most eight words.`;
@@ -308,6 +333,7 @@ How you answer here:
 export function buildResearchPrompt(opts: {
   canary: string;
   tools: ToolCitation[];
+  models?: ModelCitation[];
   evidence?: ModelEvidence | null;
   docs: DocSection[];
   web: WebResult[];
@@ -330,6 +356,7 @@ export function buildResearchPrompt(opts: {
     docsBlock(opts.docs),
     profileBlock(opts.bio, opts.interests, opts.skills),
     toolBlock(opts.tools),
+    modelBlock(opts.models),
     evidenceBlock(opts.evidence),
     webBlock(opts.web),
   ]

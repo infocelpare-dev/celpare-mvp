@@ -223,3 +223,82 @@ function Card({
     </Tag>
   );
 }
+
+/*
+  Models the catalogue search matched (2026-10-07). A second shape of card,
+  because a model is not a tool: it has a maker, a context window and token
+  prices, and it opens /models and the Models tab of Compare. Every value is
+  as recorded; a missing one says so (D13).
+*/
+export type ModelCardData = {
+  slug: string;
+  name: string;
+  provider: string | null;
+  description: string;
+  logoUrl: string | null;
+  contextWindow: number | null;
+  inputPrice: number | null;
+  outputPrice: number | null;
+  openWeights: boolean | null;
+};
+
+function tokens(n: number): string {
+  return n >= 1_000_000 ? `${+(n / 1_000_000).toFixed(1)}M` : `${Math.round(n / 1000)}K`;
+}
+
+export function ModelCards({ models }: { models: ModelCardData[] }) {
+  if (models.length === 0) return null;
+  return (
+    <section className="mt-5" aria-label="Models referenced in this answer">
+      <h2 className="mb-2 text-[13px] font-medium text-muted">Models from the Celpare catalogue</h2>
+      <ul className="grid gap-2">
+        {models.map((m) => {
+          const facts = [
+            m.provider ?? "Maker not recorded",
+            m.contextWindow ? `${tokens(m.contextWindow)} context` : null,
+            m.inputPrice !== null && m.outputPrice !== null
+              ? `$${m.inputPrice} in, $${m.outputPrice} out per 1M tokens`
+              : "Price not recorded",
+            m.openWeights ? "Open weights" : null,
+          ].filter(Boolean);
+          return (
+            <li
+              key={m.slug}
+              className="rounded-xl border border-border px-4 py-3 transition-colors duration-200 hover:bg-surface"
+            >
+              <div className="flex items-start gap-3">
+                <Monogram name={m.name} logoUrl={m.logoUrl} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href={`/models/${m.slug}`} className="font-display text-[15px] font-semibold hover:underline">
+                      {m.name}
+                    </Link>
+                    <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">Model</span>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-muted">{m.description}</p>
+                  <p className="mt-2 text-[12px] text-muted">{facts.join(" · ")}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-1">
+                    <Link
+                      href={`/models/${m.slug}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] font-medium text-foreground transition-colors duration-200 hover:bg-background"
+                    >
+                      View model
+                      <ArrowRight className="size-3.5" aria-hidden />
+                    </Link>
+                    <Link
+                      href={`/compare?view=models&items=model:${m.slug}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] text-muted transition-colors duration-200 hover:bg-background hover:text-foreground"
+                    >
+                      <Scale className="size-3.5" aria-hidden />
+                      Compare
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}

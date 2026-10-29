@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { ToolCitation } from "./types";
+import type { ModelCardData } from "@/components/ask/tool-cards";
 
 /*
   Conversation persistence, for signed in people only.
@@ -39,11 +40,15 @@ export async function listConversations(limit = 100): Promise<ConversationSummar
   return data ?? [];
 }
 
+/* Models share messages.citations with tools, marked kind "model" (2026-10-07). */
+export type StoredModel = ModelCardData & { kind: "model" };
+
 export type StoredMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   citations: ToolCitation[];
+  models: ModelCardData[];
 };
 
 export async function loadConversation(
@@ -82,7 +87,16 @@ export async function loadConversation(
       id: m.id,
       role: m.role,
       content: m.content,
-      citations: (m.citations ?? []) as ToolCitation[],
+      citations: ((m.citations ?? []) as (ToolCitation | StoredModel)[]).filter(
+        (c): c is ToolCitation => (c as StoredModel).kind !== "model",
+      ),
+      models: ((m.citations ?? []) as (ToolCitation | StoredModel)[])
+        .filter((c): c is StoredModel => (c as StoredModel).kind === "model")
+        .map((c): ModelCardData => {
+          const { kind, ...card } = c;
+          void kind;
+          return card;
+        }),
     })),
   };
 }
@@ -186,7 +200,7 @@ export async function saveTurn(opts: {
   conversationId: string;
   question: string;
   answer: string;
-  citations: ToolCitation[];
+  citations: (ToolCitation | StoredModel)[];
   model: string;
   provider: string;
   inputTokens: number;

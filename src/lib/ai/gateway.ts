@@ -27,6 +27,9 @@ import { evidenceIntent, evidenceSources, loadModelEvidence } from "./model-evid
 import { estimateTokens, recordUsage } from "./usage";
 import { recordAiCall } from "./observability";
 import { webSearch } from "./web-search";
+import { searchModels } from "./model-search";
+import { providerLogo } from "@/lib/models/provider-logo";
+import type { StoredModel } from "./conversations";
 import type {
   AiFeature,
   ChatMessage,
@@ -82,6 +85,7 @@ type Event =
      their own labelled section; never in the prompt and never saved with the
      transcript. */
   | { t: "sponsored"; cards: (ToolCard & { toolId: string })[]; requestId: string | null }
+  | { t: "models"; models: StoredModel[] }
   | { t: "sources"; v: WebResult[] }
   | { t: "text"; v: string }
   | { t: "error"; v: string }
@@ -180,7 +184,9 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
     it costs several searches and nobody should pay for it by accident.
   */
   const wants: ModeRequest = {
-    toolSearch: input.modes?.toolSearch !== false,
+    /* Catalogue search is always on (founder, 2026-10-07): a request to turn
+       it off is ignored, so every answer starts from the Celpare catalogue. */
+    toolSearch: true,
     webSearch: input.modes?.webSearch !== false && identity.settings.webSearch !== false,
     deepResearch: input.modes?.deepResearch === true,
   };
@@ -317,6 +323,11 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
     wants.toolSearch &&
     classification.needsToolSearch;
 
+  /* The catalogue covers models too (2026-10-07). Runs for model questions as
+     well, which skip the tool search above. */
+  const doModelSearch =
+    !conversational && grants.toolSearch.allowed && classification.needsToolSearch;
+
   const doDeepResearch = !conversational && grants.deepResearch.allowed && wants.deepResearch;
 
   /* Plain web search does not also run when deep research is on: research does
@@ -388,6 +399,8 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
       let status: "ok" | "filtered" | "error" = "ok";
       /* What the model was actually given, kept for the saved transcript. */
       let citations: ToolCitation[] = [];
+      /* Models the catalogue search matched, as cards, saved with the turn. */
+      let modelCards: StoredModel[] = [];
       /* External search calls made for this answer, counted for the billing
          record: one for a plain web search, one per planned angle for deep
          research, none for an answer that came from the catalogue alone. */
@@ -427,7 +440,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
           answer and the sources under it, not the size of the pile it came
           from.
         */
-        if (doToolSearch || doWebSearch || doDeepResearch) {
+        if (doToolSearch || doModelSearch || doWebSearch || doDeepResearch) {
           emit(controller, { t: "step", v: "Searching" });
         }
         if (doWebSearch) searchCalls += 1;
@@ -435,7 +448,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
         /* The engine picks which catalogue tools the model sees (4BK); the
            keyword search is one of its sources and the fallback. */
         let candidates: AskCandidates | null = null;
-        const [tools, searched, evidence] = await Promise.all([
+        const [tools, searched, evidence, catalogueModels] = await Promise.all([
           doToolSearch
             ? askCandidates(cleaned.text, classification.topic, identity.userId).then((c) => {
                 candidates = c;
@@ -446,11 +459,16 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
             ? webSearch(classification.topic)
             : Promise.resolve([] as WebResult[]),
           loadModelEvidence(cleaned.text, intent),
+          doModelSearch ? searchModels(cleaned.text) : Promise.resolve([]),
         ]);
 
         let web = searched;
 
-        const thin = doToolSearch && tools.length < MIN_CATALOGUE_MATCH && !(evidence && evidence.rows.length > 0);
+        const thin =
+          doToolSearch &&
+          tools.length < MIN_CATALOGUE_MATCH &&
+          catalogueModels.length === 0 &&
+          !(evidence && evidence.rows.length > 0);
 
         /*
           The catalogue did not answer it. Reach for the web before reaching for
@@ -495,6 +513,22 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
           const cards = await loadToolCards(tools.map((t) => t.slug));
           emit(controller, { t: "cards", citations: tools, cards });
           if (candidates) void recordAskImpressions(candidates, identity.userId, cards.map((c) => c.slug));
+        }
+
+        if (catalogueModels.length > 0) {
+          modelCards = catalogueModels.map((m) => ({
+            kind: "model" as const,
+            slug: m.slug,
+            name: m.name,
+            provider: m.provider,
+            description: m.description,
+            logoUrl: providerLogo(m.provider),
+            contextWindow: m.context_window,
+            inputPrice: m.input_price_per_m === null ? null : Number(m.input_price_per_m),
+            outputPrice: m.output_price_per_m === null ? null : Number(m.output_price_per_m),
+            openWeights: m.open_weights,
+          }));
+          emit(controller, { t: "models", models: modelCards });
         }
 
         /* TypeScript narrows `candidates` to null after the closure assigned
@@ -548,6 +582,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
             ? buildResearchPrompt({
                 canary,
                 tools: citations,
+                models: catalogueModels,
                 evidence,
                 docs,
                 web: research,
@@ -560,6 +595,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
             : buildSystemPrompt({
                 canary,
                 tools: citations,
+                models: catalogueModels,
                 evidence,
                 docs,
                 web: research,
@@ -684,7 +720,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
               conversationId,
               question: cleaned.text,
               answer,
-              citations,
+              citations: [...citations, ...modelCards],
               model: main,
               provider: providerName(),
               inputTokens,

@@ -12,6 +12,7 @@ import {
   Square,
   Telescope,
 } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /*
@@ -61,12 +62,16 @@ const MODES: {
   label: string;
   icon: typeof Search;
   hint: string;
+  /* Always on, cannot be switched off (founder, 2026-10-07). The server
+     ignores a request to turn it off as well. */
+  fixed?: boolean;
 }[] = [
   {
     key: "toolSearch",
-    label: "Tool search",
+    label: "Catalogue search",
     icon: Search,
-    hint: "Search the Celpare catalogue for matching tools",
+    hint: "Always on. Searches the Celpare catalogue for matching tools, models, SaaS and tech.",
+    fixed: true,
   },
   {
     key: "webSearch",
@@ -144,7 +149,7 @@ export function Composer({
 
   /* What the one button says. Naming the single active mode is more useful than
      a count, and a count is more useful than a list once there are two. */
-  const active = MODES.filter((m) => grants[m.key].allowed && modes[m.key]);
+  const active = MODES.filter((m) => grants[m.key].allowed && (m.fixed || modes[m.key]));
   const activeCount = active.length;
   const summary =
     activeCount === 0
@@ -165,6 +170,13 @@ export function Composer({
 
   return (
     <div>
+      {/*
+        Phones: the AI notice sits ABOVE the box. Below it, a phone browser's
+        bottom toolbar and the home bar cover it (founder screenshot 2026-10-07).
+      */}
+      <p className="mb-2 px-1 text-center text-[12px] leading-relaxed text-muted sm:hidden">
+        Ask Celpare is AI and can make mistakes.
+      </p>
       <div
         className={cn(
           "rounded-[20px] border bg-surface px-3 pb-2 pt-3 transition-colors duration-200",
@@ -242,7 +254,7 @@ export function Composer({
               >
                 {MODES.map((mode) => {
                   const grant = grants[mode.key];
-                  const on = grant.allowed && modes[mode.key];
+                  const on = grant.allowed && (mode.fixed || modes[mode.key]);
                   const Icon = grant.allowed ? mode.icon : Lock;
 
                   return (
@@ -250,7 +262,7 @@ export function Composer({
                       key={mode.key}
                       type="button"
                       aria-pressed={grant.allowed ? on : undefined}
-                      aria-disabled={!grant.allowed}
+                      aria-disabled={!grant.allowed || mode.fixed}
                       onClick={() => {
                         if (!grant.allowed) {
                           setLocked(lockedMessage(mode, grant));
@@ -258,11 +270,16 @@ export function Composer({
                           return;
                         }
                         setLocked(null);
+                        if (mode.fixed) return;
                         onToggle(mode.key, !on);
                       }}
                       className={cn(
                         "flex w-full cursor-pointer items-start gap-3 border-b border-border px-3 py-2.5 text-left transition-colors duration-200 last:border-b-0",
-                        grant.allowed ? "hover:bg-surface" : "cursor-not-allowed opacity-60",
+                        !grant.allowed
+                          ? "cursor-not-allowed opacity-60"
+                          : mode.fixed
+                            ? "cursor-default"
+                            : "hover:bg-surface",
                       )}
                     >
                       <Icon
@@ -275,7 +292,9 @@ export function Composer({
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center justify-between gap-2">
                           <span className="text-[14px] font-medium">{mode.label}</span>
-                          {on ? (
+                          {mode.fixed && grant.allowed ? (
+                            <span className="shrink-0 text-[12px] text-muted">Always on</span>
+                          ) : on ? (
                             <Check className="size-4 shrink-0 text-accent" aria-hidden />
                           ) : null}
                         </span>
@@ -320,6 +339,14 @@ export function Composer({
           {locked}
         </p>
       ) : null}
+
+      {/* Founder, 2026-10-07: always say it is AI and can be wrong (Terms 5, AI and your data). From sm up, under the box. */}
+      <p className="mt-2 hidden px-1 text-center text-[12px] leading-relaxed text-muted sm:block">
+        Ask Celpare is AI and can make mistakes. Check important info.{" "}
+        <Link href="/legal/ai-data" className="underline underline-offset-4 transition-colors duration-200 hover:text-foreground">
+          How it works
+        </Link>
+      </p>
     </div>
   );
 }
