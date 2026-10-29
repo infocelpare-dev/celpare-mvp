@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
 import { DeveloperShell } from "@/components/developer/developer-shell";
 import { ModeOff } from "@/components/developer/mode-off";
+import { AnalyticsLocked } from "@/components/developer/analytics-locked";
 import { KpiCard, KpiGrid } from "@/components/analytics/kpi";
 import { TrendChart } from "@/components/analytics/trend-chart";
 import { Breakdown, Funnel, InsightList, Panel } from "@/components/analytics/breakdown";
@@ -14,6 +15,7 @@ import {
   ANALYTICS_WINDOWS,
   gate,
   getToolAnalytics,
+  hasAnalyticsPlan,
   getToolViewsByDay,
   isAnalyticsWindow,
   type AnalyticsWindow,
@@ -64,6 +66,22 @@ export default async function DeveloperAnalyticsPage({
   if (g.state === "signed-out") redirect("/get-started");
   if (g.state === "mode-off") return <ModeOff />;
   if (g.state === "needs-onboarding") redirect("/developer/terms");
+
+  /* Pro and Elite only (founder, 2026-10-09). The SQL function returns nothing
+     to a Free developer anyway; this says why instead of drawing zeros. */
+  if (!hasAnalyticsPlan(g.profile)) {
+    return (
+      <DeveloperShell
+        title="Analytics"
+        lead="How people are finding and using the tools you submitted."
+        verified={g.profile.verified}
+        backHref="/developer"
+        backLabel="Back to dashboard"
+      >
+        <AnalyticsLocked />
+      </DeveloperShell>
+    );
+  }
 
   const params = await searchParams;
   /* Validated against the three we offer. The function clamps its own input as

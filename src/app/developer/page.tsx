@@ -5,6 +5,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DeveloperShell } from "@/components/developer/developer-shell";
 import { ModeOff } from "@/components/developer/mode-off";
+import { AnalyticsLocked } from "@/components/developer/analytics-locked";
 import { RecentList } from "@/components/profile/recent-list";
 import { TimeSeries } from "@/components/ui/charts";
 import {
@@ -12,6 +13,7 @@ import {
   getMyModels,
   getMyTools,
   getToolAnalytics,
+  hasAnalyticsPlan,
   statsFrom,
 } from "@/lib/developer/queries";
 import type { RecentRow } from "@/lib/profile/queries";
@@ -57,7 +59,9 @@ export default async function DeveloperHome() {
     /* The last seven days, as a headline. The full board with its range control
        is /developer/analytics; this is the glance that tells you whether it is
        worth opening. */
-    getToolAnalytics(db!, 7),
+    /* Pro and Elite only (founder, 2026-10-09); a Free developer gets the
+       locked card instead, and no query is made. */
+    hasAnalyticsPlan(g.profile) ? getToolAnalytics(db!, 7) : Promise.resolve(null),
   ]);
   const stats = statsFrom(tools, models);
 
@@ -89,7 +93,13 @@ export default async function DeveloperHome() {
             is live: an approved tool is the thing that can be viewed at all, so
             before that these would be four zeros pretending to be a dashboard.
           */}
-          {stats.approvedTools > 0 ? (
+          {stats.approvedTools > 0 && !analytics ? (
+            <section className="mt-8" aria-label="Activity">
+              <AnalyticsLocked compact />
+            </section>
+          ) : null}
+
+          {stats.approvedTools > 0 && analytics ? (
             <section className="mt-8" aria-labelledby="activity-heading">
               <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <h2 id="activity-heading" className="font-display text-[17px] font-semibold">

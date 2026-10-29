@@ -107,7 +107,6 @@ export const INDIVIDUAL_PLANS: PricingPlan[] = [
       savedToolsLine(premium.savedTools),
       collectionsLine(premium.collections),
       "Exclusive AI ranking",
-      "Premium analytics for tools",
     ],
   },
 ];
@@ -122,7 +121,6 @@ export const DEVELOPER_PLANS: PricingPlan[] = [
       "Submit up to 2 AI tools",
       "Basic tool listing",
       "Up to 10 promotional videos",
-      "Basic performance analytics",
       "Access to community discussions",
     ],
   },
@@ -138,7 +136,7 @@ export const DEVELOPER_PLANS: PricingPlan[] = [
       "Up to 10 videos per tool",
       "Featured in category pages",
       "Higher visibility in search results",
-      "Advanced analytics",
+      "Analytics: views, how people arrive, search terms",
       "Priority placement in listings",
       "Developer insights dashboard",
     ],
@@ -192,10 +190,9 @@ export const INDIVIDUAL_COMPARE: CompareGroup[] = [
     ],
   },
   {
-    title: "Compare and analytics",
+    title: "Compare",
     rows: [
       { label: "Tool comparison", cells: ["View", "Advanced", "Advanced"] },
-      { label: "Premium analytics for tools", cells: [false, false, true] },
     ],
   },
 ];
@@ -214,7 +211,8 @@ export const DEVELOPER_COMPARE: CompareGroup[] = [
   {
     title: "Insight",
     rows: [
-      { label: "Analytics", cells: ["Basic", "Advanced", "Advanced"] },
+      /* Developer analytics are Pro and Elite only (founder, 2026-10-09), enforced in developer_tool_analytics. */
+      { label: "Analytics", cells: [false, true, true] },
       { label: "Developer insights dashboard", cells: [false, true, true] },
     ],
   },

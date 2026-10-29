@@ -32,10 +32,23 @@ export type DeveloperProfile = {
   verified: boolean;
   accepted_terms_at: string | null;
   created_at: string;
+  /* free, pro or elite (D200). Read only for the developer. */
+  plan: "free" | "pro" | "elite";
 };
 
 const DEV_COLUMNS =
-  "id, handle, display_name, bio, company, website_url, github_url, description, expertise, logo_url, verified, accepted_terms_at, created_at";
+  "id, handle, display_name, bio, company, website_url, github_url, description, expertise, logo_url, verified, accepted_terms_at, created_at, plan";
+
+/*
+  Developer analytics are a Pro and Elite plan feature (founder, 2026-10-09).
+  This decides what the page renders; developer_tool_analytics enforces the
+  same rule in SQL and returns nothing to a Free developer.
+*/
+export const ANALYTICS_PLANS = ["pro", "elite"] as const;
+
+export function hasAnalyticsPlan(profile: Pick<DeveloperProfile, "plan"> | null | undefined): boolean {
+  return Boolean(profile && (ANALYTICS_PLANS as readonly string[]).includes(profile.plan));
+}
 
 /* The current terms. Bump this when the text changes and everybody re-accepts. */
 export const DEVELOPER_TERMS_VERSION = "2026-09-14";
