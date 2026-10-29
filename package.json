@@ -14,7 +14,16 @@
     "test:algorithms": "node --import ./scripts/test-loader.mjs --test \"src/lib/community/intelligence/__tests__/*.test.ts\" \"src/lib/explore/intelligence/__tests__/*.test.ts\" \"src/lib/compare/intelligence/__tests__/*.test.ts\" \"src/lib/recommend/__tests__/*.test.ts\"",
     "test:analytics": "node --import ./scripts/test-loader.mjs --test \"src/lib/analytics/__tests__/*.test.ts\"",
     "test:pricing": "node --import ./scripts/test-loader.mjs --test \"src/lib/pricing/__tests__/*.test.ts\"",
-    "test:sponsored": "node --import ./scripts/test-loader.mjs --test \"src/lib/sponsored/__tests__/*.test.ts\""
+    "test:sponsored": "node --import ./scripts/test-loader.mjs --test \"src/lib/sponsored/__tests__/*.test.ts\"",
+    "test:comments": "node --import ./scripts/test-loader.mjs --test \"src/lib/comments/intelligence/__tests__/*.test.ts\"",
+    "test:voice": "node --import ./scripts/test-loader.mjs --test \"src/lib/voice/__tests__/*.test.ts\"",
+    "test:content": "node --import ./scripts/test-loader.mjs --test \"src/content/__tests__/*.test.ts\"",
+    "video:studio": "remotion studio video/index.ts",
+    "video:render": "node video/render.mjs",
+    "video:audio": "node video/audio/generate.mjs",
+    "video:story": "node video/render.mjs story",
+    "video:coding": "node video/render.mjs coding",
+    "video:launch": "node video/render.mjs launch"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -40,12 +49,15 @@
     "zod": "^4.6.1"
   },
   "devDependencies": {
+    "@remotion/cli": "^4.0.532",
+    "@remotion/google-fonts": "^4.0.532",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
+    "remotion": "^4.0.532",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
