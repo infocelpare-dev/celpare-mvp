@@ -14,6 +14,9 @@ import {
 } from "@/lib/auth/second-factor";
 import { siteUrl } from "@/lib/email/layout";
 import { withinBurst } from "@/lib/security/burst";
+import { MAX_WRONG_CODES, countWrongCode, resetWrongCodes, wrongCodes } from "@/lib/auth/code-attempts";
+import { accountDeletedEmail } from "@/lib/email/messages";
+import { sendEmail } from "@/lib/email/send";
 
 /*
   Password and email changes (D193). Every email here is sent by Supabase from
@@ -229,4 +232,144 @@ export async function changeEmail(prev: AccountState, formData: FormData): Promi
     status: "success",
     message: `Almost done. We sent a link to ${user.email} and to ${next}. Open both to finish. Nothing changes until you do.`,
   };
+}
+
+/* ------------------------------------------------------- delete account */
+
+/*
+  Delete account (phase LEGAL, 2026-10-07). Two steps, both server side:
+
+  1. sendDeletionCode emails a 6 digit code to the address on the account,
+     the same Supabase code a login sends, so a stolen session alone cannot
+     erase somebody.
+  2. deleteAccount checks the typed phrase and the code (with the login's
+     wrong code limit), then account_erase_prepare removes what the cascades
+     cannot reach and returns the person's storage files, the files are
+     deleted, and auth.admin.deleteUser cascades everything else.
+
+  The code is verified on the admin client, which keeps no cookies, so the
+  session in this browser is not replaced while it is being deleted.
+*/
+
+const DELETE_PHRASE = "delete my account";
+
+export type DeleteState = {
+  status: "idle" | "sent" | "error";
+  message: string;
+  field?: "phrase" | "code";
+  attempt?: number;
+};
+
+export async function sendDeletionCode(prev: DeleteState): Promise<DeleteState> {
+  if (!isSupabaseConfigured() || !hasServiceRole()) {
+    return { ...prev, status: "error", message: "Account deletion is not available on this server." };
+  }
+  const user = await getCurrentUser();
+  if (!user?.email) return { status: "error", message: "Sign in to delete your account." };
+  if (!(await withinBurst("auth_email"))) {
+    return { status: "error", message: "Too many emails were asked for from this network. Wait a few minutes, then try again." };
+  }
+
+  const { error } = await createAdminClient().auth.signInWithOtp({
+    email: user.email,
+    options: { shouldCreateUser: false },
+  });
+  if (error && !/rate limit|too many|security purposes/i.test(error.message)) {
+    console.error("[account] deletion code failed", error.message);
+    return { status: "error", message: "The code could not be sent. Try again in a minute." };
+  }
+  if (!error) await resetWrongCodes("delete", user.email);
+  return {
+    status: "sent",
+    message: error
+      ? `A code was sent to ${user.email} less than a minute ago. Use that one.`
+      : `We sent a 6 digit code to ${user.email}. It works for one hour.`,
+  };
+}
+
+const deleteSchema = z.object({
+  phrase: z.string().trim().toLowerCase(),
+  code: z.string().trim().regex(/^\d{6}$/, "Enter the 6 digit code from the email."),
+});
+
+export async function deleteAccount(prev: DeleteState, formData: FormData): Promise<DeleteState> {
+  const fail = (field: DeleteState["field"], message: string): DeleteState => ({
+    status: "error",
+    field,
+    message,
+    attempt: (prev.attempt ?? 0) + 1,
+  });
+
+  const parsed = deleteSchema.safeParse({
+    phrase: formData.get("phrase") ?? "",
+    code: formData.get("code") ?? "",
+  });
+  if (!parsed.success) return fail("code", parsed.error.issues[0]?.message ?? "Check the code.");
+  if (parsed.data.phrase !== DELETE_PHRASE) return fail("phrase", `Type "${DELETE_PHRASE}" to confirm.`);
+  if (!isSupabaseConfigured() || !hasServiceRole()) return fail(undefined, "Account deletion is not available on this server.");
+
+  const user = await getCurrentUser();
+  if (!user?.email) return fail(undefined, "Sign in to delete your account.");
+  const email = user.email;
+
+  if ((await wrongCodes("delete", email)) >= MAX_WRONG_CODES) {
+    return fail("code", "Too many wrong codes. Send a new code and try again.");
+  }
+
+  /*
+    Two clients on purpose. verifyOtp signs the client it runs on into the
+    person's session (in memory), and every later call on that client would go
+    out as them, not as the service role. The code is checked on a client that
+    is thrown away; the erasure runs on a clean one.
+  */
+  const admin = createAdminClient();
+  const { data: verified, error: codeError } = await createAdminClient().auth.verifyOtp({
+    email,
+    token: parsed.data.code,
+    type: "magiclink",
+  });
+  if (codeError || verified.user?.id !== user.id) {
+    const wrong = await countWrongCode("delete", email);
+    if (wrong >= MAX_WRONG_CODES) return fail("code", "Too many wrong codes. Send a new code and try again.");
+    const left = MAX_WRONG_CODES - wrong;
+    return fail("code", `That code is not right, or it has expired. ${left} ${left === 1 ? "try" : "tries"} left.`);
+  }
+  await resetWrongCodes("delete", email);
+
+  const { data: profile } = await admin.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+
+  /* What the cascades cannot reach, then the person's own files. */
+  const { data: objects, error: prepError } = await admin.rpc("account_erase_prepare", { p_user: user.id });
+  if (prepError) {
+    console.error("[account] erase prepare failed", prepError.message);
+    return fail(undefined, "Your account could not be deleted. Nothing visible was removed. Try again, or email info@celpare.com.");
+  }
+  const byBucket = new Map<string, string[]>();
+  for (const o of (objects ?? []) as { bucket: string; path: string }[]) {
+    byBucket.set(o.bucket, [...(byBucket.get(o.bucket) ?? []), o.path]);
+  }
+  for (const [bucket, paths] of byBucket) {
+    for (let i = 0; i < paths.length; i += 100) {
+      const { error } = await admin.storage.from(bucket).remove(paths.slice(i, i + 100));
+      if (error) {
+        console.error("[account] file removal failed", bucket, error.message);
+        return fail(undefined, "Some of your files could not be removed, so the account was kept. Try again, or email info@celpare.com.");
+      }
+    }
+  }
+
+  const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
+  if (deleteError) {
+    console.error("[account] delete user failed", deleteError.message);
+    return fail(undefined, "Your account could not be deleted. Try again, or email info@celpare.com.");
+  }
+
+  await sendEmail(email, accountDeletedEmail(profile?.full_name ?? null)).catch(() => "failed");
+
+  /* The session belongs to a user that no longer exists; drop its cookies. */
+  const jar = await cookies();
+  for (const c of jar.getAll()) {
+    if (c.name.startsWith("sb-") || c.name.startsWith("cp_")) jar.delete(c.name);
+  }
+  redirect("/login?notice=account-deleted");
 }

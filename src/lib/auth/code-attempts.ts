@@ -14,7 +14,7 @@ import { bump, clearCounter } from "@/lib/ai/ratelimit";
 export const MAX_WRONG_CODES = 4;
 const WINDOW_S = 60 * 60;
 
-export type CodeMode = "login" | "signup";
+export type CodeMode = "login" | "signup" | "delete";
 
 const key = (mode: CodeMode, email: string) =>
   `auth:code-wrong:${mode}:${email.trim().toLowerCase()}`;

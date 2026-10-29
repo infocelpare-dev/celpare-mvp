@@ -27,7 +27,8 @@ export type BurstName =
   | "notifications"
   | "plan"
   | "auth_email"
-  | "waitlist";
+  | "waitlist"
+  | "account_export";
 
 const PER_MINUTE: Record<BurstName, number> = {
   /* A beacon carries up to 60 events; a busy tab sends a few a minute. */
@@ -51,6 +52,8 @@ const PER_MINUTE: Record<BurstName, number> = {
   auth_email: 4,
   /* A person joins the waitlist once (D198). */
   waitlist: 5,
+  /* Download my data builds one large file; a person needs it once. */
+  account_export: 2,
 };
 
 const PER_HOUR: Partial<Record<BurstName, number>> = {

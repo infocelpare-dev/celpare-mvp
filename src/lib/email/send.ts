@@ -32,6 +32,7 @@ const SENDER: Record<EmailKind, { from: string; replyTo: string }> = {
   developer_verified: { from: "Celpare Submissions <submission@celpare.com>", replyTo: "submission@celpare.com" },
   report: { from: "Celpare <noreply@celpare.com>", replyTo: "info@celpare.com" },
   new_follower: { from: "Celpare <noreply@celpare.com>", replyTo: "info@celpare.com" },
+  account_deleted: { from: "Celpare <noreplyaccount@celpare.com>", replyTo: "info@celpare.com" },
 };
 
 export const REPORTS_INBOX = process.env.REPORTS_INBOX || "reports@celpare.com";
@@ -45,6 +46,7 @@ const KIND_DAILY_CAP: Record<EmailKind, number> = {
   developer_verified: 10,
   new_follower: 30,
   new_login: 30,
+  account_deleted: 20,
 };
 
 let warned = false;

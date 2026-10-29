@@ -13,7 +13,8 @@ export type EmailKind =
   | "tool_decision"
   | "developer_verified"
   | "new_follower"
-  | "new_login";
+  | "new_login"
+  | "account_deleted";
 
 export type BuiltEmail = { kind: EmailKind; subject: string; html: string; text: string };
 
@@ -76,6 +77,22 @@ export function welcomeEmail(name: string | null): BuiltEmail {
     footnote: "You are getting this because you just created a Celpare account.",
   });
   return { kind: "welcome", subject: "Welcome to Celpare", ...body };
+}
+
+/* Sent to the address the account had, after it is gone (phase LEGAL). */
+export function accountDeletedEmail(name: string | null): BuiltEmail {
+  const first = name?.trim().split(/\s+/)[0];
+  const body = renderEmail({
+    heading: first ? `Your Celpare account is deleted, ${first}` : "Your Celpare account is deleted",
+    paragraphs: [
+      "Your profile, posts, comments, messages, saved items, chats and uploaded files have been removed, as you asked.",
+      "Search and view records you made are kept only without your name or account attached. Tools you listed as a developer stay in the catalogue without an owner.",
+      "If you did not ask for this, reply to this email straight away.",
+    ],
+    action: { label: "Read the Privacy Policy", href: siteUrl("/legal/privacy") },
+    footnote: "This is the last email Celpare sends to this address about the account.",
+  });
+  return { kind: "account_deleted", subject: "Your Celpare account is deleted", ...body };
 }
 
 export function toolSubmittedEmail(kind: "tool" | "model", name: string): BuiltEmail {

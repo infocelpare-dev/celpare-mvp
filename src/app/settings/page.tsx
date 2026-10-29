@@ -22,6 +22,7 @@ import type { NotificationPreferences } from "@/lib/notifications/shared";
 import { ClearRecent } from "@/components/profile/clear-recent";
 import { ThemeChoice } from "@/components/ui/theme-choice";
 import { AccountSecurity } from "@/components/settings/account-security";
+import { YourData } from "@/components/settings/your-data";
 import type { PrivacyValues } from "@/app/actions/settings";
 import type { Plan } from "@/lib/ai/types";
 
@@ -297,6 +298,15 @@ export default async function SettingsPage() {
             webSearchAvailable={webSearchAvailable}
             webSearchReason={webSearchReason}
           />
+        </section>
+
+        {/* Your data (phase LEGAL): access and erasure, self serve, as the Privacy Policy says. */}
+        <section id="your-data" className="mt-12 scroll-mt-20 border-t border-border pt-10">
+          <h2 className="font-display text-[17px] font-semibold">Your data</h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-muted">
+            Take a copy of everything Celpare holds about you, or delete the account and its data.
+          </p>
+          <YourData email={email} />
         </section>
 
         {/*
