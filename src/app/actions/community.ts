@@ -11,6 +11,7 @@ import { POST_KINDS } from "@/lib/community/kinds";
 import { normaliseUrl } from "@/lib/format";
 import { processPost } from "@/lib/community/intelligence/server/upload";
 import { clampDurationMs } from "@/lib/community/intelligence/upload";
+import { recordCommentEvents } from "@/lib/comments/intelligence/server/events";
 
 /*
   Every community write. Same doctrine as follow.ts and settings.ts: a zod
@@ -400,6 +401,13 @@ export async function createComment(
     return fail("Could not comment. Try again.");
   }
 
+  /* A reply is an event on the comment it answers; the writer marks it when the
+     replier is the post author. */
+  const parentId = parsed.data.parentId;
+  if (parentId) {
+    after(() => recordCommentEvents({ userId: user.id, events: [{ commentId: parentId, postId: parsed.data.postId, event: "reply" }] }));
+  }
+
   revalidatePath(`/community/${parsed.data.postId}`);
   revalidatePath("/community");
 
@@ -466,6 +474,14 @@ export async function toggleLike(
       console.error("[community] unlike failed", error.code, error.message);
       return { ok: false, on: true, message: "Could not undo that." };
     }
+  }
+
+  /* Comment Intelligence learns from comment likes (guide 20). After the
+     response, so a slow write never slows the heart. */
+  if (parsed.data.entityType === "comment") {
+    const commentId = parsed.data.entityId;
+    const event = parsed.data.on ? "like" : "unlike";
+    after(() => recordCommentEvents({ userId: user.id, events: [{ commentId, event }] }));
   }
 
   return { ok: true, on: parsed.data.on, message: "" };
@@ -622,6 +638,9 @@ export async function reportItem(
 
   /* A copy to reports@celpare.com (D191). Never the reporter's name. */
   const reported = parsed.data;
+  if (reported.entityType === "comment") {
+    after(() => recordCommentEvents({ userId: user.id, events: [{ commentId: reported.entityId, event: "report" }] }));
+  }
   after(() =>
     emailReport({
       entityType: reported.entityType,

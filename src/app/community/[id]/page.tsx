@@ -16,8 +16,6 @@ import { Badge } from "@/components/ui/card";
 import { hostOf, relativeTime } from "@/lib/format";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import {
-  getComments,
-  getLikedComments,
   getPost,
   getViewerState,
   readerFor,
@@ -31,8 +29,11 @@ import {
   PostMediaGallery,
 } from "@/components/community/post-media";
 import { CommentForm } from "@/components/community/comment-form";
-import { CommentThread } from "@/components/community/comment-thread";
-import { buildThread } from "@/lib/community/thread";
+import { RankedComments } from "@/components/community/ranked-comments";
+import { CommentDebug } from "@/components/community/comment-debug";
+import { loadCommentPage } from "@/lib/comments/intelligence/server/engine";
+import { getAdminSession } from "@/lib/admin/guard";
+import { debugAllowed } from "@/lib/compare/intelligence/debug-gate";
 import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 export const dynamic = "force-dynamic";
@@ -68,8 +69,9 @@ export async function generateMetadata({
   };
 }
 
-export default async function PostPage({ params }: PageProps<"/community/[id]">) {
+export default async function PostPage({ params, searchParams }: PageProps<"/community/[id]">) {
   const { id } = await params;
+  const debugRequested = (await searchParams).debug === "1";
 
   if (!isSupabaseConfigured()) notFound();
 
@@ -94,23 +96,32 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
   */
   if (!post) notFound();
 
-  const comments = await getComments(db, post.id);
-  /* The same flat read as before, shaped into a tree. Replies are unlimited in
-     depth as of 2026-09-22, so a flat list would have shown every reply as a
-     sibling of the comment it answers. */
-  const thread = buildThread(comments);
+  /*
+    Comment Intelligence v1 (guide 20): the first page in Top, ranked for this
+    viewer. Moderator status decides whether hidden comments are in the pool,
+    exactly as comments_select_auth decides it today. The debug rows are built
+    only for an admin who asked (?debug=1), and never for anyone else.
+  */
+  const [moderator, isAdmin] = await Promise.all([
+    signedIn ? supabase.rpc("is_moderator").then((r) => r.data === true) : Promise.resolve(false),
+    debugRequested && signedIn ? getAdminSession().then((a) => a !== null) : Promise.resolve(false),
+  ]);
+  const showDebug = debugAllowed({ requested: debugRequested, signedIn, isAdmin });
 
-  const [viewer, likedComments] = await Promise.all([
+  const [viewer, comments] = await Promise.all([
     signedIn
       ? getViewerState(supabase, viewerId, [post.id])
       : Promise.resolve(EMPTY_VIEWER_STATE),
-    signedIn
-      ? getLikedComments(
-          supabase,
-          viewerId,
-          comments.map((c) => c.id),
-        )
-      : Promise.resolve(new Set<string>()),
+    loadCommentPage({
+      reader: db,
+      post,
+      viewerId,
+      moderator,
+      mode: "top",
+      seen: [],
+      cursor: null,
+      debug: showDebug,
+    }),
   ]);
 
   /* The name, not the handle. Founder instruction 2026-09-19: the @username is
@@ -262,7 +273,7 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
             )}
           </div>
 
-          {comments.length === 0 ? (
+          {comments.total === 0 ? (
             <p className="mt-6 text-[14px] text-muted">
               No comments yet.
             </p>
@@ -280,15 +291,17 @@ export default async function PostPage({ params }: PageProps<"/community/[id]">)
               out.
             */
             <div className="mt-6">
-              <CommentThread
-                nodes={thread}
+              {/* Keyed on the total, so a new comment posted from the form
+                  above (which revalidates this page) starts a fresh first page. */}
+              <RankedComments
+                key={`${comments.total}`}
                 postId={post.id}
-                likedIds={[...likedComments]}
-                signedIn={signedIn}
-                viewerId={viewerId}
+                initial={{ ...comments, debug: null, viewerId, signedIn }}
               />
             </div>
           )}
+
+          {comments.debug ? <CommentDebug rows={comments.debug} algorithm={comments.algorithm} /> : null}
         </section>
       </Container>
     </AppShell>

@@ -22,22 +22,25 @@ import type { Comment } from "./queries";
   failure, and the alternative is a thread that quietly loses posts.
 */
 
-export type CommentNode = Comment & {
+export type CommentNode<T extends Comment = Comment> = T & {
   depth: number;
-  children: CommentNode[];
+  children: CommentNode<T>[];
   /* Every descendant, not just direct children. This is what "3 replies" on a
      collapsed branch has to count, and computing it during the build costs
      nothing while doing it in render is a walk per node. */
   descendantCount: number;
 };
 
-export function buildThread(comments: Comment[]): CommentNode[] {
-  const nodes = new Map<string, CommentNode>();
+/* Generic so a ranked comment keeps its extra fields (relation, position) on
+   the node. Children keep the order they arrive in, so the caller decides the
+   order and this only decides the shape. */
+export function buildThread<T extends Comment>(comments: T[]): CommentNode<T>[] {
+  const nodes = new Map<string, CommentNode<T>>();
   for (const c of comments) {
-    nodes.set(c.id, { ...c, depth: 0, children: [], descendantCount: 0 });
+    nodes.set(c.id, { ...c, depth: 0, children: [], descendantCount: 0 } as CommentNode<T>);
   }
 
-  const roots: CommentNode[] = [];
+  const roots: CommentNode<T>[] = [];
 
   for (const c of comments) {
     const node = nodes.get(c.id);
@@ -60,7 +63,7 @@ export function buildThread(comments: Comment[]): CommentNode[] {
     feature needs an unbounded-safe traversal or the limit comes back as a crash
     instead of a rule.
   */
-  const stack: CommentNode[] = [...roots];
+  const stack: CommentNode<T>[] = [...roots];
   while (stack.length > 0) {
     const node = stack.pop();
     if (!node) continue;
@@ -86,6 +89,6 @@ export function buildThread(comments: Comment[]): CommentNode[] {
 /* How many comments the thread holds in total, replies included. The post's
    comment_count says the same thing and is trigger owned; this is for a list that
    has already been filtered by what the viewer may see. */
-export function countThread(roots: CommentNode[]): number {
+export function countThread<T extends Comment>(roots: CommentNode<T>[]): number {
   return roots.reduce((sum, node) => sum + 1 + node.descendantCount, 0);
 }

@@ -4,8 +4,8 @@ import { useActionState, useCallback, useEffect, useRef, useState } from "react"
 import { Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createComment, type CommentState } from "@/app/actions/community";
-import { loadCommentThread, type ThreadResult } from "@/app/actions/comments";
-import { CommentThread } from "../comment-thread";
+import { loadComments, type ThreadResult } from "@/app/actions/comments";
+import { RankedComments } from "../ranked-comments";
 import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
@@ -64,7 +64,7 @@ export function VideoComments({
   const closeRef = useRef<HTMLButtonElement>(null);
 
   const refresh = useCallback(async () => {
-    const result = await loadCommentThread(postId);
+    const result = await loadComments({ postId, mode: "top" });
     setLoaded({ postId, result });
     onCountChange?.(result.total);
   }, [postId, onCountChange]);
@@ -76,7 +76,7 @@ export function VideoComments({
     /* Every setState below runs in an async callback, never in the effect body,
        so nothing cascades. */
     void (async () => {
-      const result = await loadCommentThread(postId);
+      const result = await loadComments({ postId, mode: "top" });
       if (cancelled) return;
       setLoaded({ postId, result });
       onCountChange?.(result.total);
@@ -151,17 +151,17 @@ export function VideoComments({
             Loading comments
           </p>
         ) : thread ? (
-          <CommentThread
-            nodes={thread.nodes}
+          /* Top, Following and Newest, the same wrapper as the post page.
+             Keyed on the total so a new top level comment from the composer
+             below starts a fresh first page. A reply reloads inside it and
+             reports the new total here. */
+          <RankedComments
+            key={thread.total}
             postId={postId}
-            likedIds={thread.likedIds}
-            signedIn={thread.signedIn}
-            viewerId={thread.viewerId}
+            initial={thread}
             tone="dark"
-            onReplied={() => {
-              onTrack?.();
-              void refresh();
-            }}
+            onReplied={() => onTrack?.()}
+            onTotal={(total) => onCountChange?.(total)}
           />
         ) : null}
       </div>

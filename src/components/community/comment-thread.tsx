@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, CornerDownRight, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, CornerDownRight, Ellipsis, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { personName, relativeTime } from "@/lib/format";
 import { createComment, deleteComment, type CommentState } from "@/app/actions/community";
+import { hideComment } from "@/app/actions/comments";
+import type { Comment } from "@/lib/community/queries";
 import type { CommentNode } from "@/lib/community/thread";
+import { ReportForm } from "./post-controls";
 import { CommentLike } from "./post-actions";
 import { SignInButton } from "@/components/auth/sign-in-prompt";
 
@@ -36,6 +39,15 @@ import { SignInButton } from "@/components/auth/sign-in-prompt";
   neither has its own copy of what a comment looks like.
 */
 
+/* A comment as ranked (guide 20). The extra fields are optional so a plain
+   thread still renders: relation is the viewer's OWN relation to the author,
+   shown only to them; position and reason feed impression events. */
+export type ThreadComment = Comment & {
+  relation?: "friend" | "following" | null;
+  position?: number | null;
+  reason?: string;
+};
+
 /* Past this, replies stop moving right. Chosen against 390px: 4 levels of 22px
    is 88px of gutter, which still leaves a readable measure. */
 const MAX_INDENT = 4;
@@ -49,7 +61,7 @@ export function CommentThread({
   onReplied,
   tone = "light",
 }: {
-  nodes: CommentNode[];
+  nodes: CommentNode<ThreadComment>[];
   postId: string;
   likedIds: string[];
   signedIn: boolean;
@@ -97,7 +109,7 @@ function CommentRow({
   onReplied,
   tone,
 }: {
-  node: CommentNode;
+  node: CommentNode<ThreadComment>;
   postId: string;
   liked: Set<string>;
   signedIn: boolean;
@@ -115,6 +127,26 @@ function CommentRow({
   const [deleteError, setDeleteError] = useState("");
   const [deleting, startDelete] = useTransition();
   const router = useRouter();
+  /* Hide, Not interested and Report live behind one More control, so a deep
+     thread does not grow three more buttons on every row. */
+  const [menu, setMenu] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [hiddenNote, setHiddenNote] = useState("");
+  const [hideError, setHideError] = useState("");
+  const [hiding, startHide] = useTransition();
+
+  function hide(kind: "hide" | "not_interested") {
+    setHideError("");
+    startHide(async () => {
+      const result = await hideComment(node.id, kind);
+      if (!result.ok) {
+        setHideError(result.message);
+        return;
+      }
+      setMenu(false);
+      setHiddenNote(result.message);
+    });
+  }
 
   function confirmDelete() {
     setDeleteError("");
@@ -148,6 +180,10 @@ function CommentRow({
   return (
     <li style={{ marginInlineStart: indent }}>
       <div
+        data-cid={node.id}
+        data-depth={node.depth}
+        data-pos={node.position ?? undefined}
+        data-reason={node.reason ?? undefined}
         className={cn(
           "relative py-2.5",
           /* A hairline down the left of a reply, so a deep branch reads as one
@@ -190,6 +226,15 @@ function CommentRow({
                 <span className={cn("text-[11px]", dark ? "text-white/50" : "text-muted")}>
                   you
                 </span>
+              ) : node.relation ? (
+                <span
+                  className={cn(
+                    "rounded-full border px-1.5 text-[11px] leading-[18px]",
+                    dark ? "border-white/20 text-white/70" : "border-border text-muted",
+                  )}
+                >
+                  {node.relation === "friend" ? "Friend" : "Following"}
+                </span>
               ) : null}
 
               {/* suppressHydrationWarning because relativeTime reads the clock,
@@ -203,12 +248,12 @@ function CommentRow({
               </span>
             </div>
 
-            {deleted ? (
+            {deleted || hiddenNote ? (
               <p
                 role="status"
                 className={cn("mt-0.5 text-[14px] italic", dark ? "text-white/50" : "text-muted")}
               >
-                You deleted this reply.
+                {deleted ? "You deleted this reply." : hiddenNote}
               </p>
             ) : (
               <p
@@ -221,7 +266,7 @@ function CommentRow({
               </p>
             )}
 
-            {deleted ? null : (
+            {deleted || hiddenNote ? null : (
             <div className="-ms-3 flex flex-wrap items-center gap-1">
               <CommentLike
                 commentId={node.id}
@@ -267,7 +312,7 @@ function CommentRow({
                   )}
                   {collapsed
                     ? `Show ${node.descendantCount} ${node.descendantCount === 1 ? "reply" : "replies"}`
-                    : "Hide"}
+                    : "Hide replies"}
                 </button>
               ) : null}
 
@@ -320,8 +365,60 @@ function CommentRow({
                   </button>
                 )
               ) : null}
+
+              {signedIn && !isMine ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenu((v) => !v);
+                    setReporting(false);
+                  }}
+                  aria-expanded={menu}
+                  className={cn(
+                    "inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full px-2 text-[13px]",
+                    "transition-colors duration-200 ease-out",
+                    dark
+                      ? "text-white/70 hover:bg-white/10 hover:text-white"
+                      : "text-muted hover:bg-surface hover:text-foreground",
+                  )}
+                >
+                  <Ellipsis className="size-4" aria-hidden />
+                  <span className="sr-only">More options for the comment by {name}</span>
+                </button>
+              ) : null}
             </div>
             )}
+
+            {menu && !hiddenNote && !deleted ? (
+              <div className="-ms-3 flex flex-wrap items-center gap-2">
+                <MenuButton dark={dark} disabled={hiding} onClick={() => hide("hide")}>
+                  Hide comment
+                </MenuButton>
+                <MenuButton dark={dark} disabled={hiding} onClick={() => hide("not_interested")}>
+                  Not interested
+                </MenuButton>
+                <MenuButton dark={dark} expanded={reporting} onClick={() => setReporting((v) => !v)}>
+                  Report
+                </MenuButton>
+              </div>
+            ) : null}
+
+            {hideError ? (
+              <p role="alert" className={cn("mt-1 text-[13px]", dark ? "text-white" : "text-foreground")}>
+                {hideError}
+              </p>
+            ) : null}
+
+            {menu && reporting && !hiddenNote ? (
+              <ReportForm
+                entityType="comment"
+                entityId={node.id}
+                onDone={() => {
+                  setReporting(false);
+                  setMenu(false);
+                }}
+              />
+            ) : null}
 
             {deleteError ? (
               <p role="alert" className={cn("mt-1 text-[13px]", dark ? "text-white" : "text-foreground")}>
@@ -348,7 +445,7 @@ function CommentRow({
 
       {/* The children. Rendered as their own list so the nesting is real in the
           markup too, which is what lets a screen reader report the level. */}
-      {!collapsed && node.children.length > 0 ? (
+      {!collapsed && !hiddenNote && node.children.length > 0 ? (
         <ol className="space-y-1">
           {node.children.map((child) => (
             <CommentRow
@@ -365,6 +462,36 @@ function CommentRow({
         </ol>
       ) : null}
     </li>
+  );
+}
+
+function MenuButton({
+  children,
+  onClick,
+  dark,
+  disabled,
+  expanded,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  dark: boolean;
+  disabled?: boolean;
+  expanded?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-expanded={expanded}
+      className={cn(
+        "inline-flex min-h-11 cursor-pointer items-center rounded-full px-3 text-[13px]",
+        "transition-colors duration-200 ease-out disabled:opacity-60",
+        dark ? "text-white/80 hover:bg-white/10" : "text-foreground hover:bg-surface",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
