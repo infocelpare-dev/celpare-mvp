@@ -7,7 +7,7 @@ import { Container } from "@/components/ui/container";
 import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Button, ButtonLink } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { TubelightNav } from "@/components/ui/tubelight-navbar";
 
 /*
   Hrefs are root relative on purpose. This nav is shared by every page, but the
@@ -56,21 +56,12 @@ export function Navbar() {
       <Container className="flex h-[72px] items-center justify-between gap-4">
         <Logo />
 
-        <nav aria-label="Main" className="hidden flex-1 items-center gap-8 ps-10 lg:flex">
-          {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              aria-current={active === l.id ? "true" : undefined}
-              className={cn(
-                "border-b-2 py-1 text-[16px] text-foreground transition-colors duration-200 ease-out hover:text-muted",
-                active === l.id ? "border-accent" : "border-transparent",
-              )}
-            >
-              {l.label}
-            </Link>
-          ))}
-        </nav>
+        <TubelightNav
+          items={links.map((l) => ({ name: l.label, url: l.href }))}
+          active={links.find((l) => l.id === active)?.label ?? ""}
+          onSelect={(name) => setActive(links.find((l) => l.label === name)?.id ?? "")}
+          className="hidden flex-1 justify-center md:flex lg:ps-6"
+        />
 
         <div className="hidden items-center gap-3 lg:flex">
           <ThemeToggle />
@@ -113,7 +104,7 @@ export function Navbar() {
               key={l.href}
               href={l.href}
               onClick={() => setOpen(false)}
-              className="rounded-lg px-2 py-2.5 text-[15px] text-muted transition-colors duration-200 hover:bg-surface hover:text-foreground"
+              className="rounded-lg px-2 py-2.5 text-[15px] text-muted transition-colors duration-200 hover:bg-surface hover:text-foreground md:hidden"
             >
               {l.label}
             </Link>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import {
   ArrowUp,
   ArrowUpRight,
@@ -43,22 +44,31 @@ const SUGGESTIONS = [
 ];
 
 const ANSWER =
-  "Three tools in the Celpare catalogue fit video generation. Runway is built for production work and editing, Kling is known for realistic motion, and Sora is OpenAI's text to video model, included if you already pay for ChatGPT.";
+  "Three tools in the Celpare catalogue fit video generation. Runway is built for production work and editing, Higgsfield makes video, images and voice from a prompt or a reference, and Sora is OpenAI's text to video model, included if you already pay for ChatGPT.";
 
-/* Real rows from public.tools (slugs runway, kling, sora), as the catalogue words them. */
+/*
+  Real rows from public.tools (slugs runway, higgsfield, sora), as the catalogue
+  words them, with each row's logo_url. Higgsfield replaced Kling at the founder's
+  request on 2026-10-07; its row, and Sora's logo, were added the same day from
+  each tool's own site.
+*/
+const LOGOS = "https://uckulakdtmaqgwakowyq.supabase.co/storage/v1/object/public/tool-images/logos";
 const TOOLS = [
   {
     name: "Runway",
+    logo: `${LOGOS}/runway.png`,
     tagline: "Video generation and editing for production work.",
     pricing: "Free tier with limited credits. Paid subscription and enterprise plans.",
   },
   {
-    name: "Kling",
-    tagline: "Video generation with strong motion realism.",
-    pricing: "Free daily credits. Paid subscription plans.",
+    name: "Higgsfield",
+    logo: `${LOGOS}/higgsfield.png`,
+    tagline: "Video, image and voice generation from text prompts or references.",
+    pricing: "Free plan with limited credits and models. Paid subscription plans.",
   },
   {
     name: "Sora",
+    logo: `${LOGOS}/sora.png`,
     tagline: "OpenAI's text to video model.",
     pricing: "Included with paid ChatGPT plans, subject to usage limits.",
   },
@@ -137,7 +147,7 @@ export function AskDemo() {
     <figure className="mx-auto w-full">
       <p className="sr-only">
         A looping preview of Ask Celpare. Someone asks for the three best AI tools
-        for video generation, and Ask Celpare answers with Runway, Kling and Sora
+        for video generation, and Ask Celpare answers with Runway, Higgsfield and Sora
         from the Celpare catalogue.
       </p>
 
@@ -259,26 +269,40 @@ function Frame({ now, reduced }: { now: number; reduced: boolean }) {
                 </p>
               )}
 
-              <ul className="mt-4 grid grid-cols-1 gap-2.5 md:grid-cols-3">
+              {/* All three on every width: a compact row each on phones, three columns from md. */}
+              <ul className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-2.5">
                 {TOOLS.map((tool, i) => (
                   <li
                     key={tool.name}
                     className={cn(
-                      "rounded-2xl border border-border bg-elevated p-4 transition-all duration-500 ease-out",
+                      "flex items-center gap-3 rounded-2xl border border-border bg-elevated px-3.5 py-3 transition-all duration-500 ease-out md:block md:p-4",
                       i < cards && !status && words >= ANSWER_WORDS.length
                         ? "translate-y-0 opacity-100"
                         : "translate-y-2 opacity-0",
-                      i > 0 && "hidden md:block",
                     )}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <span className="flex size-8 items-center justify-center rounded-full bg-accent font-display text-[13px] font-semibold text-on-accent">
-                        {tool.name[0]}
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <Image
+                        src={tool.logo}
+                        alt=""
+                        width={36}
+                        height={36}
+                        className="size-9 rounded-[10px] border border-border object-cover md:size-8"
+                        unoptimized
+                      />
+                      <span className="hidden font-display text-[15px] font-semibold md:inline">
+                        {tool.name}
                       </span>
-                      <span className="font-display text-[15px] font-semibold">{tool.name}</span>
                     </div>
-                    <p className="mt-2.5 text-[13px] leading-snug">{tool.tagline}</p>
-                    <p className="mt-1.5 text-[12px] leading-snug text-muted">{tool.pricing}</p>
+                    <div className="min-w-0 md:mt-2.5">
+                      <p className="font-display text-[14px] font-semibold md:hidden">{tool.name}</p>
+                      <p className="line-clamp-2 text-[13px] leading-snug text-muted md:line-clamp-none md:text-foreground">
+                        {tool.tagline}
+                      </p>
+                      <p className="mt-1.5 hidden text-[12px] leading-snug text-muted md:block">
+                        {tool.pricing}
+                      </p>
+                    </div>
                   </li>
                 ))}
               </ul>
