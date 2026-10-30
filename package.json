@@ -23,7 +23,9 @@
     "video:audio": "node video/audio/generate.mjs",
     "video:story": "node video/render.mjs story",
     "video:coding": "node video/render.mjs coding",
-    "video:launch": "node video/render.mjs launch"
+    "video:launch": "node video/render.mjs launch",
+    "video:carousel": "node video/render.mjs carousel",
+    "video:ais": "node video/render.mjs ais"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
