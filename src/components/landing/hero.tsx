@@ -13,7 +13,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 */
 export function Hero() {
   return (
-    <Section className="pb-12 pt-16 sm:pt-24 lg:pb-16 lg:pt-32">
+    <Section className="pb-12 pt-6 sm:pt-10 lg:pb-16 lg:pt-12">
       <Container>
         {/* Centred, not bottom aligned: with the founder block the right column
             is as tall as the left, and bottom alignment pushed its text up and
