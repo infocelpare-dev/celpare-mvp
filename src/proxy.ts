@@ -9,6 +9,7 @@ import {
   secondFactorEnabled,
   sessionClaims,
 } from "@/lib/auth/second-factor";
+import { cleanRef, REF_COOKIE, REF_MAX_AGE } from "@/lib/onboarding/options";
 
 /*
   Refreshes the auth session on every request and writes the rotated cookies
@@ -76,6 +77,29 @@ export async function proxy(request: NextRequest) {
     ) {
       await supabase.auth.signOut({ scope: "local" });
       response.cookies.delete(SECOND_FACTOR_COOKIE);
+    }
+  }
+
+  /*
+    The campaign tag (phase ONB, D227). A link posted with `?ref=tiktok-gems`
+    or `?utm_source=` is remembered first party for 30 days, first touch only,
+    and saved once with the onboarding answers. Letters, digits, _ and - only.
+    No tracker, no third party, nothing set without a tag in the link.
+
+    OFF unless ONBOARDING_REF_COOKIE=on. The Cookie Policy promises strictly
+    necessary cookies only, and a campaign tag is not one, so it stays off
+    until the founder decides on consent and the policy row (D227).
+  */
+  if (process.env.ONBOARDING_REF_COOKIE === "on" && !request.cookies.has(REF_COOKIE)) {
+    const ref = cleanRef(request.nextUrl.searchParams.get("ref") ?? request.nextUrl.searchParams.get("utm_source"));
+    if (ref) {
+      response.cookies.set(REF_COOKIE, ref, {
+        maxAge: REF_MAX_AGE,
+        httpOnly: true,
+        sameSite: "lax",
+        secure: request.nextUrl.protocol === "https:",
+        path: "/",
+      });
     }
   }
 

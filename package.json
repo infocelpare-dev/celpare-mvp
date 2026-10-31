@@ -27,7 +27,8 @@
     "video:carousel": "node video/render.mjs carousel",
     "video:ais": "node video/render.mjs ais",
     "video:gems": "node video/render.mjs gems",
-    "video:meme": "node video/render.mjs meme"
+    "video:meme": "node video/render.mjs meme",
+    "test:onboarding": "node --import ./scripts/test-loader.mjs --test \"src/lib/onboarding/__tests__/*.test.ts\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
