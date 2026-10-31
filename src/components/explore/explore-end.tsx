@@ -1,4 +1,5 @@
-import { ArrowUp, PenLine, Search } from "lucide-react";
+import { PenLine, Search } from "lucide-react";
+import { BackToTop } from "@/components/ui/back-to-top";
 import { ButtonLink, buttonVariants } from "@/components/ui/button";
 import { EndOfList } from "@/components/ui/end-of-list";
 import { SparkIcon } from "@/components/ui/spark-icon";
@@ -90,10 +91,7 @@ export function ExploreEnd({
         ))}
       </p>
 
-      <ButtonLink href="#top" variant="ghost" size="sm" scroll className="w-full">
-        <ArrowUp className="size-4" aria-hidden />
-        Back to top
-      </ButtonLink>
+      <BackToTop variant="ghost" size="sm" className="w-full" />
     </EndOfList>
   );
 }

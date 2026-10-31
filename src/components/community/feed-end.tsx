@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowUp, CheckCheck, PenLine } from "lucide-react";
+import { ArrowDown, CheckCheck, PenLine } from "lucide-react";
+import { BackToTop } from "@/components/ui/back-to-top";
 import { ButtonLink, buttonVariants } from "@/components/ui/button";
 import { EndOfList } from "@/components/ui/end-of-list";
 import type { FeedScope } from "@/lib/community/queries";
@@ -87,16 +88,9 @@ export function FeedEnd({
         </SignInButton>
       )}
 
-      {/*
-        A plain anchor to the top of the document, not a scroll handler. The
-        feed scrolls inside <main> rather than the window, so window.scrollTo
-        would do nothing, and a hash link is handled by the browser against the
-        right scroller with no JavaScript at all.
-      */}
-      <ButtonLink href="#top" variant="outline" scroll>
-        <ArrowUp className="size-4" aria-hidden />
-        Back to top
-      </ButtonLink>
+      {/* Scrolls the feed's own scroller, not the window (back-to-top.tsx). */}
+      <BackToTop />
+
     </EndOfList>
   );
 }

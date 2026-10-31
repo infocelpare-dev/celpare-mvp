@@ -7,6 +7,7 @@ import { AdminLink } from "@/components/app/admin-link";
 import { Container } from "@/components/ui/container";
 import { EndOfList } from "@/components/ui/end-of-list";
 import { ButtonLink } from "@/components/ui/button";
+import { BackToTop } from "@/components/ui/back-to-top";
 import { SparkIcon } from "@/components/ui/spark-icon";
 import { CompareProvider } from "@/components/compare/compare-provider";
 import { CompareBuilder, type BuilderSlot } from "@/components/compare/builder";
@@ -445,9 +446,7 @@ export default async function ComparePage({
                   <ButtonLink href="#ask" size="sm">
                     Ask Celpare
                   </ButtonLink>
-                  <ButtonLink href="#top" variant="outline" size="sm">
-                    Back to top
-                  </ButtonLink>
+                  <BackToTop size="sm" />
                 </EndOfList>
               </div>
             </Container>
