@@ -3,7 +3,7 @@ import { applyDiversity, applyFrequencyControls } from "./diversity";
 import { distributionStage, inAudience, type DistributionState } from "./distribution";
 import { explainRanking } from "./explain";
 import { NOT_FOR_DISCOVERY, isFresh, stateToDistribution, type StoredPostState } from "./lifecycle";
-import { NO_SEEDS, extractFeatures, type SeedTokens } from "./features";
+import { NO_SEEDS, extractFeatures, type DeclaredMatch, type SeedTokens } from "./features";
 import { calculateFreshness, type FreshnessProfile } from "./freshness";
 import { interestIn, isColdStart, topKeys, type SessionProfile } from "./interests";
 import { hash32, hoursBetween, unitHash } from "./math";
@@ -90,6 +90,8 @@ export type PipelineOptions = {
   /* distribution_v2 (feed_v4, reels_v3): each post's stored lifecycle state.
      A missing or stale state falls back to distribution_v1 for that post. */
   postStates?: Map<string, StoredPostState>;
+  /* Phase ONB: the declared prior (features.ts DeclaredMatch). Absent, ranking is unchanged. */
+  declared?: DeclaredMatch;
 };
 
 /* Why a candidate is not where one might expect (admin debug only). */
@@ -491,6 +493,7 @@ export function runPipeline(opts: PipelineOptions): RankedItem[] {
       explorationValue: expValue,
       v3: opts.v3,
       network: opts.v3 ? opts.network?.get(w.item.id) : undefined,
+      declared: opts.declared,
     });
     const audienceFactor = outOfAudience.has(w.item.id) ? OUT_OF_AUDIENCE : 1;
     const score = value(scorer.predict(features), features, objective) * audienceFactor;

@@ -1,4 +1,5 @@
 import { halfLifeDecay, saturate } from "../community/intelligence/math";
+import { declaredWeight } from "../onboarding/prior";
 import { TMR_V1 } from "./config";
 import type { CatalogueIndex } from "./catalogue";
 import { interestKeys } from "./entity";
@@ -89,6 +90,11 @@ export type UserInput = {
   /* my_search_affinity: category names and tags, weighted. */
   affinity?: { categories: Map<string, number>; tags: Map<string, number> } | null;
   now: number;
+  /* Phase ONB (D225): sign up picks as feature keys (onboarding/server.ts
+     declaredKeys). Categories enter long term at the faded prior; tools they
+     already use become owned, and lend their categories and use cases at half
+     the prior. Topics are content and are not read here (D173). */
+  declared?: string[];
 };
 
 /* Only these interest prefixes describe tools and models. Topic and author keys
@@ -200,9 +206,31 @@ export function buildUserContext(input: UserInput, index: CatalogueIndex): UserC
   ctx.recent = normalise(recent);
   ctx.session = normalise(session);
   for (const [k, v] of negative) ctx.negative.set(k, saturate(v, 1.5));
+  applyDeclared(ctx, input.declared ?? [], index);
   ctx.intent = dominantIntent(ctx.session);
   ctx.cold = ctx.evidence < TMR_V1.COLD_EVIDENCE && ctx.long.size === 0 && ctx.session.size === 0 && ctx.sessionQueries.length === 0;
   return ctx;
+}
+
+/* Phase ONB: fold the sign up picks into long term at the faded prior (D225). */
+function applyDeclared(ctx: UserContext, keys: string[], index: CatalogueIndex) {
+  const prior = declaredWeight(ctx.evidence);
+  const lift = (k: string, w: number) => {
+    if (w > 0) ctx.long.set(k, Math.max(ctx.long.get(k) ?? 0, w));
+  };
+  for (const key of keys) {
+    if (key.startsWith("category:")) {
+      lift(`category:${slug(key.slice("category:".length))}`, prior);
+    } else if (key.startsWith("tool:")) {
+      /* Owned stands whatever the evidence: they told us they use it. */
+      ctx.owned.add(key);
+      const entity = index.entities.get(key);
+      if (!entity) continue;
+      for (const k of interestKeys(entity)) {
+        if (k.startsWith("category:") || k.startsWith("usecase:")) lift(k, 0.5 * prior);
+      }
+    }
+  }
 }
 
 /* The session's job: the strongest use case, else the strongest category. */

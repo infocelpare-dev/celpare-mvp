@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { loadInterestProfile } from "@/lib/community/intelligence/server/data";
 import { loadAffinity } from "@/lib/search/personalization";
+import { declaredKeys, loadDeclared } from "@/lib/onboarding/server";
 import type { CatalogueIndex } from "../catalogue";
 import { buildUserContext, emptyUserContext, type ActivityRow, type UserContext } from "../user";
 
@@ -30,7 +31,7 @@ export async function loadUserContext(viewerId: string | null, index: CatalogueI
   const toolIds = index.list.filter((e) => e.ref.type === "tool" && !e.fixture).map((e) => e.ref.id);
   const modelIds = index.list.filter((e) => e.ref.type === "model" && !e.fixture).map((e) => e.ref.id);
 
-  const [activity, interests, affinity, toolNet, modelNet] = await Promise.all([
+  const [activity, interests, affinity, toolNet, modelNet, declared] = await Promise.all([
     db.rpc("my_tool_model_activity", { p_days: 60 }).then(
       (r) => {
         if (r.error) {
@@ -55,6 +56,12 @@ export async function loadUserContext(viewerId: string | null, index: CatalogueI
     }),
     opts.network && toolIds.length ? db.rpc("my_explore_network", { p_type: "tool", p_ids: toolIds.slice(0, 200) }) : Promise.resolve(null),
     opts.network && modelIds.length ? db.rpc("my_explore_network", { p_type: "model", p_ids: modelIds.slice(0, 200) }) : Promise.resolve(null),
+    loadDeclared(db, viewerId)
+      .then((d) => declaredKeys(db, d))
+      .catch(() => {
+        failed.push("declared");
+        return [] as string[];
+      }),
   ]);
 
   const rows: ActivityRow[] = activity.flatMap((r) => {
@@ -80,6 +87,7 @@ export async function loadUserContext(viewerId: string | null, index: CatalogueI
       communityLong: interests?.profile.longTerm,
       affinity: affinity ? { categories: affinity.categories, tags: affinity.tags } : null,
       now: opts.now,
+      declared,
     },
     index,
   );

@@ -73,7 +73,19 @@ export type FeatureContext = {
   v3?: boolean;
   /* What the people this person follows did with the post, counts only. */
   network?: NetworkEngagement;
+  /* Phase ONB (D225): topics and tools picked at sign up, at a weight that
+     fades as the person's own evidence grows (onboarding/prior.ts). */
+  declared?: DeclaredMatch;
 };
+
+export type DeclaredMatch = { topics: Set<string>; tools: Set<string>; weight: number };
+
+/* The prior's relevance for one post: the faded weight on a picked topic or tool, else 0. */
+export function declaredRelevance(item: ContentItem, d: DeclaredMatch | undefined): number {
+  if (!d || !(d.weight > 0)) return 0;
+  const hit = (item.topicId !== null && d.topics.has(item.topicId)) || (item.toolId !== null && d.tools.has(item.toolId));
+  return hit ? clamp01(d.weight) : 0;
+}
 
 /* feed_v3: the people you follow engaging with a post, 0..1. Commenting and
    reposting are public acts and count fully; likes (only ever present when two
@@ -135,8 +147,12 @@ export function extractFeatures(item: ContentItem, ctx: FeatureContext): Extract
   const session =
     ctx.session && ctx.session.lastAt > 0 ? sessionAffinity(ctx.session, item, tokens) : { pos: 0, neg: 0 };
 
+  const declared = declaredRelevance(item, ctx.declared);
   const relevance = clamp01(
-    (match ? Math.max(match.overall, 0.8 * semantic) : 0.5 * semantic) + SESSION.RELEVANCE_WEIGHT * session.pos,
+    Math.max(
+      (match ? Math.max(match.overall, 0.8 * semantic) : 0.5 * semantic) + SESSION.RELEVANCE_WEIGHT * session.pos,
+      declared,
+    ),
   );
 
   const rejected = clamp01(ctx.similarToRejected ?? 0);
@@ -155,7 +171,7 @@ export function extractFeatures(item: ContentItem, ctx: FeatureContext): Extract
   const features: RankingFeatures = {
     relevance,
     authorAffinity,
-    topicAffinity: clamp01(match?.topic ?? 0),
+    topicAffinity: clamp01(Math.max(match?.topic ?? 0, item.topicId !== null && ctx.declared?.topics.has(item.topicId) ? declared : 0)),
     semantic,
     follows,
     contentQuality: contentQuality(item),

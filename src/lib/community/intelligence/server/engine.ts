@@ -8,6 +8,9 @@ import { primaryReason } from "../explain";
 import { rankWithFallback } from "../fallback";
 import { FEED, FEED_ALGORITHM, rankFollowing, rankForYou } from "../feed";
 import type { DropReason } from "../pipeline";
+import type { DeclaredMatch } from "../features";
+import { loadDeclared } from "@/lib/onboarding/server";
+import { declaredWeight } from "@/lib/onboarding/prior";
 import { buildInterestProfile, emptyInterestProfile, isColdStart, topKeys } from "../interests";
 import { tokenize } from "../text";
 import { REELS_ALGORITHM, reelsFeed } from "../reels";
@@ -225,12 +228,21 @@ export type FeedRequest = {
   profile (as of `now`), this sitting's session, and the inferred intent.
 */
 async function personFor(db: SupabaseClient, viewerId: string | null, now: number) {
-  const person = await loadInterestProfile(db, viewerId, now);
+  const [person, picked] = await Promise.all([
+    loadInterestProfile(db, viewerId, now),
+    loadDeclared(db, viewerId),
+  ]);
   const profile = person?.profile ?? null;
   const signals = person?.signals ?? [];
   const session = viewerId && signals.length ? buildSessionProfile(viewerId, signals, now) : null;
   const intent = inferIntent(viewerId, signals, now);
-  return { profile, signals, session, intent };
+  /* Phase ONB (D225): what they picked at sign up, fading as evidence grows. */
+  const weight = declaredWeight(profile?.evidence ?? 0);
+  const declared: DeclaredMatch | undefined =
+    weight > 0 && (picked.topicIds.length > 0 || picked.toolIds.length > 0)
+      ? { topics: new Set(picked.topicIds), tools: new Set(picked.toolIds), weight }
+      : undefined;
+  return { profile, signals, session, intent, declared };
 }
 
 /* Seen state: history, plus the session cookie for the candidates at hand. */
@@ -255,17 +267,24 @@ export async function getForYouFeed(req: FeedRequest): Promise<RankedFeed> {
   const pages = Math.min(Math.max(1, req.pages), FEED.MAX_PAGES);
   const loaded: Loaded = { items: [], posts: new Map() };
 
-  const { profile, session, intent } = await personFor(db, viewerId, now);
+  const { profile, session, intent, declared } = await personFor(db, viewerId, now);
   timings.person = Date.now() - t0;
   const cold = isColdStart(profile);
   const followed = profile ? [...profile.followedAuthors] : [];
 
   /* Sources personalised by the long term profile AND this sitting: topics
-     from both, creators the person engages with, their own words. */
+     from both, creators the person engages with, their own words. While the
+     declared prior holds, the topics picked at sign up are retrieved too. */
   const sessionTopics = session
     ? [...session.topicCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([t]) => t)
     : [];
-  const topicIds = [...new Set([...(profile && !cold ? topKeys(profile, "topic", 4) : []), ...sessionTopics])];
+  const topicIds = [
+    ...new Set([
+      ...(profile && !cold ? topKeys(profile, "topic", 4) : []),
+      ...sessionTopics,
+      ...(declared ? [...declared.topics].slice(0, 4) : []),
+    ]),
+  ];
   const affinityAuthors =
     profile && !cold
       ? topKeys(profile, "author", 8).filter((a) => !profile.followedAuthors.has(a) && a !== viewerId).slice(0, 6)
@@ -342,6 +361,7 @@ export async function getForYouFeed(req: FeedRequest): Promise<RankedFeed> {
         followCount: followed.length,
         trace,
         postStates,
+        declared,
       }),
     { candidates, signals, profile, pageSize: FEED.PAGE_SIZE, pages, seen, now },
     (err) => console.error(`[intelligence] ${algorithm} failed, serving fallback`, err),

@@ -6,6 +6,8 @@ import { orderSections, DEFAULT_ORDER } from "../sections";
 import type { ExploreEntityType, ExploreSectionId, SectionRanking } from "../types";
 import { EXPLORE_ALGORITHM, assignExploreVariant, type ExploreAssignment } from "../versions";
 import { loadExplorePool, type ExplorePool } from "./pool";
+import { createClient } from "@/lib/supabase/server";
+import { declaredKeys, loadDeclared } from "@/lib/onboarding/server";
 
 /*
   explore_v1 for one request.
@@ -30,13 +32,28 @@ export type ExploreResult = {
   timings: Record<string, number>;
 };
 
+/* Phase ONB: the sign up picks as feature keys. Nothing, never an error, on failure. */
+async function viewerIdDeclared(viewerId: string | null): Promise<string[]> {
+  if (!viewerId) return [];
+  try {
+    const db = await createClient();
+    return await declaredKeys(db, await loadDeclared(db, viewerId));
+  } catch (err) {
+    console.error("[explore] declared failed", err);
+    return [];
+  }
+}
+
 const ANON_TTL_MS = 60_000;
 const anonCache = new Map<string, { at: number; value: ExploreResult }>();
 
 async function compute(signedIn: boolean, viewerId: string | null, tabTypes: string | null): Promise<ExploreResult> {
   const onlyTypes = tabTypes ? (tabTypes.split(",") as ExploreEntityType[]) : null;
   const now = Date.now();
-  const pool = await loadExplorePool({ signedIn, viewerId, now });
+  const [pool, declared] = await Promise.all([
+    loadExplorePool({ signedIn, viewerId, now }),
+    viewerIdDeclared(viewerId),
+  ]);
   const t = Date.now();
   const byKey = new Map(pool.candidates.map((c) => [c.key, c.featureKeys]));
   const profile = viewerId
@@ -48,6 +65,7 @@ async function compute(signedIn: boolean, viewerId: string | null, tabTypes: str
         owned: pool.owned,
         keysOf: (k) => byKey.get(k),
         now,
+        declared,
       })
     : emptyExploreProfile(null);
   const assignment = assignExploreVariant(viewerId);

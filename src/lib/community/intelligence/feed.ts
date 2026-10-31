@@ -1,6 +1,6 @@
 import { EXPLORATION, INTENT } from "./config";
 import { applyOverride, type Assignment } from "./experiments";
-import type { SeedTokens } from "./features";
+import type { DeclaredMatch, SeedTokens } from "./features";
 import { isColdStart, type SessionProfile } from "./interests";
 import type { StoredPostState } from "./lifecycle";
 import { assembleFeed, runPipeline, type DropReason } from "./pipeline";
@@ -74,6 +74,8 @@ export type FeedInput = {
   trace?: Map<string, DropReason>;
   /* feed_v4: each post's stored lifecycle (lifecycle.ts). */
   postStates?: Map<string, StoredPostState>;
+  /* Phase ONB: topics and tools picked at sign up, faded by evidence. */
+  declared?: DeclaredMatch;
 };
 
 /*
@@ -118,6 +120,7 @@ export function rankForYou(input: FeedInput): FeedResult {
     followCount: input.followCount,
     trace: input.trace,
     postStates: FEED_ALGORITHM.forYou === "feed_v4" ? input.postStates : undefined,
+    declared: input.declared,
   });
 
   const { items, complete } = assembleFeed(ranked, FEED.PAGE_SIZE, pages);

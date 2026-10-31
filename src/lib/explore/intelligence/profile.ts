@@ -1,6 +1,7 @@
 import { halfLifeDecay, saturate } from "../../community/intelligence/math";
 import { tokenize } from "../../community/intelligence/text";
 import type { InterestProfile } from "../../community/intelligence/types";
+import { declaredWeight } from "../../onboarding/prior";
 import { EXPLORE_V1 } from "./config";
 import type { ExploreEntityType } from "./types";
 
@@ -127,6 +128,10 @@ export type BuildProfileInput = {
      a tool becomes interest in its categories and tags. */
   keysOf: (candidateKey: string) => string[] | undefined;
   now: number;
+  /* Phase ONB (D225): feature keys picked at sign up (category:<name>,
+     topic:<id>, tool:<id>). They enter long term at the faded prior weight,
+     so a new account is no longer cold and its shelves start on what it chose. */
+  declared?: string[];
 };
 
 export function buildExploreProfile(input: BuildProfileInput): ExploreProfile {
@@ -215,6 +220,13 @@ export function buildExploreProfile(input: BuildProfileInput): ExploreProfile {
   /* Negatives are NOT normalised by their maximum: one weak rejection must not
      become a full one. Saturating keeps several rejections below 1. */
   for (const [k, v] of negative) p.negative.set(k, saturate(v, 1.5));
+  const prior = declaredWeight(p.evidence);
+  if (prior > 0) {
+    for (const k of input.declared ?? []) {
+      p.long.set(k, Math.max(p.long.get(k) ?? 0, prior));
+      p.touched.add(k);
+    }
+  }
   p.cold = p.evidence < 3 && p.long.size === 0 && p.session.size === 0;
   return p;
 }
