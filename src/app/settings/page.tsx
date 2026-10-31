@@ -24,6 +24,8 @@ import { ThemeChoice } from "@/components/ui/theme-choice";
 import { AccountSecurity } from "@/components/settings/account-security";
 import { YourData } from "@/components/settings/your-data";
 import type { PrivacyValues } from "@/app/actions/settings";
+import { InterestsForm, type InterestValues } from "@/components/settings/interests-form";
+import { loadDeclared, loadOptions } from "@/lib/onboarding/server";
 import type { Plan } from "@/lib/ai/types";
 
 const PLAN_LABEL: Record<Plan, string> = {
@@ -133,6 +135,18 @@ export default async function SettingsPage() {
   if (prefError) throw new Error(`Notification settings could not be read: ${prefError.message}`);
   const notificationPrefs = prefData as NotificationPreferences;
 
+  const [interestOptions, declared] = await Promise.all([
+    loadOptions(supabase),
+    loadDeclared(supabase, user.id),
+  ]);
+  const interestValues: InterestValues = {
+    role: declared.role,
+    goals: declared.goals,
+    categoryIds: declared.categoryIds,
+    topicIds: declared.topicIds,
+    toolIds: declared.toolIds,
+  };
+
   const privacy: PrivacyValues = {
     isPrivate: profile?.is_private ?? false,
     showReplies: profile?.show_replies ?? true,
@@ -240,6 +254,16 @@ export default async function SettingsPage() {
             enforced in the database, not just hidden on the page.
           </p>
           <PrivacyForm values={privacy} />
+        </section>
+
+        {/* Your interests (phase ONB): the sign up answers, editable any time. */}
+        <section id="interests" className="mt-12 scroll-mt-20 border-t border-border pt-10">
+          <h2 className="font-display text-[17px] font-semibold">Your interests</h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-muted">
+            What you told us when you joined. Your feed, Explore and tool suggestions start
+            from these and then follow what you actually do. Only you can see them.
+          </p>
+          <InterestsForm options={interestOptions} values={interestValues} />
         </section>
 
         {/* Notifications (4BH): one switch per kind, each saving itself. */}

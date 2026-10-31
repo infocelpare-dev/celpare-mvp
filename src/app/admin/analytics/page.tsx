@@ -7,6 +7,68 @@ import { KpiCard, KpiGrid } from "@/components/analytics/kpi";
 import { Breakdown, InsightList, Panel } from "@/components/analytics/breakdown";
 import { concentrationInsight, rank, rateInsight, trendInsights } from "@/lib/analytics/insights";
 import { delta, splitPeriods, total, type DayPoint } from "@/lib/analytics/series";
+import { getOnboardingSummary, type Count, type OnboardingSummary } from "@/lib/onboarding/server";
+import { GOALS, HEARD_FROM, labelOf, ROLES, type Choice } from "@/lib/onboarding/options";
+
+/*
+  How people found Celpare and what they came for (phase ONB): the answers
+  given after sign up, as counts. Accounts from before ONB were never asked,
+  so these cover new accounts only. Campaign tags come from ?ref= links.
+*/
+function OnboardingBoard({ summary, periodLabel }: { summary: OnboardingSummary | null; periodLabel: string }) {
+  if (!summary) {
+    return (
+      <div className="mt-5">
+        <ErrorState what="sign up answers" />
+      </div>
+    );
+  }
+  const t = summary.totals;
+  const rows = (list: Count[], labels?: readonly Choice[]) =>
+    list.map((c) => ({ label: labels ? labelOf(labels, c.key) : c.key, value: c.count }));
+  const pct = (n: number, d: number) => (d > 0 ? `${Math.round((n / d) * 100)}%` : "None yet");
+
+  return (
+    <>
+      <h2 className="mt-10 font-display text-[20px] font-medium tracking-[-0.02em]">How people found Celpare</h2>
+      <p className="mt-1 text-[14px] text-muted">
+        Answers to the questions after sign up, in the last {periodLabel}. New accounts only.
+      </p>
+
+      <KpiGrid className="mt-5">
+        <KpiCard label="Asked" value={t.started.toLocaleString("en-GB")} caption={`of ${t.signups.toLocaleString("en-GB")} new accounts`} />
+        <KpiCard label="Finished" value={pct(t.completed, t.started)} caption={`${t.completed} answered to the end`} />
+        <KpiCard label="Said where they heard" value={pct(t.answered_heard, t.started)} caption={`${t.answered_heard} accounts`} />
+      </KpiGrid>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <Panel title="Where they heard about Celpare" lead="The channel each new account named.">
+          <Breakdown dimension="Channel" measure="Accounts" rows={rows(summary.heard_from, HEARD_FROM)} limit={13} empty="Nobody has answered yet." />
+        </Panel>
+        <Panel title="Campaign links" lead="Sign ups that arrived through a link with ?ref= or ?utm_source=.">
+          <Breakdown dimension="Tag" measure="Accounts" rows={rows(summary.refs)} empty="No tagged links yet. Add ?ref=name to a link you post." />
+        </Panel>
+        <Panel title="Who they are" lead="What best describes them.">
+          <Breakdown dimension="Role" measure="Accounts" rows={rows(summary.roles, ROLES)} limit={12} empty="Nobody has answered yet." />
+        </Panel>
+        <Panel title="What they came to do" lead="Every goal picked; one account can pick several.">
+          <Breakdown dimension="Goal" measure="Accounts" rows={rows(summary.goals, GOALS)} empty="Nobody has answered yet." />
+        </Panel>
+        <Panel title="Interests" lead="Categories and topics picked.">
+          <Breakdown dimension="Interest" measure="Accounts" rows={[...rows(summary.categories), ...rows(summary.topics)]} limit={12} empty="Nobody has answered yet." />
+        </Panel>
+        <Panel title="Tools they already use" lead="The catalogue tools new accounts said they use.">
+          <Breakdown dimension="Tool" measure="Accounts" rows={rows(summary.tools)} empty="Nobody has answered yet." />
+        </Panel>
+        {summary.heard_other.length > 0 ? (
+          <Panel title="Somewhere else" lead="What people typed when no channel fitted.">
+            <Breakdown dimension="Answer" measure="Accounts" rows={rows(summary.heard_other)} />
+          </Panel>
+        ) : null}
+      </div>
+    </>
+  );
+}
 
 export const dynamic = "force-dynamic";
 
@@ -37,10 +99,11 @@ export default async function AdminAnalyticsPage({
   const sp = await searchParams;
   const days = WINDOWS.includes(Number(sp.days)) ? Number(sp.days) : 30;
 
-  const [community, doubled, overview] = await Promise.all([
+  const [community, doubled, overview, onboarding] = await Promise.all([
     getCommunityAnalytics(session.db, days),
     getCommunityAnalytics(session.db, days * 2),
     getOverview(session.db),
+    getOnboardingSummary(session.db, days),
   ]);
 
   if (!community) {
@@ -198,6 +261,8 @@ export default async function AdminAnalyticsPage({
           />
         </Panel>
       </div>
+
+      <OnboardingBoard summary={onboarding} periodLabel={periodLabel} />
 
       <p className="mt-6 text-[12px] leading-relaxed text-muted">
         Active means signed in and did something that leaves a row: posted, commented, liked,

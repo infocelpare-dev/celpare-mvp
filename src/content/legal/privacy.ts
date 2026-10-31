@@ -12,8 +12,8 @@ export const privacy: Doc = {
   title: "Privacy Policy",
   description:
     "What personal data Celpare collects, why, who processes it, how long it is kept, and how to see, download or delete it.",
-  version: "1.0",
-  effective: "2026-10-07",
+  version: "1.1",
+  effective: "2026-10-31",
   summary: [
     "We collect what you give us (your account, profile, posts, messages and questions) and what using Celpare produces (searches, views, devices). We do not sell it and we run no advertising trackers.",
     "Your posts, comments and public profile are visible to anyone. Your email, messages, Ask Celpare chats, searches and devices are not.",
@@ -40,6 +40,7 @@ export const privacy: Doc = {
           list: [
             "Account: your name, email address and password (stored only as a hash by our authentication provider). If you sign in with Google, Google shares your name, email address and profile picture with us.",
             "Profile: username, bio, location, website, interests, skills, profile picture, and your privacy choices. Whatever you put in your profile is yours to leave blank.",
+            "Questions after sign up: what best describes you, what you want to do on Celpare, the categories and topics you are interested in, the AI tools you already use, and where you heard about Celpare. Every question can be skipped. Your answers are private: they are not on your profile, and you can change them in Settings.",
             "Content: posts, photos and videos, comments, replies, likes, reposts, saves, follows, collections, reviews and reactions to tools.",
             "Direct messages: the text, photos, videos, voice notes and TXT or CSV files you send, and who you send them to.",
             "Ask Celpare: the questions you ask and the answers you receive. If you are signed in and have history switched on, the conversation is saved to your account. If you are signed out, nothing is saved.",
@@ -82,7 +83,8 @@ export const privacy: Doc = {
               ["Create and run your account, sign you in, send login codes", "Account, devices", "Performance of our contract with you (the [Terms](/legal/terms))"],
               ["Show your profile and content to others, deliver messages", "Profile, content, messages", "Performance of contract"],
               ["Answer your Ask Celpare questions and keep your chat history", "Questions, answers, usage", "Performance of contract"],
-              ["Rank the feed, Explore, Search and recommendations for you", "Activity, follows, feedback", "Our legitimate interest in showing relevant content. You can use Not interested, mute and privacy settings, and object (section 8)"],
+              ["Rank the feed, Explore, Search and recommendations for you", "Activity, follows, feedback, and your answers to the questions after sign up", "Our legitimate interest in showing relevant content. You can use Not interested, mute and privacy settings, change your answers in Settings, and object (section 8)"],
+              ["Understand how people find Celpare and who it serves", "Your answers to the questions after sign up, counted together with everyone else's", "Our legitimate interest in growing Celpare. Staff see totals, never one person's answers"],
               ["Limit usage per plan and stop abuse, spam and automated traffic", "Usage, hashed network address, captcha result", "Legitimate interest in keeping Celpare available and safe"],
               ["Alert you to a new login and protect accounts", "Devices, security events", "Legitimate interest in security"],
               ["Find and fix errors", "Error reports", "Legitimate interest in a working service"],
@@ -231,5 +233,8 @@ export const privacy: Doc = {
       ],
     },
   ],
-  changes: [{ version: "1.0", date: "2026-10-07", note: "First version." }],
+  changes: [
+    { version: "1.1", date: "2026-10-31", note: "Added the questions after sign up: what we ask, why, and that every answer is optional and private." },
+    { version: "1.0", date: "2026-10-07", note: "First version." },
+  ],
 };

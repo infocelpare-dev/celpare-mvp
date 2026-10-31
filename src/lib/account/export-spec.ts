@@ -20,6 +20,7 @@ export type ExportTable = {
 
 export const EXPORT_TABLES: ExportTable[] = [
   { key: "profile", table: "profiles", column: "id", select: "*" },
+  { key: "onboarding_answers", table: "user_onboarding", column: "user_id", select: "*" },
   { key: "developer_profile", table: "developer_profiles", column: "id", select: "*" },
   { key: "posts", table: "posts", column: "author_id", select: "*" },
   { key: "comments", table: "comments", column: "author_id", select: "*" },
