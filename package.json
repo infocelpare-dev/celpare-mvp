@@ -25,7 +25,9 @@
     "video:coding": "node video/render.mjs coding",
     "video:launch": "node video/render.mjs launch",
     "video:carousel": "node video/render.mjs carousel",
-    "video:ais": "node video/render.mjs ais"
+    "video:ais": "node video/render.mjs ais",
+    "video:gems": "node video/render.mjs gems",
+    "video:meme": "node video/render.mjs meme"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
