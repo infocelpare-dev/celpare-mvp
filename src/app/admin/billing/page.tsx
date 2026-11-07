@@ -15,39 +15,109 @@ import {
   Td,
   Th,
   Tr,
+  StatusBadge,
   Usd,
   When,
 } from "@/components/admin/ui";
+import { BILLING_STATUS_TONE } from "@/components/admin/billing-status";
+import {
+  displayStatus,
+  formatMoney,
+  periodLabel,
+  planLabel,
+  type BillingKind,
+  type BillingPeriod,
+  type RequestStatus,
+} from "@/lib/billing/catalog";
 
 export const dynamic = "force-dynamic";
 
 /*
   Plans and billing.
 
-  THERE IS NO BILLING. No payment provider is connected, no subscription table
-  exists, and profiles.plan is a column an administrator sets. So there is no
-  revenue, no cancellation, no payment failure and no subscription status to
-  report, and this page says that in one sentence rather than showing six tiles
-  of zeros that look like a business having a bad month.
+  Billing is by manual invoice (phase BILL, D239): a customer requests a paid
+  plan, an admin reviews it and records the Payoneer invoice, the founder
+  verifies the payment in Payoneer and activates (D242). The queue below is
+  that work, by status; each row opens the request, where the next step is.
+  There is no card on file and nothing renews by itself, so there is no
+  churn or failed payment to report.
 
-  What it CAN honestly report, and does: how many accounts are on each plan, the
-  full history of who changed whose plan and why, and the AI cost each plan is
-  currently generating, which is the one real money number the platform has.
-
-  The audit trail requirement in the brief is satisfied by the plan change
-  history below. Nothing on this page can move money, because there is no money
-  to move; changing a plan is an entitlement change and it is recorded.
+  Also here, as before: accounts by plan, the AI cost each plan generates, and
+  every plan change with its reason. A plan can still be granted by hand from
+  the account page; those changes have no invoice and are listed below.
 */
-export default async function AdminBillingPage() {
-  const session = await requireAdmin("billing.read");
 
-  const [overview, ai, audit] = await Promise.all([
+const QUEUE_TABS: { key: string; label: string; statuses: RequestStatus[] }[] = [
+  { key: "pending", label: "Pending", statuses: ["pending"] },
+  { key: "under_review", label: "Under review", statuses: ["under_review"] },
+  { key: "invoice_sent", label: "Invoice sent", statuses: ["invoice_sent"] },
+  { key: "paid", label: "Paid", statuses: ["paid"] },
+  { key: "rejected", label: "Rejected", statuses: ["rejected"] },
+];
+
+type QueueRow = {
+  id: string;
+  kind: BillingKind;
+  plan: string;
+  period: BillingPeriod;
+  amount_cents: number;
+  currency: string;
+  billing_name: string;
+  billing_email: string;
+  country: string;
+  status: RequestStatus;
+  activated_at: string | null;
+  created_at: string;
+};
+
+export default async function AdminBillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const session = await requireAdmin("billing.read");
+  const wanted = (await searchParams).status;
+  const tab = QUEUE_TABS.find((t) => t.key === wanted) ?? QUEUE_TABS[0];
+
+  const [overview, ai, audit, queue, counts, activeSubs, payments] = await Promise.all([
     getOverview(session.db),
     session.can("ai.read") ? getAiAnalytics(session.db, 30) : null,
     session.can("audit.read")
       ? listAudit(session.db, { action: "user.plan_changed", perPage: 25 })
       : null,
+    session.db
+      .from("billing_requests")
+      .select("id, kind, plan, period, amount_cents, currency, billing_name, billing_email, country, status, activated_at, created_at")
+      .in("status", tab.statuses)
+      .order("created_at", { ascending: tab.key !== "rejected" })
+      .limit(100)
+      .returns<QueueRow[]>(),
+    session.db.from("billing_requests").select("status, activated_at").returns<{ status: RequestStatus; activated_at: string | null }[]>(),
+    session.db
+      .from("subscriptions")
+      .select("id, user_id, kind, plan, current_period_end, tools(name)")
+      .eq("status", "active")
+      .order("current_period_end")
+      .limit(100)
+      .returns<{ id: string; user_id: string | null; kind: BillingKind; plan: string; current_period_end: string; tools: { name: string } | null }[]>(),
+    session.db
+      .from("invoices")
+      .select("request_id, number, amount_cents, currency, paid_at, payment_ref")
+      .eq("status", "paid")
+      .order("paid_at", { ascending: false })
+      .limit(50)
+      .returns<{ request_id: string; number: string; amount_cents: number; currency: string; paid_at: string; payment_ref: string }[]>(),
   ]);
+
+  /* Before the billing migration is applied the tables do not exist (42P01).
+     Say that, rather than a generic failure. */
+  const billingMissing = queue.error?.code === "42P01" || counts.error?.code === "42P01";
+  const billingFailed = !billingMissing && Boolean(queue.error || counts.error || activeSubs.error || payments.error);
+  const tally = new Map<string, number>();
+  for (const r of counts.data ?? []) {
+    const key = r.status === "paid" && r.activated_at ? "done" : r.status;
+    tally.set(key, (tally.get(key) ?? 0) + 1);
+  }
 
   if (!overview) {
     return (
@@ -70,21 +140,171 @@ export default async function AdminBillingPage() {
     <>
       <PageHeader
         title="Plans and billing"
-        lead="Who is on which plan, what each plan costs to serve, and every plan change ever made."
+        lead="Billing requests to work through, active subscriptions, payments, and every plan change."
       />
 
-      <div className="mt-5">
-        <Panel className="px-4 py-4">
-          <p className="text-[13px] font-medium">No payment provider is connected.</p>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
-            There is no subscription table, no invoice, no card on file and no revenue. A plan is
-            a column on the account that an administrator sets, and Pro and Premium accounts are
-            entitlements granted rather than subscriptions bought. Revenue, cancellations, renewal
-            dates and payment failures are therefore absent from this page rather than shown as
-            zero: a zero would imply the meter is running and reading nothing.
-          </p>
-        </Panel>
-      </div>
+      <Section
+        title="Billing queue"
+        lead="Requests by status, oldest first. Open one to take the next step. Invoices go out through Payoneer; only the founder marks a payment as received."
+      >
+        {billingMissing ? (
+          <Panel className="px-4 py-4 text-[13px] text-muted">
+            Billing is not installed yet. The migration billing_manual_v1 has not been applied to this database.
+          </Panel>
+        ) : billingFailed ? (
+          <ErrorState what="the billing queue" />
+        ) : (
+          <>
+            <nav aria-label="Billing status" className="mb-3 flex flex-wrap gap-2">
+              {QUEUE_TABS.map((t) => {
+                const n = t.key === "paid" ? tally.get("paid") ?? 0 : tally.get(t.key) ?? 0;
+                const active = t.key === tab.key;
+                return (
+                  <Link
+                    key={t.key}
+                    href={`/admin/billing?status=${t.key}`}
+                    aria-current={active ? "page" : undefined}
+                    className={
+                      active
+                        ? "rounded-full bg-primary px-3 py-1.5 text-[13px] font-medium text-on-primary"
+                        : "rounded-full border border-border px-3 py-1.5 text-[13px] text-foreground hover:bg-surface"
+                    }
+                  >
+                    {t.label}
+                    {n ? <span className="ml-1.5 tabular-nums opacity-80">{n}</span> : null}
+                  </Link>
+                );
+              })}
+            </nav>
+            {(queue.data ?? []).filter((r) => tab.key !== "paid" || !r.activated_at).length === 0 ? (
+              <EmptyState title={`Nothing ${tab.label.toLowerCase()}`} />
+            ) : (
+              <TableWrap>
+                <Table className="min-w-[720px]">
+                  <thead>
+                    <tr>
+                      <Th>Received</Th>
+                      <Th>Plan</Th>
+                      <Th numeric>Amount</Th>
+                      <Th>Customer</Th>
+                      <Th>Country</Th>
+                      <Th>Status</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(queue.data ?? [])
+                      .filter((r) => tab.key !== "paid" || !r.activated_at)
+                      .map((r) => {
+                        const label = displayStatus(r);
+                        return (
+                          <Tr key={r.id}>
+                            <Td>
+                              <When iso={r.created_at} time />
+                            </Td>
+                            <Td>
+                              <Link href={`/admin/billing/${r.id}`} className="font-medium hover:underline">
+                                {planLabel(r.kind, r.plan)}
+                              </Link>
+                              <span className="block text-[12px] text-muted">{periodLabel(r.period)}</span>
+                            </Td>
+                            <Td numeric>{formatMoney(r.amount_cents, r.currency)}</Td>
+                            <Td>
+                              {r.billing_name}
+                              <span className="block text-[12px] text-muted">{r.billing_email}</span>
+                            </Td>
+                            <Td>{r.country}</Td>
+                            <Td>
+                              <StatusBadge tone={BILLING_STATUS_TONE[label]}>{label}</StatusBadge>
+                            </Td>
+                          </Tr>
+                        );
+                      })}
+                  </tbody>
+                </Table>
+              </TableWrap>
+            )}
+          </>
+        )}
+      </Section>
+
+      {!billingMissing && !billingFailed ? (
+        <>
+          <Section title="Active subscriptions" lead="Soonest to end first. Nothing renews by itself; the daily job sets an ended plan back to Free.">
+            {(activeSubs.data ?? []).length === 0 ? (
+              <EmptyState title="No active subscriptions" />
+            ) : (
+              <TableWrap>
+                <Table className="min-w-[560px]">
+                  <thead>
+                    <tr>
+                      <Th>Plan</Th>
+                      <Th>Account</Th>
+                      <Th>Ends</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(activeSubs.data ?? []).map((s) => (
+                      <Tr key={s.id}>
+                        <Td className="font-medium">
+                          {planLabel(s.kind, s.plan)}
+                          {s.tools?.name ? <span className="font-normal text-muted"> for {s.tools.name}</span> : null}
+                        </Td>
+                        <Td>
+                          {s.user_id ? (
+                            <Link href={`/admin/users/${s.user_id}`} className="hover:underline">
+                              Open
+                            </Link>
+                          ) : (
+                            "Deleted"
+                          )}
+                        </Td>
+                        <Td>
+                          <When iso={s.current_period_end} />
+                        </Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </TableWrap>
+            )}
+          </Section>
+
+          <Section title="Payment history" lead="Invoices verified as paid in Payoneer, newest first.">
+            {(payments.data ?? []).length === 0 ? (
+              <EmptyState title="No payments yet" />
+            ) : (
+              <TableWrap>
+                <Table className="min-w-[560px]">
+                  <thead>
+                    <tr>
+                      <Th>Paid</Th>
+                      <Th>Reference</Th>
+                      <Th numeric>Amount</Th>
+                      <Th>Payoneer transaction</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(payments.data ?? []).map((p) => (
+                      <Tr key={p.number}>
+                        <Td>
+                          <When iso={p.paid_at} time />
+                        </Td>
+                        <Td>
+                          <Link href={`/admin/billing/${p.request_id}`} className="font-mono text-[13px] hover:underline">
+                            {p.number}
+                          </Link>
+                        </Td>
+                        <Td numeric>{formatMoney(p.amount_cents, p.currency)}</Td>
+                        <Td className="font-mono text-[13px]">{p.payment_ref}</Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </TableWrap>
+            )}
+          </Section>
+        </>
+      ) : null}
 
       <Section title="Accounts by plan">
         <StatGrid>
