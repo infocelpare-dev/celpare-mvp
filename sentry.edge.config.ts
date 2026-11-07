@@ -32,6 +32,13 @@ if (dsn) {
          can be a credential, and name based filtering does not survive
          minification. */
       stackFrameVariables: false,
+      /* Sentry 11 collects unset keys by default; these stay off, as in the
+         server config. */
+      databaseQueryData: false,
+      genAI: { inputs: false, outputs: false },
+      mcp: { inputs: false, outputs: false },
+      queues: false,
+      graphQL: { document: false, variables: false },
     },
 
     beforeSend(event) {
