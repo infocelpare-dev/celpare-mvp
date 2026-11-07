@@ -22,6 +22,14 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "workers_dev": false,
   "preview_urls": true,
+  /* Production hostname. A zone route, not a custom domain: the apex already
+     has a proxied placeholder A record (192.0.2.1) in the celpare.com zone,
+     which a route sits on top of and a custom domain would have to replace.
+     Mail records are untouched either way. Live only after the first approved
+     deploy; until then the placeholder keeps answering. */
+  "routes": [
+    { "pattern": "celpare.com/*", "zone_name": "celpare.com" }
+  ],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
