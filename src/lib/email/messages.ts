@@ -15,7 +15,9 @@ export type EmailKind =
   | "new_follower"
   | "new_login"
   | "account_deleted"
-  | "demo";
+  | "demo"
+  | "billing"
+  | "billing_alert";
 
 export type BuiltEmail = { kind: EmailKind; subject: string; html: string; text: string };
 
@@ -274,4 +276,101 @@ export function demoEmail(videoUrl?: string | null): BuiltEmail {
     footnote: "You asked for a demo at celpare.com. Reply to this email with any question and we will answer.",
   });
   return { kind: "demo", subject: "Your Celpare demo", ...body };
+}
+
+/* ---------------------------------------------------------------- billing */
+/*
+  Phase BILL (D239). Customer emails go to the account's own address, never to
+  the billing email typed into the form, so the form cannot be used to send
+  Celpare mail to a stranger. The Payoneer invoice itself goes to the billing
+  email, from Payoneer.
+*/
+
+export type BillingEmailInput = {
+  plan: string;
+  period: string;
+  amount: string;
+  invoiceNumber?: string;
+  endsOn?: string;
+};
+
+const PAY_SAFELY =
+  "Pay only through the link in the invoice email from Payoneer. Celpare never asks for card details, bank logins or payment screenshots by email or chat.";
+
+export function billingReceivedEmail(b: BillingEmailInput): BuiltEmail {
+  const body = renderEmail({
+    heading: "We received your request",
+    paragraphs: [
+      `Thanks for choosing ${b.plan}. We review every request by hand, then send an invoice to your billing email through Payoneer.`,
+      "Nothing is charged until you pay that invoice. You can follow the status in your billing settings.",
+    ],
+    details: [
+      { label: "Plan", value: b.plan },
+      { label: "Billing", value: b.period },
+      { label: "Amount", value: b.amount },
+    ],
+    action: { label: "See your billing", href: siteUrl("/settings/billing") },
+    footnote: PAY_SAFELY,
+  });
+  return { kind: "billing", subject: `Request received: ${subjectPart(b.plan)}`, ...body };
+}
+
+export function billingInvoiceSentEmail(b: BillingEmailInput): BuiltEmail {
+  const body = renderEmail({
+    heading: "Your invoice is on its way",
+    paragraphs: [
+      "We sent the invoice for your plan through Payoneer to your billing email. Open that email to pay.",
+      "Once we confirm the payment in our Payoneer account, we switch your plan on and email you.",
+    ],
+    details: [
+      { label: "Plan", value: b.plan },
+      { label: "Amount", value: b.amount },
+      ...(b.invoiceNumber ? [{ label: "Celpare reference", value: b.invoiceNumber }] : []),
+    ],
+    action: { label: "See your billing", href: siteUrl("/settings/billing") },
+    footnote: PAY_SAFELY,
+  });
+  return { kind: "billing", subject: `Invoice sent: ${subjectPart(b.plan)}`, ...body };
+}
+
+export function billingActivatedEmail(b: BillingEmailInput): BuiltEmail {
+  const body = renderEmail({
+    heading: `${b.plan} is active`,
+    paragraphs: [
+      "Your payment is confirmed and your plan is switched on. Thank you for supporting Celpare.",
+      b.endsOn
+        ? `It runs until ${b.endsOn}. We will not charge you automatically: renew by requesting a new invoice before then.`
+        : "We will not charge you automatically: renew by requesting a new invoice before it ends.",
+    ],
+    details: [
+      { label: "Plan", value: b.plan },
+      ...(b.endsOn ? [{ label: "Active until", value: b.endsOn }] : []),
+    ],
+    action: { label: "Open Celpare", href: siteUrl("/app") },
+  });
+  return { kind: "billing", subject: `${subjectPart(b.plan)} is active`, ...body };
+}
+
+export type BillingAlertInput = BillingEmailInput & {
+  billingName: string;
+  billingEmail: string;
+  country: string;
+  requestId: string;
+};
+
+/* To billing@ (D241): a new request is waiting in the admin queue. */
+export function billingAlertEmail(a: BillingAlertInput): BuiltEmail {
+  const body = renderEmail({
+    heading: "New billing request",
+    paragraphs: ["A new paid plan request is waiting for review."],
+    details: [
+      { label: "Plan", value: `${a.plan}, ${a.period}` },
+      { label: "Amount", value: a.amount },
+      { label: "Name", value: a.billingName },
+      { label: "Billing email", value: a.billingEmail },
+      { label: "Country", value: a.country },
+    ],
+    action: { label: "Open the request", href: siteUrl(`/admin/billing/${a.requestId}`) },
+  });
+  return { kind: "billing_alert", subject: `New request: ${subjectPart(a.plan)} ${a.amount}`, ...body };
 }
