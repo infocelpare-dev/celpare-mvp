@@ -83,7 +83,21 @@ if (dsn) {
       attach IP and similar by default. The server attaches the Celpare user id
       where it is actually useful, which is deliberate rather than automatic.
     */
-    dataCollection: { userInfo: false },
+    /*
+      Sentry 11 collects every unset key by default, cookies and full request
+      and response bodies included (2026-11-07). In the browser a body can be an
+      Ask question or a sign in form, so each category is off by name.
+    */
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpBodies: [],
+      databaseQueryData: false,
+      genAI: { inputs: false, outputs: false },
+      mcp: { inputs: false, outputs: false },
+      queues: false,
+      graphQL: { document: false, variables: false },
+    },
 
     /* Noise that is not ours and cannot be acted on. A failed fetch to a browser
        extension URL is not a Celpare bug. */

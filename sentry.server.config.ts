@@ -56,8 +56,16 @@ if (dsn) {
 
       Dropped here rather than only filtered out of the dashboard query, because
       it is quota spent on watching ourselves.
+
+      ignoreSpans, not ignoreTransactions (Sentry 11, 2026-11-07). v11 streams
+      spans and produces no transactions, so ignoreTransactions silently did
+      nothing. v11 span names are also low cardinality and may no longer carry
+      the URL, so the envelope path is matched on the name and on url.full.
     */
-    ignoreTransactions: [/\/api\/\d+\/envelope\//],
+    ignoreSpans: [
+      { name: /\/api\/\d+\/envelope\// },
+      { attributes: { "url.full": /\/api\/\d+\/envelope\// } },
+    ],
 
     /*
       No request bodies, no user identity harvested automatically.
@@ -92,6 +100,19 @@ if (dsn) {
         in production is worse than no filter. Off is the honest setting.
       */
       stackFrameVariables: false,
+
+      /*
+        Sentry 11 collects every unset key by default (v10 was restrictive), so
+        each category it added is switched off by name rather than left on:
+        bound query parameters and returned rows, AI prompts and answers (an
+        Ask question is personal), MCP payloads, queue task arguments, and
+        GraphQL documents and variables.
+      */
+      databaseQueryData: false,
+      genAI: { inputs: false, outputs: false },
+      mcp: { inputs: false, outputs: false },
+      queues: false,
+      graphQL: { document: false, variables: false },
     },
 
     /*
