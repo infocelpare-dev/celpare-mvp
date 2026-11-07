@@ -243,10 +243,10 @@ export function BillingRequestForm({
           />
           <span>
             I understand that Celpare sends an invoice through Payoneer, that my plan starts once the payment is
-            confirmed, that it does not renew automatically, and that a payment can be refunded within 24 hours
-            and not after. See the{" "}
-            <Link href="/terms" className="underline underline-offset-2">
-              Terms
+            confirmed, that it does not renew automatically, and that I can ask for a full refund within 24 hours
+            of the payment being confirmed and not after. See the{" "}
+            <Link href="/legal/paid-plans" className="underline underline-offset-2">
+              Paid Plans Terms
             </Link>
             .
           </span>
