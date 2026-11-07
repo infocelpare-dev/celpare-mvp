@@ -28,7 +28,8 @@ export type BurstName =
   | "plan"
   | "auth_email"
   | "waitlist"
-  | "account_export";
+  | "account_export"
+  | "google_signin";
 
 const PER_MINUTE: Record<BurstName, number> = {
   /* A beacon carries up to 60 events; a busy tab sends a few a minute. */
@@ -54,6 +55,9 @@ const PER_MINUTE: Record<BurstName, number> = {
   waitlist: 5,
   /* Download my data builds one large file; a person needs it once. */
   account_export: 2,
+  /* Sign in with Google's own button (/auth/google). A person signs in once;
+     a few retries after a closed popup stay well under. */
+  google_signin: 10,
 };
 
 const PER_HOUR: Partial<Record<BurstName, number>> = {
