@@ -560,3 +560,13 @@ grant execute on function public.admin_billing_reject(uuid, text) to authenticat
 grant execute on function public.admin_billing_mark_paid(uuid, text, boolean, text) to authenticated;
 grant execute on function public.admin_billing_activate(uuid) to authenticated;
 grant execute on function public.billing_activate(uuid) to service_role;
+
+-- 15. The switch that opens sales ---------------------------------------------
+-- Off. The Request invoice buttons show only when an admin turns this on in
+-- /admin/settings. The app reads it failing CLOSED (isBillingOpen), unlike the
+-- other feature flags, so a missing or unreadable value never starts selling.
+
+insert into public.platform_settings (key, category, value, description, is_public)
+values ('features.billing_requests', 'features', 'false'::jsonb,
+        'Paid plan requests by manual invoice (phase BILL). Off until the founder opens sales.', true)
+on conflict (key) do nothing;

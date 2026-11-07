@@ -19,15 +19,22 @@ export function SponsorToolPicker({
   initial,
   price,
   endsFormatted,
+  toolIds = {},
+  billingOpen = false,
 }: {
   choices: SponsorChoice[];
   initial: string | null;
   price: string;
   /* slug to "1 November 2026", formatted on the server (rule: pin the timezone). */
   endsFormatted: Record<string, string>;
+  /* slug to tool id, for the Request invoice link (phase BILL). */
+  toolIds?: Record<string, string>;
+  /* Paid requests are open (isBillingOpen, fails closed). */
+  billingOpen?: boolean;
 }) {
   const [selected, setSelected] = useState<string | null>(initial);
   const chosen = choices.find((c) => c.slug === selected) ?? null;
+  const chosenId = chosen?.eligible ? toolIds[chosen.slug] : undefined;
 
   if (choices.length === 0) {
     return (
@@ -107,10 +114,21 @@ export function SponsorToolPicker({
       </p>
 
       <div className="mt-3">
-        <Button className="w-full" disabled aria-describedby="sponsored-note">
-          Coming soon
-          <span className="sr-only">: sponsorship cannot be bought yet</span>
-        </Button>
+        {billingOpen && chosenId ? (
+          <ButtonLink
+            href={`/settings/billing/request?kind=sponsorship&plan=sponsored&period=monthly&tool=${encodeURIComponent(chosenId)}`}
+            className="w-full"
+            aria-describedby="sponsored-note"
+          >
+            Request invoice
+            <span className="sr-only"> to sponsor {chosen?.name}</span>
+          </ButtonLink>
+        ) : (
+          <Button className="w-full" disabled aria-describedby="sponsored-note">
+            {billingOpen ? "Choose a tool you can sponsor" : "Coming soon"}
+            {billingOpen ? null : <span className="sr-only">: sponsorship cannot be bought yet</span>}
+          </Button>
+        )}
       </div>
     </div>
   );

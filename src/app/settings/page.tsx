@@ -16,6 +16,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { PLAN_LIMITS } from "@/lib/ai/config";
 import { isWebSearchConfigured } from "@/lib/ai/web-search";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { isBillingOpen } from "@/lib/platform/settings";
 import { PrivacyForm } from "@/components/settings/privacy-form";
 import { NotificationForm } from "@/components/settings/notification-form";
 import type { NotificationPreferences } from "@/lib/notifications/shared";
@@ -175,6 +176,14 @@ export default async function SettingsPage() {
         <p className="mt-3 text-[15px] leading-relaxed text-muted">
           You are on the {plan} plan, which allows {limits.messagesPerDay}{" "}
           questions a day. Limits reset at midnight.
+          {(await isBillingOpen()) ? (
+            <>
+              {" "}
+              <Link href="/settings/billing" className="text-foreground underline underline-offset-2">
+                Billing and invoices
+              </Link>
+            </>
+          ) : null}
         </p>
 
         {/*

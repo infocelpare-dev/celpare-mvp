@@ -1,5 +1,5 @@
 import { Check, type LucideIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SignInButton } from "@/components/auth/sign-in-prompt";
 import {
@@ -20,18 +20,21 @@ import {
   log in prompt (UI.4). Signed in, the plan you are on says "Current plan" and
   a cheaper one says it is included.
 */
-export type PlanAction = "current" | "included" | "sign-in" | "coming-soon";
+export type PlanAction = "current" | "included" | "sign-in" | "coming-soon" | "request";
 
 export function PlanCard({
   plan,
   icon: Icon,
   billing,
   action,
+  requestHref,
 }: {
   plan: PricingPlan;
   icon: LucideIcon;
   billing: Billing;
   action: PlanAction;
+  /* Where "Request invoice" goes (phase BILL), when action is "request". */
+  requestHref?: string;
 }) {
   const paid = plan.monthlyCents > 0;
   const yearly = billing === "yearly";
@@ -96,7 +99,7 @@ export function PlanCard({
       </p>
 
       <div className="mt-6">
-        <PlanButton action={action} name={plan.name} />
+        <PlanButton action={action} name={plan.name} requestHref={requestHref} />
       </div>
 
       <hr className="my-6 border-border" />
@@ -125,9 +128,24 @@ export function PlanCard({
   );
 }
 
-function PlanButton({ action, name }: { action: PlanAction; name: string }) {
+function PlanButton({
+  action,
+  name,
+  requestHref,
+}: {
+  action: PlanAction;
+  name: string;
+  requestHref?: string;
+}) {
   const full = "w-full";
   switch (action) {
+    case "request":
+      return requestHref ? (
+        <ButtonLink href={requestHref} className={full} aria-describedby="payments-note">
+          Request invoice
+          <span className="sr-only"> for {name}</span>
+        </ButtonLink>
+      ) : null;
     case "current":
       return (
         <Button variant="outline" className={full} disabled>
