@@ -192,6 +192,18 @@ jobs:
           MESSAGE: v${{ steps.meta.outputs.version }}+${{ steps.meta.outputs.short }}
         run: npx wrangler versions deploy "$WORKER_ID@100%" --message "$MESSAGE" --yes
 
+      # versions deploy moves code only. Routes (celpare.com/* in wrangler.jsonc)
+      # are triggers, applied only by `wrangler deploy` or `triggers deploy`.
+      # Without this the first deploy served nothing: the zone kept sending
+      # celpare.com to its placeholder origin and answered 522 (2026-11-07).
+      # Idempotent, so it runs on every deploy and keeps routes equal to config.
+      - name: Apply routes from wrangler.jsonc
+        if: steps.fresh.outputs.ship == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler triggers deploy
+
       - name: Smoke test production
         if: steps.fresh.outputs.ship == 'true'
         id: smoke
