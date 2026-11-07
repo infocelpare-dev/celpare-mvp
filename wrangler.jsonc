@@ -30,6 +30,13 @@
   "routes": [
     { "pattern": "celpare.com/*", "zone_name": "celpare.com" }
   ],
+  /* Off, against wrangler's default. With keep_names, esbuild wraps functions
+     in __name(...) calls. next-themes ships its no flash theme script as a
+     function turned into an inline <script> string, so the browser ran
+     __name with no definition: "ReferenceError: __name is not defined" on
+     every page (found live 2026-11-07), and the theme was set only after
+     hydration. Nothing in the app reads Function.name. */
+  "keep_names": false,
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
