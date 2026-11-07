@@ -1,41 +1,48 @@
 name: CI
 
-# Two jobs in one file, and it exists for two reasons.
+# Every pull request to main and every push to main runs here (phase OPS).
+# Five jobs: verify (types, lint), test, security, build, and one summary job
+# whose name is the required status check, so branch rules name a single check
+# that only passes when everything did.
 #
-# The first is the obvious one: nothing was checking this repository on push.
-# tsc and eslint pass locally or they do not get committed, but "locally" is one
-# machine and one Node version.
+# A note that predates this file's rewrite and still holds: GitHub's default
+# code scanning analyses two languages here, javascript-typescript and actions.
+# The actions analysis reads workflow files, and with none it fails with the
+# repository reporting no code. A workflow directory that is never empty is
+# load bearing.
 #
-# The second is less obvious and worth writing down. GitHub's default code
-# scanning setup analyses two languages here, javascript-typescript and actions.
-# The actions analysis reads workflow files. When the old CodeQL workflow was
-# removed this was the only one left, so that analysis had nothing to read and
-# failed with the repository reporting no code. A workflow directory that is
-# never empty is now load bearing.
+# Production deploys (deploy.yml, OPS step 3) start only from a successful run
+# of this workflow on main, and ship the Worker artifact this run built, so the
+# deployed code is exactly the tested code.
 
 on:
-  push:
-    branches: ["main"]
   pull_request:
     branches: ["main"]
+  push:
+    branches: ["main"]
+
+# A newer push to the same PR cancels the older run. Runs on main are never
+# cancelled: each one may be the build that goes to production.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
-  check:
-    name: Types, lint and secrets
+  verify:
+    name: Types and lint
     runs-on: ubuntu-latest
-
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The secret scan walks history, so it needs history.
-          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
           cache: npm
@@ -43,14 +50,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # tsconfig includes next-env.d.ts and .next/types, and both are generated
-      # and gitignored, correctly. Without this step tsc fails in CI while
-      # passing locally, on "Cannot find name 'PageProps'" and its siblings,
-      # which is a confusing way to learn that the checkout is simply missing
-      # files your machine has.
-      #
-      # typegen rather than build: it produces exactly those types, needs no
-      # NEXT_PUBLIC_SUPABASE_URL, and takes seconds.
+      # tsconfig includes next-env.d.ts and .next/types, both generated and
+      # gitignored. Without this step tsc fails on "Cannot find name
+      # 'PageProps'". typegen makes exactly those types, with no env values.
       - name: Generate Next route types
         run: npx next typegen
 
@@ -60,17 +62,157 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # The same scan .githooks/pre-commit runs, over the whole history rather
-      # than the staged set. It catches a commit made with --no-verify, or one
-      # pushed from a machine that never installed the hook.
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The 11 suites under Node's own test runner (scripts/test-loader.mjs).
+      # Pure modules only: no network, no database, no secrets.
+      - name: Run every test suite
+        run: npm test
+
+  security:
+    name: Secrets, dependencies and migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The secret scan walks history and the migration check diffs against
+          # the base, so both need history.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The same scan .githooks/pre-commit runs, over all history. Catches a
+      # commit made with --no-verify or from a machine without the hook.
       - name: Scan history for secrets
         run: npm run scan:history
 
-# `next build` is deliberately absent.
-#
-# It reads NEXT_PUBLIC_SUPABASE_URL and friends at build time, and putting real
-# values in CI means either committing them or wiring repository secrets for a
-# check that proves less than the two above. A type error and a lint error are
-# what actually break a build here, and both are caught without a single secret
-# leaving the founder's machine. Add it when there is a deploy pipeline that
-# needs the artefact anyway.
+      # Production dependencies, high and critical only. Moderate findings are
+      # Dependabot's job and do not block a release.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      # Applied migrations never change, new ones never destroy data without a
+      # written decision. See scripts/check-migrations.mjs.
+      - name: Check migrations
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "No base commit to compare against; nothing to check."
+            exit 0
+          fi
+          git diff --name-status --no-renames "$BASE_SHA" HEAD -- supabase/migrations | npm run -s check:migrations
+
+      # New dependencies with known vulnerabilities or a disallowed licence fail
+      # the PR. Needs the dependency graph, on by default for public repos.
+      - name: Review dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+
+  build:
+    name: Worker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The checkout has no .env files (all gitignored), so the adapter compiles
+      # none into the Worker. Only public build values are passed, from
+      # repository Actions variables: they ship to every browser by design and
+      # are not secrets. Server secrets are Worker secrets, set on Cloudflare.
+      - name: Build for Cloudflare Workers
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+          NEXT_PUBLIC_COMMIT_SHA: ${{ github.sha }}
+        run: npm run cf:build
+
+      # Bundles the Worker exactly as a deploy would, without uploading, so its
+      # size can be measured. Needs no Cloudflare credentials.
+      - name: Bundle the Worker (dry run)
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: npx wrangler deploy --dry-run --outdir .wrangler/dry-run
+
+      # No server key compiled in, no secret shape in browser assets, size
+      # under the guard line. See scripts/check-worker-build.mjs.
+      - name: Check the Worker build
+        run: npm run -s check:worker -- .wrangler/dry-run
+
+      # Kept only for main, where deploy.yml picks it up by run id. Holds the
+      # public build values and the app code, both already public.
+      - name: Keep the Worker build for deploy
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: worker-${{ github.sha }}
+          path: .open-next
+          include-hidden-files: true
+          retention-days: 14
+          if-no-files-found: error
+
+  ci-ok:
+    name: All checks passed
+    if: always()
+    needs: [verify, test, security, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to succeed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          for r in $RESULTS; do
+            if [ "$r" != "success" ]; then
+              echo "A required job did not succeed."
+              exit 1
+            fi
+          done

@@ -27,6 +27,14 @@ next-env.d.ts
 # vercel
 .vercel
 
+# cloudflare workers (OpenNext). The build compiles every .env* file it finds,
+# .env.local included, into .open-next, so this output holds secrets after a
+# local build. Never commit it and never deploy a local build: CI builds with
+# no env files. .dev.vars is wrangler's local secrets file.
+/.open-next/
+/.wrangler/
+.dev.vars*
+
 # typescript
 *.tsbuildinfo
 

@@ -1,0 +1,51 @@
+/*
+  Celpare on Cloudflare Workers through OpenNext (D15). Phase OPS, step 0.
+
+  - nodejs_compat: Next's server code and src/proxy.ts need Node APIs.
+  - global_fetch_strictly_public: a fetch to our own hostname goes out to the
+    public internet rather than looping back into this Worker.
+  - workers_dev false: production is served only on celpare.com, behind the
+    zone's WAF and rate limits. A *.workers.dev address would bypass both.
+  - preview_urls true: each uploaded version gets its own preview URL for PR
+    checks. These go behind Cloudflare Access before any are made.
+  - compatibility_date matches the workerd that wrangler 4.156.0 ships, so
+    local and deployed behaviour agree. Move it forward on purpose, not by habit.
+
+  Secrets are never written here. They are set with `wrangler secret put` by the
+  founder, or live in .dev.vars locally (gitignored).
+*/
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "celpare",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-23",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
+  "preview_urls": true,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      /* Self reference, used by OpenNext's caching. Must match "name". */
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "celpare"
+    }
+  ],
+  "r2_buckets": [
+    {
+      /* Incremental cache. Simulated locally by wrangler dev; the bucket is
+         created in the account only with founder approval, before a deploy. */
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "celpare-opennext-cache"
+    }
+  ],
+  "images": {
+    /* next/image optimisation through Cloudflare Images. */
+    "binding": "IMAGES"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
