@@ -1,0 +1,336 @@
+name: Deploy
+
+# Continuous deployment to Cloudflare Workers (phase OPS, step 3, D15).
+#
+# Production: every green CI run on main ships the Worker that run built, so the
+# deployed code is exactly the tested code. Nothing is rebuilt here.
+#
+#   CI on main passes
+#     -> founder approves (GitHub environment "production", required reviewer)
+#     -> wrangler versions upload   (a new version, serving no traffic yet)
+#     -> wrangler versions deploy <id>@100%
+#     -> scripts/smoke.mjs <site> <sha>
+#          ok   -> GitHub Deployment success, holding the Worker version id
+#          fail -> wrangler rollback <last healthy id>, ONCE, smoke that,
+#                  mark this deployment failed, fail the run. Never a retry loop.
+#
+# "Last healthy" is read from GitHub Deployments written by this workflow, never
+# "whatever ran before", so a rollback never lands on a version that failed.
+#
+# A rollback restores code only. Worker secrets keep their current values and
+# the database is untouched (migrations are applied by hand, never from here).
+#
+# PR previews (same repo PRs, never forks, never pull_request_target) upload a
+# version with a pr-<n> alias that serves no production traffic. They stay off
+# until the repository variable PREVIEWS_ENABLED is "true", which waits on the
+# staging Supabase project and Cloudflare Access in front of preview hostnames
+# (plan, risk 3). A preview never sees production keys: it builds with the
+# "preview" environment's variables.
+#
+# Needs (founder): environment "production" with the founder as required
+# reviewer and secrets CLOUDFLARE_API_TOKEN (Workers Scripts edit, this account
+# only) and CLOUDFLARE_ACCOUNT_ID; the celpare.com route on the Worker; for
+# previews, environment "preview" with the same two secrets and staging values.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  production:
+    name: Deploy to production
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The approval pause happens here, before any step runs and before the
+    # Cloudflare token is readable.
+    environment:
+      name: production
+      url: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+    # One production change at a time, and never cancelled halfway: a cancelled
+    # deploy could leave a version live without its smoke test or record.
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read        # download the Worker artifact from the CI run
+      deployments: write   # history: which version, which commit, which outcome
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha }}
+      CI_RUN_ID: ${{ github.event.workflow_run.id }}
+      SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - name: Checkout the tested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      # An approval can sit for hours. If main moved on meanwhile, a newer CI
+      # run will offer a newer build; shipping this older one would go backwards.
+      - name: Skip if main has moved on
+        id: fresh
+        run: |
+          tip=$(gh api "repos/$GH_REPO/commits/main" --jq .sha)
+          if [ "$tip" != "$SHA" ]; then
+            echo "main is at $tip, this run built $SHA. Not deploying an older build." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "ship=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ship=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node
+        if: steps.fresh.outputs.ship == 'true'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+
+      # wrangler is a pinned devDependency; this installs it, nothing is built.
+      - name: Install dependencies
+        if: steps.fresh.outputs.ship == 'true'
+        run: npm ci
+
+      - name: Download the Worker CI built
+        if: steps.fresh.outputs.ship == 'true'
+        run: gh run download "$CI_RUN_ID" --name "worker-$SHA" --dir .open-next
+
+      # The same guard CI ran, again on what is about to ship: no server key
+      # compiled in, no secret shapes in assets, size under the guard line.
+      - name: Check the Worker before upload
+        if: steps.fresh.outputs.ship == 'true'
+        run: |
+          npx wrangler deploy --dry-run --outdir .wrangler/dry-run
+          npm run -s check:worker -- .wrangler/dry-run
+
+      - name: Work out version and last healthy deploy
+        if: steps.fresh.outputs.ship == 'true'
+        id: meta
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "short=${SHA:0:7}" >> "$GITHUB_OUTPUT"
+          # Newest production deployment written by this workflow (it carries a
+          # worker_version_id) that reached success and never failed. Checked
+          # over all its statuses, not only the latest: GitHub may later mark an
+          # old deployment "inactive", which does not make it unhealthy.
+          last=""; last_sha=""
+          for id in $(gh api "repos/$GH_REPO/deployments?environment=production&per_page=50" \
+                        --jq '.[] | select(.payload.worker_version_id != null) | .id'); do
+            state=$(gh api "repos/$GH_REPO/deployments/$id/statuses?per_page=100" \
+                      --jq 'if any(.[]; .state == "failure" or .state == "error") then "bad"
+                            elif any(.[]; .state == "success") then "success" else "none" end')
+            if [ "$state" = "success" ]; then
+              last=$(gh api "repos/$GH_REPO/deployments/$id" --jq .payload.worker_version_id)
+              last_sha=$(gh api "repos/$GH_REPO/deployments/$id" --jq .sha)
+              break
+            fi
+          done
+          echo "last_id=$last" >> "$GITHUB_OUTPUT"
+          echo "last_sha=$last_sha" >> "$GITHUB_OUTPUT"
+          echo "Shipping v$version+${SHA:0:7}. Last healthy version: ${last:-none (first deploy)}." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the new version (serves no traffic yet)
+        if: steps.fresh.outputs.ship == 'true'
+        id: upload
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-upload.json
+          MESSAGE: v${{ steps.meta.outputs.version }}+${{ steps.meta.outputs.short }}
+          TAG: ${{ steps.meta.outputs.short }}
+        run: |
+          npx wrangler versions upload --message "$MESSAGE" --tag "$TAG"
+          id=$(node -e '
+            const lines = require("fs").readFileSync(process.argv[1], "utf8").trim().split("\n");
+            const up = lines.map((l) => JSON.parse(l)).find((e) => e.type === "version-upload");
+            if (!up || !/^[0-9a-f-]{36}$/.test(up.version_id ?? "")) process.exit(1);
+            console.log(up.version_id);
+          ' "$WRANGLER_OUTPUT_FILE_PATH")
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "Uploaded Worker version $id" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Open a GitHub Deployment record
+        if: steps.fresh.outputs.ship == 'true'
+        id: record
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          WORKER_ID: ${{ steps.upload.outputs.id }}
+        run: |
+          payload=$(node -e 'console.log(JSON.stringify({
+            ref: process.env.SHA, environment: "production", auto_merge: false,
+            required_contexts: [], transient_environment: false, production_environment: true,
+            description: `v${process.env.VERSION}`,
+            payload: { version: process.env.VERSION, sha: process.env.SHA,
+                       worker_version_id: process.env.WORKER_ID, url: process.env.SITE_URL,
+                       timestamp: new Date().toISOString() } }))')
+          id=$(echo "$payload" | gh api "repos/$GH_REPO/deployments" --input - --jq .id)
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          gh api "repos/$GH_REPO/deployments/$id/statuses" -f state=in_progress >/dev/null
+
+      - name: Send all traffic to the new version
+        if: steps.fresh.outputs.ship == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WORKER_ID: ${{ steps.upload.outputs.id }}
+          MESSAGE: v${{ steps.meta.outputs.version }}+${{ steps.meta.outputs.short }}
+        run: npx wrangler versions deploy "$WORKER_ID@100%" --message "$MESSAGE" --yes
+
+      - name: Smoke test production
+        if: steps.fresh.outputs.ship == 'true'
+        id: smoke
+        continue-on-error: true
+        run: node scripts/smoke.mjs "$SITE_URL" "$SHA"
+
+      - name: Record success
+        if: steps.fresh.outputs.ship == 'true' && steps.smoke.outcome == 'success'
+        env:
+          DEPLOYMENT_ID: ${{ steps.record.outputs.id }}
+          WORKER_ID: ${{ steps.upload.outputs.id }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          gh api "repos/$GH_REPO/deployments/$DEPLOYMENT_ID/statuses" \
+            -f state=success -f environment_url="$SITE_URL" \
+            -f description="Live, smoke test passed" >/dev/null
+          echo "Live: v$VERSION, commit $SHA, Worker version $WORKER_ID." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Exactly once. If the rollback's own smoke test fails too, the run says
+      # so loudly and stops; a human decides what happens next.
+      - name: Roll back to the last healthy version
+        if: steps.fresh.outputs.ship == 'true' && steps.smoke.outcome != 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOYMENT_ID: ${{ steps.record.outputs.id }}
+          LAST_ID: ${{ steps.meta.outputs.last_id }}
+          LAST_SHA: ${{ steps.meta.outputs.last_sha }}
+        run: |
+          if [ -z "$LAST_ID" ]; then
+            gh api "repos/$GH_REPO/deployments/$DEPLOYMENT_ID/statuses" \
+              -f state=failure -f description="Smoke failed; no healthy version to roll back to" >/dev/null
+            echo "::error::Smoke test failed and there is no earlier healthy version. The new version is still live. Investigate now."
+            exit 1
+          fi
+          npx wrangler rollback "$LAST_ID" --message "Automatic: smoke test failed for ${SHA:0:7}" --yes
+          if node scripts/smoke.mjs "$SITE_URL" "$LAST_SHA"; then
+            outcome="Smoke failed; rolled back to $LAST_ID, which passed its smoke test"
+          else
+            outcome="Smoke failed; rolled back to $LAST_ID, whose smoke test ALSO failed"
+          fi
+          gh api "repos/$GH_REPO/deployments/$DEPLOYMENT_ID/statuses" \
+            -f state=failure -f description="${outcome:0:140}" >/dev/null
+          echo "::error::$outcome"
+          echo "$outcome" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      # The deploy step itself failed (the smoke test never ran): close the
+      # record as failed so it is never mistaken for a healthy rollback target.
+      # Production may be unchanged or on the new version; the run says which
+      # to check, and a human decides.
+      - name: Record a deploy that did not finish
+        if: >-
+          failure() && steps.record.outputs.id != '' &&
+          steps.smoke.outcome != 'success' && steps.smoke.outcome != 'failure'
+        env:
+          DEPLOYMENT_ID: ${{ steps.record.outputs.id }}
+        run: |
+          gh api "repos/$GH_REPO/deployments/$DEPLOYMENT_ID/statuses" \
+            -f state=error -f description="Deploy step failed before the smoke test" >/dev/null
+          echo "::error::The deploy did not finish. Check which version serves traffic: npx wrangler deployments list"
+
+  preview:
+    name: PR preview
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]' &&
+      vars.PREVIEWS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: preview
+    concurrency:
+      group: preview-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: write   # one comment with the preview address
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Staging values only, from the "preview" environment's variables.
+      - name: Build for Cloudflare Workers
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+          NEXT_PUBLIC_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: npm run cf:build
+
+      - name: Check the Worker build
+        run: |
+          npx wrangler deploy --dry-run --outdir .wrangler/dry-run
+          npm run -s check:worker -- .wrangler/dry-run
+
+      - name: Upload a preview version
+        id: upload
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-upload.json
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          npx wrangler versions upload --preview-alias "pr-$PR" --message "PR #$PR ${HEAD_SHA:0:7}" --tag "pr-$PR"
+          url=$(node -e '
+            const lines = require("fs").readFileSync(process.argv[1], "utf8").trim().split("\n");
+            const up = lines.map((l) => JSON.parse(l)).find((e) => e.type === "version-upload");
+            const u = up?.preview_alias_url ?? up?.preview_url ?? "";
+            if (!/^https:\/\/[a-z0-9.-]+\/?$/i.test(u)) process.exit(1);
+            console.log(u);
+          ' "$WRANGLER_OUTPUT_FILE_PATH")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Comment the preview address
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          URL: ${{ steps.upload.outputs.url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh pr comment "$PR" --edit-last --create-if-none \
+            --body "Preview for ${HEAD_SHA:0:7}: $URL (staging data, behind Cloudflare Access)"
