@@ -21,7 +21,21 @@ updates:
       prefix: "fix"
       prefix-development: "chore"
       include: "scope"
+    # A dependency goes to the FIRST group it matches, so the lockstep groups
+    # come before the broad runtime and dev ones.
     groups:
+      # Next, its eslint config and the Cloudflare adapter must move together.
+      # The adapter pins a minimum Next (1.20.16 needs next >=16.4.5), and next
+      # is a runtime dependency while the other two are dev ones. Split across
+      # the runtime and dev groups, neither PR could install on its own (PR #13
+      # failed npm ci with ERESOLVE until #12 brought Next 16.4.5). Mixed types
+      # take the runtime prefix, fix(deps), which is right for a Next update.
+      next-platform:
+        patterns: ["next", "eslint-config-next", "@opennextjs/cloudflare"]
+        update-types: ["minor", "patch"]
+      # Every Remotion package must be on the exact same version, majors too.
+      remotion:
+        patterns: ["remotion", "@remotion/*"]
       runtime-minor-and-patch:
         dependency-type: production
         update-types: ["minor", "patch"]
