@@ -114,7 +114,10 @@ export const config = {
        through our own origin so an ad blocker cannot silently drop them
        (tunnelRoute in next.config.ts). Running the session refresh on it would
        put a Supabase round trip in front of every event the SDK sends, for a
-       request that has no session and needs none. */
-    "/((?!monitoring|_next/static|_next/image|favicon.ico|brand/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+       request that has no session and needs none.
+
+       /api/health is excluded for the same reason: deploy checks call it with
+       no session, and it must answer even if the auth service is slow. */
+    "/((?!monitoring|api/health|_next/static|_next/image|favicon.ico|brand/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

@@ -10,6 +10,7 @@
     "test": "npm run test:email && npm run test:auth && npm run test:algorithms && npm run test:analytics && npm run test:pricing && npm run test:sponsored && npm run test:comments && npm run test:voice && npm run test:content && npm run test:ai && npm run test:onboarding",
     "check:migrations": "node scripts/check-migrations.mjs",
     "check:worker": "node scripts/check-worker-build.mjs",
+    "smoke": "node scripts/smoke.mjs",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "wrangler dev --port 8787",
     "scan": "node scripts/security-scan.mjs",
