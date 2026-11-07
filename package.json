@@ -7,6 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "npm run test:email && npm run test:auth && npm run test:algorithms && npm run test:analytics && npm run test:pricing && npm run test:sponsored && npm run test:comments && npm run test:voice && npm run test:content && npm run test:ai && npm run test:onboarding",
+    "check:migrations": "node scripts/check-migrations.mjs",
+    "check:worker": "node scripts/check-worker-build.mjs",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "wrangler dev --port 8787",
     "scan": "node scripts/security-scan.mjs",
     "scan:history": "node scripts/security-scan.mjs --history",
     "test:email": "node --import ./scripts/test-loader.mjs --test \"src/lib/email/__tests__/*.test.ts\"",
@@ -38,7 +43,6 @@
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
     "@sentry/nextjs": "^10.78.0",
-    "@sentry/profiling-node": "^10.78.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "@upstash/ratelimit": "^2.0.8",
@@ -59,6 +63,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.20.15",
     "@remotion/cli": "^4.0.532",
     "@remotion/google-fonts": "^4.0.532",
     "@tailwindcss/postcss": "^4",
@@ -69,7 +74,8 @@
     "eslint-config-next": "16.4.3",
     "remotion": "^4.0.532",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "4.156.0"
   },
   "overrides": {
     "zod": "$zod"

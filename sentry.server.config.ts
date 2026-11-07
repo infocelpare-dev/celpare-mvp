@@ -1,5 +1,4 @@
 import * as Sentry from "@sentry/nextjs";
-import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
 /*
   Sentry on the Node server.
@@ -22,11 +21,13 @@ if (dsn) {
 
     tracesSampleRate: isDev ? 1.0 : 0.1,
 
-    /* Required to enable profiling at all: the default is 0. */
-    profileSessionSampleRate: isDev ? 1.0 : 0.1,
-    profileLifecycle: "trace",
-
-    integrations: [nodeProfilingIntegration()],
+    /*
+      No server profiling (phase OPS, 2026-11-07). @sentry/profiling-node is a
+      native addon, and Cloudflare Workers (D15) cannot load native code: the
+      OpenNext build failed bundling its .node binaries into the proxy. Traces
+      above still show where server time goes. Browser profiling is separate,
+      in instrumentation-client.ts, and unchanged.
+    */
 
     /*
       Aborted requests, which are not errors.
