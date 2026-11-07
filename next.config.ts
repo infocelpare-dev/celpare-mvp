@@ -1,5 +1,14 @@
 import type { NextConfig } from "next";
+import { readFileSync } from "node:fs";
 import { withSentryConfig } from "@sentry/nextjs/config";
+
+/*
+  The running version, for /api/health and the admin footer (phase OPS).
+  package.json's version is the one release-please bumps on each release, and
+  CI passes the exact commit as NEXT_PUBLIC_COMMIT_SHA. Both are public on
+  purpose: knowing which build is live is how a rollback is checked.
+*/
+const appVersion = (JSON.parse(readFileSync("./package.json", "utf8")) as { version: string }).version;
 
 /*
   Response headers on every route. None of these existed before the 2026-09-23 audit.
@@ -35,6 +44,10 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   /* No "X-Powered-By: Next.js". It tells a scanner which exploits to try first. */
   poweredByHeader: false,
+  env: {
+    NEXT_PUBLIC_APP_VERSION: appVersion,
+    NEXT_PUBLIC_COMMIT_SHA: process.env.NEXT_PUBLIC_COMMIT_SHA ?? "local",
+  },
   /* Dev only: lets a phone load the dev server through a Cloudflare quick tunnel.
      Ignored by production builds. */
   allowedDevOrigins: ["*.trycloudflare.com"],

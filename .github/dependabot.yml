@@ -1,0 +1,42 @@
+# Dependabot version updates (phase OPS). Security updates are switched on in
+# the repository settings and use the same commit prefixes from this file.
+#
+# Prefixes follow the commit format CI checks (scripts/check-commit-msg.mjs):
+# runtime dependencies are fix(deps), so release-please cuts a patch release;
+# development dependencies and actions are chore, which releases nothing.
+#
+# Minor and patch updates are grouped into one PR a week per ecosystem, so the
+# queue stays readable. Major updates come one per PR, because each one needs
+# reading (Sentry 11 changed what it collects by default).
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "fix"
+      prefix-development: "chore"
+      include: "scope"
+    groups:
+      runtime-minor-and-patch:
+        dependency-type: production
+        update-types: ["minor", "patch"]
+      dev-minor-and-patch:
+        dependency-type: development
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]
