@@ -1,0 +1,68 @@
+name: Release
+
+# Automatic versioning (phase OPS, step 2). release-please reads the
+# Conventional Commit prefixes on main and keeps one open "Release PR" with the
+# next version number, the CHANGELOG entry and the package.json bump.
+#
+#   fix: ...      next patch   0.2.0 -> 0.2.1
+#   feat: ...     next minor   0.2.1 -> 0.3.0
+#   feat!: / BREAKING CHANGE   next minor while below 1.0.0 (bump-minor-pre-major),
+#                              next major from 1.0.0 on
+#   docs, chore, ci, test, refactor, build, style   no release on their own
+#
+# Merging the Release PR creates the vX.Y.Z tag and the GitHub Release with its
+# notes. Nothing here deploys: deploy.yml (step 3) ships every green build of
+# main and records which version it was. Tags are never moved or reused; a
+# ruleset protects v* (step 7).
+#
+# 1.0.0 is chosen, not reached: at public launch, merge a commit whose body
+# carries the footer "Release-As: 1.0.0".
+
+on:
+  push:
+    branches: ["main"]
+
+# Never two release runs at once: both could open or update the same PR.
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: Release PR and tags
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # Write the release branch, tags and the GitHub Release.
+      contents: write
+      # Open and update the Release PR.
+      pull-requests: write
+    steps:
+      # RELEASE_PLEASE_TOKEN is optional. A pull request opened with the default
+      # GITHUB_TOKEN does not start other workflows, so the Release PR would get
+      # no CI run, and once main requires "All checks passed" it could not be
+      # merged. A fine grained token scoped to this repository only (Contents and
+      # Pull requests: read and write) fixes that. Without it, the workflow
+      # still works and the Release PR needs its checks started by hand.
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Report
+        env:
+          CREATED: ${{ steps.release.outputs.release_created }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+          SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          if [ "$CREATED" = "true" ]; then
+            echo "Released $TAG at $SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No release this run. The Release PR, if any, is up to date." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
