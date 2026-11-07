@@ -2,6 +2,12 @@ import "server-only";
 import { bump } from "@/lib/ai/ratelimit";
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import {
+  billingActivatedEmail,
+  billingAlertEmail,
+  billingInvoiceSentEmail,
+  billingReceivedEmail,
+  type BillingAlertInput,
+  type BillingEmailInput,
   demoEmail,
   describeBrowser,
   developerVerifiedEmail,
@@ -15,7 +21,7 @@ import {
   type Decision,
   type ReportInput,
 } from "./messages";
-import { REPORTS_INBOX, sendEmail } from "./send";
+import { BILLING_INBOX, REPORTS_INBOX, sendEmail } from "./send";
 
 /*
   Who gets each app email, and whether they may (D191). Every function here is
@@ -271,4 +277,32 @@ export function emailNewFollower(followerId: string, targetId: string) {
       );
     }
   });
+}
+
+/* ---------------------------------------------------------------- billing */
+/*
+  Phase BILL (D239, D241). The customer's copy goes to the account's own
+  address (read with the service role, like the other emails to a person),
+  never to the billing email typed into the form.
+*/
+
+export type BillingStep = "received" | "invoice_sent" | "activated";
+
+export function emailBillingCustomer(userId: string | null, step: BillingStep, input: BillingEmailInput) {
+  return safely(`billing ${step}`, async () => {
+    if (!userId) return;
+    const to = await addressOf(userId);
+    if (!to) return;
+    const email =
+      step === "received"
+        ? billingReceivedEmail(input)
+        : step === "invoice_sent"
+          ? billingInvoiceSentEmail(input)
+          : billingActivatedEmail(input);
+    await sendEmail(to, email);
+  });
+}
+
+export function emailBillingAlert(input: BillingAlertInput) {
+  return safely("billing alert", () => sendEmail(BILLING_INBOX, billingAlertEmail(input)));
 }

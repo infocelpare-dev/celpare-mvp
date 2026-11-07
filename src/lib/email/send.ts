@@ -37,9 +37,13 @@ const SENDER: Record<EmailKind, { from: string; replyTo: string }> = {
   new_follower: { from: "Celpare <noreply@celpare.com>", replyTo: "reports@celpare.com" },
   account_deleted: { from: "Celpare <noreplyaccount@celpare.com>", replyTo: "reports@celpare.com" },
   demo: { from: "Celpare <demo@celpare.com>", replyTo: "demo@celpare.com" },
+  /* Phase BILL (D239, D241): customer billing mail, and the alert to billing@. */
+  billing: { from: "Celpare Billing <billing@celpare.com>", replyTo: "billing@celpare.com" },
+  billing_alert: { from: "Celpare <noreply@celpare.com>", replyTo: "billing@celpare.com" },
 };
 
 export const REPORTS_INBOX = process.env.REPORTS_INBOX || "reports@celpare.com";
+export const BILLING_INBOX = process.env.BILLING_INBOX || "billing@celpare.com";
 
 const APP_DAILY_CAP = 60;
 const KIND_DAILY_CAP: Record<EmailKind, number> = {
@@ -52,6 +56,9 @@ const KIND_DAILY_CAP: Record<EmailKind, number> = {
   new_login: 30,
   account_deleted: 20,
   demo: 20,
+  /* At most 5 requests per account a day (billing_submit_request). */
+  billing: 30,
+  billing_alert: 20,
 };
 
 let warned = false;

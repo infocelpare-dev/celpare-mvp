@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npm run test:email && npm run test:auth && npm run test:algorithms && npm run test:analytics && npm run test:pricing && npm run test:sponsored && npm run test:comments && npm run test:voice && npm run test:content && npm run test:ai && npm run test:onboarding",
+    "test": "npm run test:email && npm run test:auth && npm run test:algorithms && npm run test:analytics && npm run test:pricing && npm run test:sponsored && npm run test:comments && npm run test:voice && npm run test:content && npm run test:ai && npm run test:onboarding && npm run test:billing",
     "check:migrations": "node scripts/check-migrations.mjs",
     "check:worker": "node scripts/check-worker-build.mjs",
     "smoke": "node scripts/smoke.mjs",
@@ -39,7 +39,8 @@
     "video:stack": "node video/render.mjs stack",
     "video:meme": "node video/render.mjs meme",
     "test:ai": "node --import ./scripts/test-loader.mjs --test \"src/lib/ai/__tests__/*.test.ts\"",
-    "test:onboarding": "node --import ./scripts/test-loader.mjs --test \"src/lib/onboarding/__tests__/*.test.ts\""
+    "test:onboarding": "node --import ./scripts/test-loader.mjs --test \"src/lib/onboarding/__tests__/*.test.ts\"",
+    "test:billing": "node --import ./scripts/test-loader.mjs --test \"src/lib/billing/__tests__/*.test.ts\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

@@ -33,6 +33,10 @@ export const CAPABILITIES = [
   "ai.configure",
   "analytics.read",
   "billing.read",
+  /* Phase BILL (D239, D242): review, record an invoice as sent, reject. */
+  "billing.manage",
+  /* Mark paid and activate. super_admin only (D242). */
+  "billing.verify",
   "security.read",
   "audit.read",
   "settings.manage",
@@ -118,6 +122,7 @@ export const MATRIX: Record<StaffRole, Capability[]> = {
     "ai.read",
     "analytics.read",
     "billing.read",
+    "billing.manage",
     "security.read",
     "audit.read",
     "settings.manage",
@@ -139,6 +144,8 @@ export const MATRIX: Record<StaffRole, Capability[]> = {
     "ai.configure",
     "analytics.read",
     "billing.read",
+    "billing.manage",
+    "billing.verify",
     "security.read",
     "audit.read",
     "settings.manage",

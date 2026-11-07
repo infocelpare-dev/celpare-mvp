@@ -11,6 +11,7 @@ import { SponsorToolPicker } from "@/components/pricing/sponsor-tool-picker";
 import { initialChoice, sortChoices, sponsorChoice, type SponsorChoice } from "@/lib/sponsored/choice";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { formatUsd } from "@/lib/pricing/plans";
+import { isBillingOpen } from "@/lib/platform/settings";
 import { MAX_SPONSORED_TOOLS as SPONSORED_MAX, SPONSORSHIP_PRICE_CENTS } from "@/lib/sponsored/config";
 
 export const metadata: Metadata = {
@@ -91,6 +92,9 @@ export default async function SponsoredPricingPage({
   let signedIn = false;
   let isDeveloper = false;
   let choices: SponsorChoice[] = [];
+  /* slug to id, for the Request invoice link (phase BILL). Own tools only. */
+  let toolIds: Record<string, string> = {};
+  const billingOpen = await isBillingOpen();
 
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
@@ -115,6 +119,7 @@ export default async function SponsoredPricingPage({
         .select("id, slug, name, logo_url, status, website_url")
         .eq("developer_id", user.id);
       if (toolsError) throw new Error(`Your tools could not be read: ${toolsError.message}`);
+      toolIds = Object.fromEntries((tools ?? []).map((t) => [String(t.slug), String(t.id)]));
 
       const ids = (tools ?? []).map((t) => t.id as string);
       const { data: runs, error: runsError } = ids.length
@@ -194,6 +199,8 @@ export default async function SponsoredPricingPage({
                 initial={initialChoice(choices, wanted)}
                 price={price}
                 endsFormatted={endsFormatted}
+                toolIds={toolIds}
+                billingOpen={billingOpen}
               />
             </div>
             <hr className="my-6 border-border" />

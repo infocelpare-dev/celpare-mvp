@@ -10,6 +10,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getViewerPlans } from "@/lib/pricing/viewer";
 import { plansFor, type Audience, type Billing } from "@/lib/pricing/plans";
 import { dismissPlans } from "@/app/actions/plans";
+import { isBillingOpen } from "@/lib/platform/settings";
 
 export const metadata: Metadata = {
   title: "Plans",
@@ -51,6 +52,7 @@ export default async function PlansPage({
   const currentId = audience === "developers" ? developerPlan : plan;
   const currentName =
     plansFor(audience).plans.find((p) => p.id === currentId)?.name ?? "Free";
+  const billingOpen = await isBillingOpen();
 
   return (
     <>
@@ -97,6 +99,7 @@ export default async function PlansPage({
             signedIn
             currentId={currentId}
             defaultAudience={v.isDeveloper ? "developers" : "individual"}
+            billingOpen={billingOpen}
           />
 
           <div className="mx-auto mt-10 flex max-w-[1040px] flex-col items-center gap-4">

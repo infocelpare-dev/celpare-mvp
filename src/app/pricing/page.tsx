@@ -9,6 +9,7 @@ import { PricingFaq } from "@/components/pricing/pricing-faq";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getViewerPlans } from "@/lib/pricing/viewer";
 import { plansFor, type Audience, type Billing } from "@/lib/pricing/plans";
+import { isBillingOpen } from "@/lib/platform/settings";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -62,6 +63,7 @@ export default async function PricingPage({
 
   /* The developer plan is developer_profiles.plan (D200). */
   const currentId = audience === "developers" ? developerPlan : plan;
+  const billingOpen = await isBillingOpen();
 
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
@@ -88,6 +90,7 @@ export default async function PricingPage({
           isDeveloper={isDeveloper}
           signedIn={signedIn}
           currentId={currentId}
+          billingOpen={billingOpen}
         />
 
         <section aria-labelledby="compare-heading" className="mx-auto mt-20 max-w-[1040px]">

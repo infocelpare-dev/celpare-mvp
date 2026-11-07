@@ -55,6 +55,7 @@ export function PlanPicker({
   signedIn,
   currentId,
   defaultAudience = "individual",
+  billingOpen = false,
 }: {
   base: string;
   defaultAudience?: Audience;
@@ -64,18 +65,24 @@ export function PlanPicker({
   signedIn: boolean;
   /* The plan this account is on for this audience; null when unknown. */
   currentId: string | null;
+  /* Paid plans can be requested by invoice (phase BILL, isBillingOpen). */
+  billingOpen?: boolean;
 }) {
   const { plans } = plansFor(audience);
   const bestSaving = bestYearlyPercent(plans);
   const href = (a: Audience, b: Billing) => planHref(base, a, b, defaultAudience);
 
   const actionFor = (p: PricingPlan, index: number): PlanAction => {
-    if (!signedIn) return p.monthlyCents === 0 ? "sign-in" : "coming-soon";
+    const paid = p.monthlyCents > 0;
+    if (!signedIn) return !paid || billingOpen ? "sign-in" : "coming-soon";
     if (p.id === currentId) return "current";
     const currentIndex = plans.findIndex((x) => x.id === currentId);
     if (currentIndex > index) return "included";
-    return "coming-soon";
+    return billingOpen ? "request" : "coming-soon";
   };
+
+  const requestHref = (p: PricingPlan) =>
+    `/settings/billing/request?kind=${audience === "developers" ? "developer" : "individual"}&plan=${encodeURIComponent(p.id)}&period=${billing}`;
 
   return (
     <>
@@ -111,6 +118,7 @@ export function PlanPicker({
             icon={ICONS[audience][i]}
             billing={billing}
             action={actionFor(p, i)}
+            requestHref={requestHref(p)}
           />
         ))}
       </div>
@@ -123,7 +131,9 @@ export function PlanPicker({
         className="mx-auto mt-6 flex max-w-[1040px] items-center justify-center gap-2 text-center text-[13px] text-muted"
       >
         <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
-        Paid plans open soon. Prices in USD.
+        {billingOpen
+          ? "Paid plans are invoiced through Payoneer. Nothing is charged until you pay the invoice. Prices in USD."
+          : "Paid plans open soon. Prices in USD."}
       </p>
     </>
   );

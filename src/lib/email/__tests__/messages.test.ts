@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { escapeHtml, renderEmail } from "../layout";
 import {
+  billingActivatedEmail,
+  billingAlertEmail,
+  billingInvoiceSentEmail,
+  billingReceivedEmail,
   demoEmail,
   describeBrowser,
   maskIp,
@@ -119,5 +123,39 @@ describe("demo", () => {
     const withVideo = demoEmail("https://youtu.be/x");
     assert.ok(withVideo.html.includes('href="https://youtu.be/x"'));
     assert.ok(withVideo.text.includes("Watch the demo: https://youtu.be/x"));
+  });
+});
+
+describe("billing (phase BILL)", () => {
+  const input = { plan: "Pro", period: "Monthly", amount: "$7.99", invoiceNumber: "CP-2026-0001", endsOn: "7 December 2026" };
+
+  it("warns to pay only through Payoneer and never asks for payment details", () => {
+    for (const e of [billingReceivedEmail(input), billingInvoiceSentEmail(input)]) {
+      assert.match(e.text, /Pay only through the link in the invoice email from Payoneer/);
+      assert.match(e.text, /never asks for card details/);
+      assert.doesNotMatch(e.text, /send (us )?(a )?screenshot/i);
+      assert.equal(e.kind, "billing");
+    }
+  });
+
+  it("keeps every subject on one line", () => {
+    const weird = { ...input, plan: "Pro\r\nBcc: x@y.z" };
+    for (const e of [billingReceivedEmail(weird), billingInvoiceSentEmail(weird), billingActivatedEmail(weird)]) {
+      assert.doesNotMatch(e.subject, /[\r\n]/);
+    }
+  });
+
+  it("states the amount, the reference and the end date", () => {
+    assert.match(billingReceivedEmail(input).text, /\$7\.99/);
+    assert.match(billingInvoiceSentEmail(input).text, /CP-2026-0001/);
+    assert.match(billingActivatedEmail(input).text, /7 December 2026/);
+    assert.match(billingActivatedEmail(input).text, /not charge you automatically/);
+  });
+
+  it("alerts billing@ with a link to the request in the admin queue", () => {
+    const e = billingAlertEmail({ ...input, billingName: "A <b>", billingEmail: "a@example.com", country: "KE", requestId: "abc" });
+    assert.equal(e.kind, "billing_alert");
+    assert.match(e.html, /\/admin\/billing\/abc/);
+    assert.doesNotMatch(e.html, /<b>/);
   });
 });

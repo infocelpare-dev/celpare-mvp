@@ -66,6 +66,17 @@ export async function isEnabled(flag: FlagKey): Promise<boolean> {
   return value === undefined ? true : value === true;
 }
 
+/*
+  Whether paid plans can be requested (phase BILL, D239). Fails CLOSED, the
+  opposite of isEnabled: this door takes people's money, so a value that is
+  missing, unreadable or anything but true keeps it shut. The database is the
+  real gate anyway: without the billing migration the request cannot be saved.
+*/
+export async function isBillingOpen(): Promise<boolean> {
+  const settings = await getPublicSettings();
+  return settings["features.billing_requests"] === true;
+}
+
 export type Announcement = { active: boolean; message: string };
 
 export async function getAnnouncement(): Promise<Announcement | null> {
