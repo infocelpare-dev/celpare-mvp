@@ -1,7 +1,7 @@
 import type { Doc } from "../types";
 
 /*
-  Cookie Policy, version 1.0 (phase LEGAL, 2026-10-07). The table is the real
+  Cookie Policy, version 1.1 (phase LEGAL 2026-10-07, cp_plans 2026-11-04). The table is the real
   list: names and lifetimes come from src/lib/auth/after-login.ts,
   src/lib/auth/second-factor.ts, src/lib/ai/identity.ts,
   src/lib/community/intelligence/seen.ts and @supabase/ssr. Add a cookie, add
@@ -12,8 +12,8 @@ export const cookies: Doc = {
   slug: "cookies",
   title: "Cookie Policy",
   description: "Every cookie and browser storage item Celpare uses, what it is for and how long it lasts.",
-  version: "1.0",
-  effective: "2026-10-07",
+  version: "1.1",
+  effective: "2026-11-04",
   summary: [
     "Celpare uses only its own cookies, and only ones it needs to work.",
     "There are no advertising, analytics or third party tracking cookies, which is why there is no cookie banner.",
@@ -32,6 +32,7 @@ export const cookies: Doc = {
               ["cp_login_pending", "Remembers that your password was right while you enter the emailed login code", "15 minutes"],
               ["cp_2fa", "Remembers that this browser passed the login code step", "30 days"],
               ["cp_recovery", "Allows a password reset only in the browser that opened the reset link", "30 minutes"],
+              ["cp_plans", "Remembers that you just logged in, so the plans are shown once after a login and not again until the next one", "Until you continue, log out or close the browser"],
               ["cp_device", "A random id for this browser, so we can email you when your account is used from a new one", "400 days"],
               ["celpare_anon", "A random, signed id used when you are signed out: it applies the daily question limit to Ask Celpare, and limits how often the same sponsored tool is shown to you. It is not linked to any account", "180 days"],
               ["cp_seen", "The last posts you saw in the feed, so they are not shown again straight away", "2 days"],
@@ -65,5 +66,8 @@ export const cookies: Doc = {
       ],
     },
   ],
-  changes: [{ version: "1.0", date: "2026-10-07", note: "First version." }],
+  changes: [
+    { version: "1.1", date: "2026-11-04", note: "Added cp_plans, which shows the plans once after a login." },
+    { version: "1.0", date: "2026-10-07", note: "First version." },
+  ],
 };

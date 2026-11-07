@@ -1,30 +1,14 @@
 import type { Metadata } from "next";
-import {
-  BadgeCheck,
-  Code,
-  Compass,
-  FlaskConical,
-  Rocket,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { Container } from "@/components/ui/container";
-import { SegmentedLinks } from "@/components/pricing/segmented-links";
-import { PlanCard, type PlanAction } from "@/components/pricing/plan-card";
+import { PlanPicker } from "@/components/pricing/plan-picker";
 import { CompareTable } from "@/components/pricing/compare-table";
 import { PricingFaq } from "@/components/pricing/pricing-faq";
-import { SponsoredAddon } from "@/components/pricing/sponsored-addon";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import {
-  bestYearlyPercent,
-  plansFor,
-  type Audience,
-  type Billing,
-  type PricingPlan,
-} from "@/lib/pricing/plans";
+import { getViewerPlans } from "@/lib/pricing/viewer";
+import { plansFor, type Audience, type Billing } from "@/lib/pricing/plans";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -33,15 +17,11 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-const ICONS: Record<Audience, LucideIcon[]> = {
-  individual: [Compass, Zap, FlaskConical],
-  developers: [Code, Rocket, BadgeCheck],
-};
-
 /*
   Laid out like claude.com/pricing: heading, audience switch, billing switch,
   three plan cards, a full comparison, then questions. All state is in the URL
   (?for=developers, ?billing=yearly), so the page is server rendered whole.
+  The switches and cards are PlanPicker, shared with /plans (phase PLANS).
 
   The Developers tab renders only for someone with Developer Mode on (D196).
   That reads profiles.is_developer, which per D20 grants nothing and decides
@@ -57,6 +37,7 @@ export default async function PricingPage({
 
   let signedIn = false;
   let plan: string | null = null;
+  let developerPlan: string | null = null;
   let isDeveloper = false;
 
   if (isSupabaseConfigured()) {
@@ -67,13 +48,10 @@ export default async function PricingPage({
     signedIn = Boolean(user);
 
     if (user) {
-      const [priv, own] = await Promise.all([
-        // plan is readable only by its owner, through this function (D194).
-        supabase.rpc("my_profile_private"),
-        supabase.from("profiles").select("is_developer").eq("id", user.id).maybeSingle(),
-      ]);
-      plan = ((priv.data as { plan: string | null } | null)?.plan ?? "free");
-      isDeveloper = Boolean(own.data?.is_developer);
+      const v = await getViewerPlans(supabase, user.id);
+      plan = v.plan ?? "free";
+      developerPlan = v.developerPlan ?? "free";
+      isDeveloper = v.isDeveloper;
     }
   }
 
@@ -81,27 +59,9 @@ export default async function PricingPage({
     params.for === "developers" && isDeveloper ? "developers" : "individual";
   const billing: Billing = params.billing === "yearly" ? "yearly" : "monthly";
   const { plans, compare } = plansFor(audience);
-  const bestSaving = bestYearlyPercent(plans);
 
-  const href = (a: Audience, b: Billing) => {
-    const q = new URLSearchParams();
-    if (a === "developers") q.set("for", "developers");
-    if (b === "yearly") q.set("billing", "yearly");
-    const s = q.toString();
-    return s ? `/pricing?${s}` : "/pricing";
-  };
-
-  /* Developer plans are not modelled yet (G37), so every developer is on the
-     developer Free plan. */
-  const currentId = audience === "developers" ? "free" : plan;
-
-  const actionFor = (p: PricingPlan, index: number): PlanAction => {
-    if (!signedIn) return p.monthlyCents === 0 ? "sign-in" : "coming-soon";
-    if (p.id === currentId) return "current";
-    const currentIndex = plans.findIndex((x) => x.id === currentId);
-    if (currentIndex > index) return "included";
-    return "coming-soon";
-  };
+  /* The developer plan is developer_profiles.plan (D200). */
+  const currentId = audience === "developers" ? developerPlan : plan;
 
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />}
@@ -121,52 +81,14 @@ export default async function PricingPage({
           </p>
         </header>
 
-        <div className="mt-8 flex flex-col items-center gap-3">
-          {isDeveloper ? (
-            <SegmentedLinks
-              label="Plans for"
-              items={[
-                { href: href("individual", billing), label: "Individual", active: audience === "individual" },
-                { href: href("developers", billing), label: "Developers", active: audience === "developers" },
-              ]}
-            />
-          ) : null}
-          <SegmentedLinks
-            label="Billing"
-            items={[
-              { href: href(audience, "monthly"), label: "Monthly", active: billing === "monthly" },
-              {
-                href: href(audience, "yearly"),
-                label: "Yearly",
-                active: billing === "yearly",
-                badge: bestSaving ? `Save up to ${bestSaving}%` : undefined,
-              },
-            ]}
-          />
-        </div>
-
-        <div className="mx-auto mt-10 grid max-w-[1040px] gap-4 md:grid-cols-3">
-          {plans.map((p, i) => (
-            <PlanCard
-              key={p.id}
-              plan={p}
-              icon={ICONS[audience][i]}
-              billing={billing}
-              action={actionFor(p, i)}
-            />
-          ))}
-        </div>
-
-        {/* Per tool, with any developer plan (D204). */}
-        {audience === "developers" ? <SponsoredAddon /> : null}
-
-        <p
-          id="payments-note"
-          className="mx-auto mt-6 flex max-w-[1040px] items-center justify-center gap-2 text-center text-[13px] text-muted"
-        >
-          <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
-          Paid plans open soon. Prices in USD.
-        </p>
+        <PlanPicker
+          base="/pricing"
+          audience={audience}
+          billing={billing}
+          isDeveloper={isDeveloper}
+          signedIn={signedIn}
+          currentId={currentId}
+        />
 
         <section aria-labelledby="compare-heading" className="mx-auto mt-20 max-w-[1040px]">
           <h2

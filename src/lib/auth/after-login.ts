@@ -5,6 +5,7 @@ import { emailWelcome, noteLogin } from "@/lib/email/dispatch";
 import { clientIp } from "@/lib/telemetry";
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import { TERMS_VERSION } from "@/content/legal";
+import { PLANS_COOKIE } from "@/lib/pricing/due";
 
 /*
   What happens once a login is complete (D192): the browser gets a long lived
@@ -35,10 +36,28 @@ async function browserId(): Promise<string> {
   return id;
 }
 
+/*
+  A returning login is due the plans once (phase PLANS, D228): /app reads this
+  cookie and, for a free account, sends it to /plans, whose Continue free
+  clears it. A session cookie with no maxAge, so closing the browser forgets
+  it too. Strictly necessary state set by our own login, nothing tracked.
+*/
+export async function markPlansDue(): Promise<void> {
+  const jar = await cookies();
+  jar.set(PLANS_COOKIE, "1", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
+}
+
 export async function afterLogin(
   user: { id: string; email?: string; user_metadata?: Record<string, unknown> },
   opts: { welcome: boolean },
 ): Promise<void> {
+  /* New accounts get /welcome instead; the plans are for returning logins. */
+  if (!opts.welcome) await markPlansDue();
   const h = await headers();
   const deviceId = await browserId();
   const userAgent = h.get("user-agent");

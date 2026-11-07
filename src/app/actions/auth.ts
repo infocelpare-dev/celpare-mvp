@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
-import { afterLogin } from "@/lib/auth/after-login";
+import { afterLogin, markPlansDue } from "@/lib/auth/after-login";
+import { PLANS_COOKIE } from "@/lib/pricing/due";
 import { withinBurst } from "@/lib/security/burst";
 import { newPassword } from "@/lib/auth/password-rules";
 import {
@@ -426,7 +427,10 @@ async function signInImpl(formData: FormData): Promise<AuthState> {
 
   /* Without the secret there is nothing to sign the steps with, so local
      development without Supabase secrets keeps the old one step login. */
-  if (!secondFactorEnabled()) redirect("/app");
+  if (!secondFactorEnabled()) {
+    await markPlansDue();
+    redirect("/app");
+  }
 
   /*
     The password was right. That session is revoked on the auth server now, so
@@ -587,5 +591,6 @@ export async function signOut() {
     const supabase = await createClient();
     await supabase.auth.signOut();
   }
+  (await cookies()).delete(PLANS_COOKIE);
   redirect("/");
 }
