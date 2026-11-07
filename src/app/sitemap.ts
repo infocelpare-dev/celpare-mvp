@@ -10,7 +10,7 @@ import { OPERATOR, PLACEHOLDERS_OPEN } from "@/content/operator";
 */
 export default function sitemap(): MetadataRoute.Sitemap {
   const site = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || OPERATOR.site;
-  const pages = ["", "/explore", "/community", "/search", "/compare", "/ask", "/pricing", "/demo", "/help"];
+  const pages = ["", "/explore", "/community", "/search", "/compare", "/ask", "/pricing", "/demo", "/help", "/startups"];
   const docs = [
     ...HELP_DOCS.map((d) => ({ path: `/help/${d.slug}`, effective: d.effective })),
     ...(PLACEHOLDERS_OPEN

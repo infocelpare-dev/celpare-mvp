@@ -1,6 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import { Container, Section } from "@/components/ui/container";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 
 /*
   The ElevenLabs hero shape (D122): a large, light headline on the left, the
@@ -66,23 +66,20 @@ export function Hero() {
             </p>
 
             {/*
-              For founders (founder instruction 2026-09-25). More details is a
-              placeholder until the Celpare documents exist: it goes nowhere yet,
-              so it is aria-disabled rather than a link to an empty page. When
-              the documents ship, make it a ButtonLink to them.
+              For founders (founder instruction 2026-09-25). More details opens
+              /startups since 2026-11-04 (D237).
             */}
             <div className="mt-10">
               <p className="text-[13px] font-medium uppercase tracking-[0.08em] text-foreground">
                 As a founder: grow your startup with Celpare
               </p>
-              <Button
-                type="button"
+              <ButtonLink
+                href="/startups"
                 variant="outline"
-                aria-disabled="true"
-                className="mt-4 h-11 cursor-not-allowed px-6 text-[15px]"
+                className="mt-4 h-11 px-6 text-[15px]"
               >
                 More details
-              </Button>
+              </ButtonLink>
             </div>
           </div>
         </div>
