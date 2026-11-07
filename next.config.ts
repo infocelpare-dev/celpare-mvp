@@ -35,6 +35,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   /* No "X-Powered-By: Next.js". It tells a scanner which exploits to try first. */
   poweredByHeader: false,
+  /* Dev only: lets a phone load the dev server through a Cloudflare quick tunnel.
+     Ignored by production builds. */
+  allowedDevOrigins: ["*.trycloudflare.com"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
