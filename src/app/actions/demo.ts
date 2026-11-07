@@ -1,6 +1,8 @@
 "use server";
 
+import { after } from "next/server";
 import { z } from "zod";
+import { emailDemo } from "@/lib/email/dispatch";
 import { createAnonClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { withinBurst } from "@/lib/security/burst";
 
@@ -70,9 +72,13 @@ export async function requestDemo(
       };
     }
 
+    /* A new request gets the demo from demo@ (D236). A repeat (23505) does
+       not, so the form cannot be used to mail one address over and over. */
+    if (!error) after(() => emailDemo(parsed.data.email));
+
     return {
       status: "success",
-      message: "Thanks. We will send the demo and docs to that address.",
+      message: "Thanks. The demo is on its way to your inbox.",
     };
   } catch (err) {
     console.error("[demo] unexpected error", err);

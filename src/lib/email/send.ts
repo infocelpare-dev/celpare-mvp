@@ -22,17 +22,21 @@ import type { BuiltEmail, EmailKind } from "./messages";
     codes, reset links and change notices from it too (SMTP sender).
   - submission@: the developer side. Receives replies, and the founder also
     writes from it in Gmail.
-  - noreply@: community mail. Reports go TO reports@, which only receives.
+  - noreply@: community mail. Reports go TO reports@.
+  - reports@: reports and customer help (D236). Every reply to an account or
+    community email lands there; info@ is the founder's own and is not shown.
+  - demo@: sends the demo to whoever asks for one, and receives the replies.
 */
 const SENDER: Record<EmailKind, { from: string; replyTo: string }> = {
-  welcome: { from: "Celpare <noreplyaccount@celpare.com>", replyTo: "info@celpare.com" },
-  new_login: { from: "Celpare <noreplyaccount@celpare.com>", replyTo: "info@celpare.com" },
+  welcome: { from: "Celpare <noreplyaccount@celpare.com>", replyTo: "reports@celpare.com" },
+  new_login: { from: "Celpare <noreplyaccount@celpare.com>", replyTo: "reports@celpare.com" },
   tool_submitted: { from: "Celpare Submissions <submission@celpare.com>", replyTo: "submission@celpare.com" },
   tool_decision: { from: "Celpare Submissions <submission@celpare.com>", replyTo: "submission@celpare.com" },
   developer_verified: { from: "Celpare Submissions <submission@celpare.com>", replyTo: "submission@celpare.com" },
-  report: { from: "Celpare <noreply@celpare.com>", replyTo: "info@celpare.com" },
-  new_follower: { from: "Celpare <noreply@celpare.com>", replyTo: "info@celpare.com" },
-  account_deleted: { from: "Celpare <noreplyaccount@celpare.com>", replyTo: "info@celpare.com" },
+  report: { from: "Celpare <noreply@celpare.com>", replyTo: "reports@celpare.com" },
+  new_follower: { from: "Celpare <noreply@celpare.com>", replyTo: "reports@celpare.com" },
+  account_deleted: { from: "Celpare <noreplyaccount@celpare.com>", replyTo: "reports@celpare.com" },
+  demo: { from: "Celpare <demo@celpare.com>", replyTo: "demo@celpare.com" },
 };
 
 export const REPORTS_INBOX = process.env.REPORTS_INBOX || "reports@celpare.com";
@@ -47,6 +51,7 @@ const KIND_DAILY_CAP: Record<EmailKind, number> = {
   new_follower: 30,
   new_login: 30,
   account_deleted: 20,
+  demo: 20,
 };
 
 let warned = false;

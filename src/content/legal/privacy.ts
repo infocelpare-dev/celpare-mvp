@@ -12,8 +12,8 @@ export const privacy: Doc = {
   title: "Privacy Policy",
   description:
     "What personal data Celpare collects, why, who processes it, how long it is kept, and how to see, download or delete it.",
-  version: "1.1",
-  effective: "2026-10-31",
+  version: "1.2",
+  effective: "2026-11-04",
   summary: [
     "We collect what you give us (your account, profile, posts, messages and questions) and what using Celpare produces (searches, views, devices). We do not sell it and we run no advertising trackers.",
     "Your posts, comments and public profile are visible to anyone. Your email, messages, Ask Celpare chats, searches and devices are not.",
@@ -234,6 +234,7 @@ export const privacy: Doc = {
     },
   ],
   changes: [
+    { version: "1.2", date: "2026-11-04", note: "Privacy and data requests now go to reports@celpare.com." },
     { version: "1.1", date: "2026-10-31", note: "Added the questions after sign up: what we ask, why, and that every answer is optional and private." },
     { version: "1.0", date: "2026-10-07", note: "First version." },
   ],

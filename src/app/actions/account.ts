@@ -342,7 +342,7 @@ export async function deleteAccount(prev: DeleteState, formData: FormData): Prom
   const { data: objects, error: prepError } = await admin.rpc("account_erase_prepare", { p_user: user.id });
   if (prepError) {
     console.error("[account] erase prepare failed", prepError.message);
-    return fail(undefined, "Your account could not be deleted. Nothing visible was removed. Try again, or email info@celpare.com.");
+    return fail(undefined, "Your account could not be deleted. Nothing visible was removed. Try again, or email reports@celpare.com.");
   }
   const byBucket = new Map<string, string[]>();
   for (const o of (objects ?? []) as { bucket: string; path: string }[]) {
@@ -353,7 +353,7 @@ export async function deleteAccount(prev: DeleteState, formData: FormData): Prom
       const { error } = await admin.storage.from(bucket).remove(paths.slice(i, i + 100));
       if (error) {
         console.error("[account] file removal failed", bucket, error.message);
-        return fail(undefined, "Some of your files could not be removed, so the account was kept. Try again, or email info@celpare.com.");
+        return fail(undefined, "Some of your files could not be removed, so the account was kept. Try again, or email reports@celpare.com.");
       }
     }
   }
@@ -361,7 +361,7 @@ export async function deleteAccount(prev: DeleteState, formData: FormData): Prom
   const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
   if (deleteError) {
     console.error("[account] delete user failed", deleteError.message);
-    return fail(undefined, "Your account could not be deleted. Try again, or email info@celpare.com.");
+    return fail(undefined, "Your account could not be deleted. Try again, or email reports@celpare.com.");
   }
 
   await sendEmail(email, accountDeletedEmail(profile?.full_name ?? null)).catch(() => "failed");

@@ -14,7 +14,8 @@ export type EmailKind =
   | "developer_verified"
   | "new_follower"
   | "new_login"
-  | "account_deleted";
+  | "account_deleted"
+  | "demo";
 
 export type BuiltEmail = { kind: EmailKind; subject: string; html: string; text: string };
 
@@ -206,7 +207,7 @@ export function newLoginEmail(l: LoginInput): BuiltEmail {
     ],
     action: { label: "Change your password", href: siteUrl("/settings") },
     footnote:
-      "If this was you, there is nothing to do. If it was not, change your password now and write to info@celpare.com.",
+      "If this was you, there is nothing to do. If it was not, change your password now and write to reports@celpare.com.",
   });
   return { kind: "new_login", subject: "New login to your Celpare account", ...body };
 }
@@ -246,4 +247,31 @@ export function maskIp(ip: string | null): string | null {
   if (v4) return `${v4[1]}.x`;
   const parts = ip.split(":").filter(Boolean);
   return parts.length > 3 ? `${parts.slice(0, 3).join(":")}::x` : ip;
+}
+
+/*
+  From demo@, to whoever asked for a demo on /demo or the landing page (D236).
+  The demo is the product itself: three places to try, the docs, and a video
+  when DEMO_VIDEO_URL is set (videos are never committed, so it is a link).
+*/
+export function demoEmail(videoUrl?: string | null): BuiltEmail {
+  const video = videoUrl?.startsWith("https://") ? videoUrl : null;
+  const body = renderEmail({
+    heading: "See Celpare in action",
+    paragraphs: [
+      "Thanks for asking. Celpare helps you find, compare and choose the right AI tool or model for what you want to do. Right tool. Right result.",
+      "Here is the quickest way to see it. Each one opens in your browser, no account needed to look around.",
+    ],
+    links: [
+      ...(video ? [{ label: "Watch the demo", href: video, note: "A short walkthrough of Celpare from question to choice." }] : []),
+      { label: "Ask Celpare", href: siteUrl("/ask"), note: "Describe what you want to do and get the tools that fit, with reasons." },
+      { label: "Compare", href: siteUrl("/compare"), note: "Put tools and models side by side: pricing, features and benchmarks, with sources." },
+      { label: "Explore", href: siteUrl("/explore"), note: "Browse what is new and rising across AI tools, models and the community." },
+      { label: "Grow your startup with Celpare", href: siteUrl("/startups"), note: "Build with the right tools, or get your own AI tool discovered." },
+      { label: "Help and docs", href: siteUrl("/help"), note: "How every part of Celpare works." },
+    ],
+    action: { label: "Create a free account", href: siteUrl("/get-started") },
+    footnote: "You asked for a demo at celpare.com. Reply to this email with any question and we will answer.",
+  });
+  return { kind: "demo", subject: "Your Celpare demo", ...body };
 }

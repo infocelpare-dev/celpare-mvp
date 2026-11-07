@@ -3,6 +3,7 @@ import { Navbar } from "@/components/landing/navbar";
 import { Footer } from "@/components/landing/footer";
 import { DocIndex } from "@/components/document/doc-index";
 import { HELP_GROUPS } from "@/content/help";
+import { OPERATOR } from "@/content/operator";
 
 export const metadata: Metadata = {
   title: "Help",
@@ -16,7 +17,7 @@ export default function HelpIndexPage() {
       <main id="main" className="flex-1">
         <DocIndex
           title="Help"
-          intro="How every part of Celpare works today. For the rules that apply, see [Legal](/legal)."
+          intro={`How every part of Celpare works today. For the rules that apply, see [Legal](/legal). Need help? Email [${OPERATOR.contact}](mailto:${OPERATOR.contact}).`}
           base="/help"
           groups={HELP_GROUPS}
         />

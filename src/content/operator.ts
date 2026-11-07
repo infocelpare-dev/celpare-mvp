@@ -14,10 +14,12 @@ export const OPERATOR = {
   address: "[POSTAL ADDRESS]",
   country: "Kenya",
   site: "https://celpare.com",
-  contact: "info@celpare.com",
-  /* No privacy@ alias exists yet; info@ is received (Forward Email). */
-  privacy: "info@celpare.com",
-  security: "info@celpare.com",
+  /* reports@ is the public address for help, reports and requests (D236).
+     info@ is the founder's own and is never shown. */
+  contact: "reports@celpare.com",
+  /* No privacy@ or security@ alias yet; reports@ is received (Forward Email). */
+  privacy: "reports@celpare.com",
+  security: "reports@celpare.com",
   reports: "reports@celpare.com",
   submissions: "submission@celpare.com",
 } as const;

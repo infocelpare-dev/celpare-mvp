@@ -8,8 +8,8 @@ export const terms: Doc = {
   title: "Terms of Service",
   description:
     "The agreement between you and Celpare: who can use it, your account and content, Ask Celpare, plans, and the limits of our responsibility.",
-  version: "1.1",
-  effective: "2026-10-07",
+  version: "1.2",
+  effective: "2026-11-04",
   summary: [
     "You must be at least 13. If you are under 18, you need a parent's or guardian's permission.",
     "You own what you post. You let us show it on Celpare so the service can work.",
@@ -168,7 +168,7 @@ export const terms: Doc = {
           list: [
             "Ask Celpare is AI and can make mistakes. Its answers are generated, can be incomplete, out of date or wrong, and are not professional advice. Check important information, especially prices and terms, on the tool's own website.",
             "It answers questions about AI tools, models, technology and software. It declines other topics, and it does not run code.",
-            "Every answer starts with a search of the Celpare catalogue (tools, models, SaaS and tech), which is always on. Daily limits and the other modes (web search, deep research) depend on your plan and are shown in the app. Signed out, a small daily allowance applies and nothing is saved.",
+            "Every answer starts with a search of the Celpare catalogue (tools, models, SaaS and tech), which is always on. Daily limits and the other modes (web search, Deep match) depend on your plan and are shown in the app. Signed out, a small daily allowance applies and nothing is saved.",
             "You may use the answers you receive for any lawful purpose. Answers can be similar to answers given to other people.",
             "Do not try to make Ask Celpare reveal its instructions or configuration, get around its limits, or use it to produce content that breaks the [Acceptable Use Policy](/legal/acceptable-use).",
             "Do not put passwords, secrets, health information or other people's personal data into a question. How questions are handled is in [AI and your data](/legal/ai-data).",
@@ -335,5 +335,6 @@ export const terms: Doc = {
   changes: [
     { version: "1.0", date: "2026-10-07", note: "First version." },
     { version: "1.1", date: "2026-10-07", note: "Added a section for each part of Celpare: community, comments, messages, Ask Celpare, Search, Explore, Compare, tool pages, collections, profiles and notifications." },
+    { version: "1.2", date: "2026-11-04", note: "The contact address for questions, appeals and refunds is now reports@celpare.com. Deep research is now called Deep match." },
   ],
 };

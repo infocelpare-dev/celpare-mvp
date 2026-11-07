@@ -2,6 +2,7 @@ import "server-only";
 import { bump } from "@/lib/ai/ratelimit";
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import {
+  demoEmail,
   describeBrowser,
   developerVerifiedEmail,
   maskIp,
@@ -90,6 +91,20 @@ export function emailReport(r: Omit<ReportInput, "itemPath" | "at"> & { toolSlug
       if (data?.post_id) itemPath = `/community/${data.post_id}`;
     }
     await sendEmail(REPORTS_INBOX, reportEmail({ ...r, itemPath, at: new Date() }));
+  });
+}
+
+/* ------------------------------------------------------------------ demo */
+
+/*
+  The demo, sent from demo@ to the address typed on /demo (D236). Called only
+  for a NEW demo_requests row, so the same address is not mailed twice, and
+  once a day per address on top, in case the row is ever deleted and re-added.
+*/
+export function emailDemo(to: string) {
+  return safely("demo", async () => {
+    if (!(await once(`email:demo:${to.toLowerCase()}`, 86400))) return;
+    await sendEmail(to, demoEmail(process.env.DEMO_VIDEO_URL));
   });
 }
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { escapeHtml, renderEmail } from "../layout";
 import {
+  demoEmail,
   describeBrowser,
   maskIp,
   newFollowerEmail,
@@ -101,5 +102,22 @@ describe("community", () => {
     assert.equal(newFollowerEmail({ name: "Sam", username: "sam" }).subject, "Sam followed you on Celpare");
     assert.equal(newFollowerEmail({ name: null, username: "sam" }).subject, "@sam followed you on Celpare");
     assert.equal(newFollowerEmail({ name: null, username: null }).subject, "Someone followed you on Celpare");
+  });
+});
+
+describe("demo", () => {
+  it("sends the places to try, and a video only when one is set", () => {
+    const plain = demoEmail();
+    assert.equal(plain.kind, "demo");
+    assert.equal(plain.subject, "Your Celpare demo");
+    for (const path of ["/ask", "/compare", "/explore", "/help", "/startups", "/get-started"]) {
+      assert.ok(plain.html.includes(`${path}"`), path);
+      assert.ok(plain.text.includes(path), path);
+    }
+    assert.ok(!plain.text.includes("Watch the demo"));
+    assert.ok(!demoEmail("javascript:alert(1)").html.includes("javascript:"));
+    const withVideo = demoEmail("https://youtu.be/x");
+    assert.ok(withVideo.html.includes('href="https://youtu.be/x"'));
+    assert.ok(withVideo.text.includes("Watch the demo: https://youtu.be/x"));
   });
 });
