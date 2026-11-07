@@ -62,7 +62,19 @@ export async function declaredKeys(db: SupabaseClient, d: DeclaredInterests): Pr
 export type Count = { key: string; count: number };
 export type OnboardingSummary = {
   window_days: number;
-  totals: { signups: number; started: number; completed: number; skipped_all: number; answered_heard: number };
+  totals: {
+    signups: number;
+    started: number;
+    completed: number;
+    skipped_all: number;
+    answered_heard: number;
+    /* Who answered each question: the base its percentages divide by. */
+    answered_role: number;
+    answered_goals: number;
+    answered_interests: number;
+    answered_tools: number;
+    answered_ref: number;
+  };
   heard_from: Count[];
   heard_other: Count[];
   refs: Count[];

@@ -63,6 +63,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/ai", label: "AI operations", capability: "ai.read" },
       { href: "/admin/gateway", label: "AI gateway", capability: "ai.read" },
       { href: "/admin/analytics", label: "Community analytics", capability: "analytics.read" },
+      { href: "/admin/signup-answers", label: "Sign up answers", capability: "analytics.read" },
       { href: "/admin/post-intelligence", label: "Post Intelligence", capability: "analytics.read" },
       { href: "/admin/search", label: "Search", capability: "analytics.read" },
       { href: "/admin/recommendations", label: "Recommendations", capability: "analytics.read" },
