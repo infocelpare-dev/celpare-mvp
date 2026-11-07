@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Container } from "@/components/ui/container";
 import { Logo } from "@/components/ui/logo";
+import { OPERATOR } from "@/content/operator";
 
 /*
   Section hrefs are root relative. The footer renders on /explore and /demo too,
@@ -12,10 +13,10 @@ const columns = [
   {
     title: "Product",
     links: [
-      { label: "How it works", href: "/#how" },
-      { label: "Why Celpare", href: "/#why" },
-      { label: "Categories", href: "/#tools" },
-      { label: "Community", href: "/#audience" },
+      { label: "Ask Celpare", href: "/#ask" },
+      { label: "Compare", href: "/#compare" },
+      { label: "AI Tools", href: "/#tools" },
+      { label: "Explore", href: "/explore" },
       { label: "Get started", href: "/signup" },
     ],
   },
@@ -30,8 +31,9 @@ const columns = [
   {
     title: "Company",
     links: [
+      { label: "For startups", href: "/startups" },
       { label: "Help", href: "/help" },
-      { label: "Contact", href: "mailto:info@celpare.com" },
+      { label: "Contact", href: `mailto:${OPERATOR.contact}` },
       { label: "Log in", href: "/login" },
     ],
   },

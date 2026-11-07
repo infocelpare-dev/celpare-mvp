@@ -23,8 +23,8 @@ interface TubelightNavProps {
 }
 
 /*
-  A pill of links with a lime "tube light" that glides to the active item.
-  Lime is an accent here, never a text background (brand: white on lime fails).
+  A pill of links with an ink "tube light" that glides to the active item.
+  Black and white only (founder 2026-11-04): ink on light, white on dark, no lime.
   The glide is the only motion, and it snaps when the visitor prefers reduced motion.
 */
 export function TubelightNav({
@@ -79,9 +79,9 @@ export function TubelightNav({
                       : { type: "spring", stiffness: 380, damping: 32 }
                   }
                 >
-                  <span className="absolute -top-1 left-1/2 h-[3px] w-7 -translate-x-1/2 rounded-full bg-accent">
-                    <span className="absolute -top-2 -left-2 h-5 w-11 rounded-full bg-accent/25 blur-md" />
-                    <span className="absolute -top-1 left-0 h-4 w-7 rounded-full bg-accent/25 blur-md" />
+                  <span className="absolute -top-1 left-1/2 h-[3px] w-7 -translate-x-1/2 rounded-full bg-foreground">
+                    <span className="absolute -top-2 -left-2 h-5 w-11 rounded-full bg-foreground/15 blur-md" />
+                    <span className="absolute -top-1 left-0 h-4 w-7 rounded-full bg-foreground/15 blur-md" />
                   </span>
                 </motion.span>
               )}
