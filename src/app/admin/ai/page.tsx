@@ -150,7 +150,7 @@ export default async function AdminAiPage({
                 hint="External search API calls, which cost money besides tokens"
               />
               <Stat
-                label="Deep research"
+                label="Deep match"
                 value={t.deep_research ?? 0}
                 hint="Premium only. Several searches and a much larger prompt each."
               />

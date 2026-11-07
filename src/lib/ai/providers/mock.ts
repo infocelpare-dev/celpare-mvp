@@ -120,7 +120,9 @@ function answerFor(req: AiRequest): string {
 
   // Quote the tool block the gateway assembled, so the streamed answer reflects
   // real retrieved data rather than invented product facts.
-  const names = [...req.system.matchAll(/^- ([^\n(]+) \(/gm)].map((m) => m[1].trim());
+  /* A catalogue tool is a line holding only "- Name" (prompt.ts toolBlock);
+     web, docs and model lines carry a bracket, colon or comma. */
+  const names = [...req.system.matchAll(/^- ([^\n(:,]+)$/gm)].map((m) => m[1].trim());
 
   if (names.length === 0) {
     return "I could not find a matching tool in the Celpare catalogue for that. Try naming the task you want to do, for example turning long videos into short clips, or searching a set of documents.";

@@ -27,7 +27,7 @@ export const askCelpare: Doc = {
             rows: [
               ["Catalogue search", "Always on. Searches the Celpare catalogue for matching tools, models, SaaS and tech", "Every plan"],
               ["Web search", "Looks up current information on the web when a question needs it", "Signed in plans"],
-              ["Deep research", "Plans several searches, then writes a longer answer with sources", "Premium"],
+              ["Deep match", "Compares catalogue tools and checks the web, then gives the best fit or a build roadmap, with sources", "Premium"],
             ],
           },
         },

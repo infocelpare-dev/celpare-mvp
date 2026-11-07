@@ -233,13 +233,20 @@ export function buildEntity(input: EntityInput): ToolModelEntity {
   }
 
   /* The listing. */
+  const listedGoals = new Set<string>();
   for (const c of categories) {
     push(sets, "category", { key: slugify(c), from: "listing" });
-    for (const g of WORD_TO_GOALS.get(slugify(c)) ?? []) push(sets, "usecase", { key: g, from: "listing" });
+    for (const g of WORD_TO_GOALS.get(slugify(c)) ?? []) {
+      push(sets, "usecase", { key: g, from: "listing" });
+      listedGoals.add(g);
+    }
   }
   for (const t of tags) {
     if (t === "test-fixture") continue;
-    for (const g of WORD_TO_GOALS.get(t) ?? []) push(sets, "usecase", { key: g, from: "listing" });
+    for (const g of WORD_TO_GOALS.get(t) ?? []) {
+      push(sets, "usecase", { key: g, from: "listing" });
+      listedGoals.add(g);
+    }
     if (DEPLOY_WORDS[t]) push(sets, "deployment", { key: DEPLOY_WORDS[t], from: "listing" });
     if (INTEGRATION_WORDS.has(t)) push(sets, "integration", { key: t, from: "listing" });
     /* A tag that is not a category slug is a capability word from the listing. */
@@ -275,6 +282,7 @@ export function buildEntity(input: EntityInput): ToolModelEntity {
     logoUrl: input.logoUrl ?? null,
     aliases,
     attrs: sets,
+    listedGoals: [...listedGoals],
     facts,
     tags,
     features: input.features ?? [],

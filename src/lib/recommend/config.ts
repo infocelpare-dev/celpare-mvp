@@ -130,6 +130,18 @@ export const TMR_V1 = {
     related: { perCategory: 99, perProvider: 3, perDeveloper: 3 },
   } as Record<Strategy, { perCategory: number; perProvider: number; perDeveloper: number }>,
 
+  /* A fit question that names a use case ("coding tools") has said which
+     category it wants, so the category cap is lifted for it, like a seeded
+     list, and tools that do not serve that use case are dropped once at least
+     this many do. Before this, "Find the best AI coding tools" kept four coding
+     tools and filled the rest with Claude and Dify while Copilot and Windsurf
+     were cut (founder screenshot 2026-11-04, D230). */
+  FIT_ON_GOAL_MIN: 3,
+  /* A use case the listing does not claim (category or tags) and only a
+     recorded fact supports counts this much of a satisfied constraint: Claude
+     can code, but a coding question should lead with coding tools (D230). */
+  FIT_FACT_ONLY_USECASE: 0.5,
+
   /* ---------------------------------------------------------- novelty */
   NOVELTY: { SERVED: 0.6, SERVED_RECOVER_HOURS: 72, OPENED: 0.35, OPENED_HALF_LIFE_DAYS: 14, SAVED_FLOOR: 0.5 },
   /* The novelty under which a personalized candidate is "already seen". */

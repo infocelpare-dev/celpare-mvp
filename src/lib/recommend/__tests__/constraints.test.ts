@@ -87,3 +87,52 @@ describe("fit (Ask Celpare)", () => {
     assert.ok(r.rejected.some((x) => x.key === bySlug(index, "model", "grok-4-7").key && x.code === "failed_constraint"));
   });
 });
+
+describe("a use case question keeps to its use case (D230)", () => {
+  const ask = (q: string, limit = 6) => {
+    const p = parseConstraints(q, index);
+    return run({ strategy: "fit", surface: "ask", query: q, constraints: p.constraints, entityTypes: ["tool"], limit, section: "ask" });
+  };
+
+  it("fills a coding answer with coding tools, not the category cap's leftovers", () => {
+    const r = ask("Find the best AI coding tools.");
+    const s = slugs(r);
+    assert.equal(s.length, 6);
+    for (const slug of ["cursor", "claude-code", "github-copilot"]) assert.ok(s.includes(slug), `${slug} missing from ${s.join(", ")}`);
+    assert.ok(!r.rejected.some((x) => x.code === "diversity_limit" && x.key === bySlug(index, "tool", "github-copilot").key));
+    for (const off of ["dify", "runway"]) assert.ok(!s.includes(off), `${off} should not answer a coding question`);
+  });
+
+  it("puts tools listed for coding ahead of a general assistant that can code", () => {
+    const s = slugs(ask("Find the best AI coding tools.", 8));
+    const claude = s.indexOf("claude");
+    for (const slug of ["cursor", "claude-code", "github-copilot", "windsurf"]) {
+      const at = s.indexOf(slug);
+      if (at >= 0 && claude >= 0) assert.ok(at < claude, `${slug} should rank above claude in ${s.join(", ")}`);
+    }
+  });
+
+  it("leaves a general assistant out of a coding answer when enough coding tools are listed", () => {
+    const r = ask("Find the best AI coding tools.", 8);
+    assert.ok(!slugs(r).includes("claude"), slugs(r).join(", "));
+    assert.ok(r.rejected.some((x) => x.key === bySlug(index, "tool", "claude").key && x.code === "off_goal"));
+  });
+
+  it("drops tools that do not serve the use case, recorded as off_goal", () => {
+    const r = ask("best ai tools for coding");
+    assert.ok(r.rejected.some((x) => x.code === "off_goal"));
+  });
+
+  it("does not read \"I can't code\" or \"no code\" as a coding question", () => {
+    for (const q of ["I want to build a booking website for my salon, I can't code", "no code website builder", "I don't know how to code, make me an app"]) {
+      const goals = parseConstraints(q, index).constraints.filter((c) => c.kind === "usecase").map((c) => c.value);
+      assert.ok(!goals.includes("coding"), `${q}: ${goals.join(", ")}`);
+    }
+    assert.ok(parseConstraints("best tool for coding", index).constraints.some((c) => c.kind === "usecase" && c.value === "coding"));
+  });
+
+  it("leaves a question with no use case as it was", () => {
+    const r = ask("free tools under $10");
+    assert.ok(!r.rejected.some((x) => x.code === "off_goal"));
+  });
+});

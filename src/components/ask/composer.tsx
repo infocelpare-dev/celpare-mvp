@@ -25,8 +25,12 @@ import { cn } from "@/lib/utils";
   competing with the send button.
 
   Celpare's own system, not the reference's palette (D31). Flat, one hairline
-  border, no shadow (D11), and an active chip is ink on lime, never white on
-  lime (D2).
+  border, no shadow (D11). Active controls are ink pills like the send button
+  (D122): lime read as invisible on the light composer (founder 2026-11-04).
+
+  Two controls (founder 2026-11-04, D234): the sources menu holds what the
+  answer may look at, catalogue (always on) and web search; deep research is
+  a different way of answering, so it is its own switch beside the menu.
 
   There is no microphone. Voice input is not built, and a control that does
   nothing is worse than an absent one.
@@ -81,9 +85,9 @@ const MODES: {
   },
   {
     key: "deepResearch",
-    label: "Deep research",
+    label: "Deep match",
     icon: Telescope,
-    hint: "Search several angles, then answer from everything found. Slower.",
+    hint: "Compare catalogue tools and check the web, then give the best fit or a build plan. Slower.",
   },
 ];
 
@@ -147,9 +151,14 @@ export function Composer({
     };
   }, [menuOpen]);
 
-  /* What the one button says. Naming the single active mode is more useful than
-     a count, and a count is more useful than a list once there are two. */
-  const active = MODES.filter((m) => grants[m.key].allowed && (m.fixed || modes[m.key]));
+  /* What the sources button says. Naming the single active mode is more useful
+     than a count, and a count is more useful than a list once there are two.
+     Deep research has its own switch, so it is not a source here. */
+  const sources = MODES.filter((m) => m.key !== "deepResearch");
+  const deep = MODES.find((m) => m.key === "deepResearch")!;
+  const deepGrant = grants.deepResearch;
+  const deepOn = deepGrant.allowed && modes.deepResearch;
+  const active = sources.filter((m) => grants[m.key].allowed && (m.fixed || modes[m.key]));
   const activeCount = active.length;
   const summary =
     activeCount === 0
@@ -220,7 +229,8 @@ export function Composer({
             tap away for the people who want it, which is the minority on any
             given message.
           */}
-          <div className="relative min-w-0 flex-1" ref={menuRef}>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="relative min-w-0" ref={menuRef}>
             <button
               type="button"
               onClick={() => setMenuOpen((v) => !v)}
@@ -229,7 +239,7 @@ export function Composer({
               className={cn(
                 "inline-flex h-8 max-w-full cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors duration-200",
                 activeCount > 0
-                  ? "border-transparent bg-accent text-on-accent"
+                  ? "border-transparent bg-primary text-on-primary hover:bg-primary-hover"
                   : "border-border text-muted hover:bg-background hover:text-foreground",
               )}
             >
@@ -252,7 +262,7 @@ export function Composer({
                    the screen and a menu dropping down would leave the page. */
                 className="absolute bottom-[calc(100%+8px)] left-0 z-20 w-[min(320px,calc(100vw-48px))] overflow-hidden rounded-2xl border border-border bg-background"
               >
-                {MODES.map((mode) => {
+                {sources.map((mode) => {
                   const grant = grants[mode.key];
                   const on = grant.allowed && (mode.fixed || modes[mode.key]);
                   const Icon = grant.allowed ? mode.icon : Lock;
@@ -285,7 +295,7 @@ export function Composer({
                       <Icon
                         className={cn(
                           "mt-0.5 size-4 shrink-0",
-                          on ? "text-accent" : "text-muted",
+                          on ? "text-foreground" : "text-muted",
                         )}
                         aria-hidden
                       />
@@ -295,7 +305,7 @@ export function Composer({
                           {mode.fixed && grant.allowed ? (
                             <span className="shrink-0 text-[12px] text-muted">Always on</span>
                           ) : on ? (
-                            <Check className="size-4 shrink-0 text-accent" aria-hidden />
+                            <Check className="size-4 shrink-0 text-foreground" aria-hidden />
                           ) : null}
                         </span>
                         <span className="mt-0.5 block text-[12px] leading-relaxed text-muted">
@@ -307,6 +317,42 @@ export function Composer({
                 })}
               </div>
             ) : null}
+          </div>
+
+          {/* Deep research, its own switch (D234). Locked plans see a lock and
+              are told what it takes, in words, as the menu does. */}
+          <button
+            type="button"
+            aria-pressed={deepGrant.allowed ? deepOn : undefined}
+            title={deepGrant.allowed ? deep.hint : lockedMessage(deep, deepGrant)}
+            onClick={() => {
+              if (!deepGrant.allowed) {
+                setLocked(lockedMessage(deep, deepGrant));
+                return;
+              }
+              setLocked(null);
+              onToggle("deepResearch", !deepOn);
+            }}
+            className={cn(
+              "inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors duration-200",
+              deepOn
+                ? "border-transparent bg-primary text-on-primary hover:bg-primary-hover"
+                : deepGrant.allowed
+                  ? "border-border text-foreground hover:bg-background"
+                  : "border-border text-muted",
+            )}
+          >
+            {deepGrant.allowed ? (
+              <Telescope className="size-3.5 shrink-0" aria-hidden />
+            ) : (
+              <Lock className="size-3.5 shrink-0" aria-hidden />
+            )}
+            {/* One row on a 390px phone: the short word there, the full name
+                from 420px, and always the full name for screen readers. */}
+            <span className="sr-only">Deep match</span>
+            <span aria-hidden className="min-[420px]:hidden">Match</span>
+            <span aria-hidden className="hidden min-[420px]:inline">Deep match</span>
+          </button>
           </div>
 
           {busy ? (

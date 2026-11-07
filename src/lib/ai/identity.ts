@@ -98,6 +98,8 @@ export type AskSettings = {
   answerLength?: "short" | "balanced" | "detailed";
   webSearch?: boolean;
   saveHistory?: boolean;
+  /* The composer's Deep research switch as the person left it (D233). */
+  deepResearch?: boolean;
 };
 
 export type Identity = {

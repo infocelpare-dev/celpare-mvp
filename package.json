@@ -27,7 +27,12 @@
     "video:carousel": "node video/render.mjs carousel",
     "video:ais": "node video/render.mjs ais",
     "video:gems": "node video/render.mjs gems",
+    "video:best": "node video/render.mjs best",
+    "video:cursor": "node video/render.mjs cursor",
+    "video:hundred": "node video/render.mjs hundred",
+    "video:stack": "node video/render.mjs stack",
     "video:meme": "node video/render.mjs meme",
+    "test:ai": "node --import ./scripts/test-loader.mjs --test \"src/lib/ai/__tests__/*.test.ts\"",
     "test:onboarding": "node --import ./scripts/test-loader.mjs --test \"src/lib/onboarding/__tests__/*.test.ts\""
   },
   "dependencies": {

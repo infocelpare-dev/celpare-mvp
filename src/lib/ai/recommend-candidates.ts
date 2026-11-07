@@ -58,7 +58,8 @@ export type AskSponsoredCandidate = SponsoredCandidate & { slug: string };
    tool. search_tools caps at 20; the model still sees TOOL_SEARCH_LIMIT. */
 const SPONSORED_SEARCH_DEPTH = 20;
 
-async function projection(slugs: string[]): Promise<ToolCitation[]> {
+/* Exported for deep research (phase DR), which asks for a wider pool. */
+export async function projection(slugs: string[]): Promise<ToolCitation[]> {
   if (!isSupabaseConfigured() || slugs.length === 0) return [];
   const { data, error } = await createAnonClient().rpc("search_tools_by_slugs", { slugs });
   if (error) {

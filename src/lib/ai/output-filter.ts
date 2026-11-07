@@ -210,6 +210,58 @@ export function redact(text: string): { text: string; hits: Redaction[] } {
   its instructions is not answering the question, and removing one identifier
   would leave the rest of the leak on screen.
 */
+/*
+  Ask Celpare guides and never writes code (founder 2026-11-04, D232). The
+  prompt says so; this is the backstop, because a prompt is not a control
+  (D35). A fenced block, finished or still open mid stream, becomes one short
+  notice. The text before it never changes as more arrives, so the streaming
+  offsets in release() stay valid.
+*/
+export const CODE_NOTICE = "Celpare guides rather than writes code. The official guide for this step has the exact commands or code.";
+
+/*
+  A line that starts with a shell command ("npm i resend", "git clone ..."),
+  bare or as a list item, is a command whatever the prompt said (live test
+  2026-11-04). Decided from the first word, which arrives long before the
+  OUTPUT_WINDOW_CHARS hold back releases the line, so offsets stay stable.
+  Lower case only: "Git" or "Docker" opening an English sentence stays.
+*/
+const COMMAND_LINE =
+  /^([ \t]*(?:[-*+]|\d+[.)])?[ \t]*)(?:npm|pnpm|yarn|npx|bunx?|pip3?|pipx|poetry|git|curl|wget|brew|docker|kubectl|sudo|apt(?:-get)?|cd|mkdir|chmod|claude-code|vercel|supabase|firebase|wrangler)[ \t]+[^\n]*/gm;
+const COMMAND_NOTICE = "See the official guide for the exact command.";
+
+/*
+  Inline code inside a sentence ("Install the SDK: npm install resend",
+  "create app/api/send/route.ts", "call resend.emails.send({...})"), which the
+  free model still wrote after being told not to (live test 2026-11-04). Each
+  becomes plain words. All are short, so they complete inside the hold back
+  window before any of their text is released.
+*/
+const INLINE: [RegExp, string][] = [
+  [/\b(?:npm|pnpm|yarn|npx|bunx?|pip3?|pipx|poetry|brew|apt(?:-get)?|gem|cargo|go)\s+(?:install|i|add|run|create|init|exec|dlx|get)\b[^\n,;)]*/g, "the install step in the official guide"],
+  [/\b(?:git\s+(?:clone|init|push|pull|commit)|docker\s+(?:run|build|compose)|curl\s+-?\S+)[^\n,;)]*/g, "the command in the official guide"],
+  [/(?<![\w@/:.])(?:[\w.-]+\/)+[\w.[\]-]+\.(?:ts|tsx|js|jsx|mjs|cjs|py|rb|go|rs|php|java|json|ya?ml|toml|sql|sh|env)\b/g, "a new file, as the official guide shows"],
+  [/\bprocess\.env\.[A-Z0-9_]+|\bos\.environ\[[^\]\n]*\]/g, "an environment variable"],
+  [/\b[a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)+\([^()\n]{0,80}\)/g, "the SDK call the official guide shows"],
+];
+
+/* A fence still being typed ("``") is held back by OUTPUT_WINDOW_CHARS. */
+export function stripCodeBlocks(text: string): string {
+  return text
+    .replace(
+      /(^|\n)[ \t]*```[^\n]*\n?[\s\S]*?(\n[ \t]*```[ \t]*(?=\n|$)|$)/g,
+      (_m, lead: string) => `${lead}${CODE_NOTICE}`,
+    )
+    .replace(COMMAND_LINE, (_m, lead: string) => `${lead}${COMMAND_NOTICE}`)
+    .replace(/[^\n]+/g, (line) =>
+      /* URLs are left whole: a link to a code file is a link, not code. */
+      line
+        .split(/(https?:\/\/[^\s)]+)/)
+        .map((part, i) => (i % 2 === 1 ? part : INLINE.reduce((l, [re, words]) => l.replace(re, words), part)))
+        .join(""),
+    );
+}
+
 export class OutputFilter {
   private raw = "";
   private emitted = 0;
@@ -226,7 +278,7 @@ export class OutputFilter {
   }
 
   private release(holdBack: number): string {
-    const { text, hits } = redact(this.raw);
+    const { text, hits } = redact(stripCodeBlocks(this.raw));
     this.hits = hits;
 
     const upTo = Math.max(0, text.length - holdBack);

@@ -106,6 +106,21 @@ export default async function AdminGatewayPage() {
                 </span>
               ) : null}
             </Field>
+            {snapshot.provider === "openrouter" ? (
+              <Field label="Free models only">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{snapshot.freeOnly ? "On" : "Off, paid allowed"}</span>
+                  <Status value={snapshot.blockedModels.length > 0 ? "down" : "healthy"} />
+                </span>
+                <span className="mt-1 block text-[12px] text-muted">
+                  {snapshot.blockedModels.length > 0
+                    ? `Refused, not free: ${snapshot.blockedModels.join(", ")}. Ask Celpare will not answer until OPENROUTER_MODEL is a :free model.`
+                    : snapshot.freeOnly
+                      ? "Only :free OpenRouter models can be called (D229). OPENROUTER_ALLOW_PAID=on lifts it."
+                      : "OPENROUTER_ALLOW_PAID is on, so paid models can be called and billed."}
+                </span>
+              </Field>
+            ) : null}
             <Field label="Base URL" mono>
               {snapshot.baseUrl ?? "Provider default"}
             </Field>
@@ -120,7 +135,7 @@ export default async function AdminGatewayPage() {
               )}
             </Field>
             <Field label="Deliberation">
-              Ordinary answers: {snapshot.answerThinking}. Deep research:{" "}
+              Ordinary answers: {snapshot.answerThinking}. Deep match:{" "}
               {snapshot.researchThinking}.
             </Field>
           </FieldList>
@@ -255,7 +270,7 @@ export default async function AdminGatewayPage() {
                 <Th numeric>Output / month</Th>
                 <Th numeric>Max reply</Th>
                 <Th>Web search</Th>
-                <Th>Research</Th>
+                <Th>Deep match</Th>
               </tr>
             </thead>
             <tbody>
@@ -297,7 +312,7 @@ export default async function AdminGatewayPage() {
           <Stat
             label="Research queries"
             value={snapshot.researchQueries}
-            hint="Angles a deep research turn searches"
+            hint="Angles a Deep match turn searches"
           />
           <Stat
             label="Research sources"

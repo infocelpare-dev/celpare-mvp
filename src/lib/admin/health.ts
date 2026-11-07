@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { models, providerName } from "@/lib/ai/providers";
+import { paidAllowed, paidModelRefusal } from "@/lib/ai/providers/free-only";
 import {
   ANSWER_THINKING,
   FEATURES,
@@ -214,6 +215,10 @@ export type GatewaySnapshot = {
   classifierModel: string;
   baseUrl: string | null;
   keyConfigured: boolean;
+  /* Free models only (D229): on unless OPENROUTER_ALLOW_PAID=on, and any
+     configured model the lock refuses. OpenRouter only. */
+  freeOnly: boolean;
+  blockedModels: string[];
   /* Every provider the code can select, and whether it could be selected right
      now. This is the fallback story: nothing routes automatically today, so it
      is stated as what is available rather than as a chain that exists. */
@@ -255,6 +260,11 @@ export function getGatewaySnapshot(): GatewaySnapshot {
     provider,
     answeringModel: m.main,
     classifierModel: m.fast,
+    freeOnly: provider === "openrouter" && !paidAllowed(process.env),
+    blockedModels:
+      provider === "openrouter"
+        ? [...new Set([m.main, m.fast])].filter((x) => paidModelRefusal(x, process.env))
+        : [],
     baseUrl,
     keyConfigured:
       provider === "openrouter"

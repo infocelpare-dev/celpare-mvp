@@ -97,12 +97,12 @@ export const INDIVIDUAL_PLANS: PricingPlan[] = [
   {
     id: "premium",
     name: "Premium",
-    tagline: "For research and the biggest tasks",
+    tagline: "For the best match and the biggest tasks",
     monthlyCents: 1999,
     yearlyCents: 19999,
     includesFrom: "Pro",
     features: [
-      "Research mode",
+      "Deep match",
       "Larger tasks and the most messages",
       savedToolsLine(premium.savedTools),
       collectionsLine(premium.collections),
@@ -168,7 +168,7 @@ export const INDIVIDUAL_COMPARE: CompareGroup[] = [
     rows: [
       { label: "AI chat", cells: ["Included", "More messages", "Most messages"] },
       { label: "Larger tasks", cells: [false, false, true] },
-      { label: "Research mode", cells: [false, false, true] },
+      { label: "Deep match", cells: [false, false, true] },
     ],
   },
   {

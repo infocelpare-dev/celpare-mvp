@@ -2,6 +2,8 @@
 
 import { Fragment, useState } from "react";
 import { Check, Copy } from "lucide-react";
+/* Lists across blank lines, numbered in order (founder screenshot 2026-11-04). */
+import { BULLET, NUMBERED, collectList, collectTable } from "@/lib/ai/rich-list";
 
 /*
   A small markdown renderer for model output.
@@ -161,8 +163,10 @@ type Block =
   | { kind: "p"; lines: string[] }
   | { kind: "h"; level: 2 | 3; text: string }
   | { kind: "ul"; items: string[] }
-  | { kind: "ol"; items: string[] }
+  | { kind: "ol"; items: string[]; start: number }
+  | { kind: "table"; header: string[]; rows: string[][] }
   | { kind: "code"; code: string; lang: string | null };
+
 
 /*
   Line based, because the text arrives a token at a time and a half written
@@ -212,31 +216,32 @@ function parse(text: string): Block[] {
       continue;
     }
 
-    const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
+    /* A table, for deep research reports (D231). */
+    const table = collectTable(lines, i);
+    if (table) {
+      flushParagraph(paragraph);
+      blocks.push({ kind: "table", header: table.header, rows: table.rows });
+      i = table.end;
+      continue;
+    }
+
+    const bullet = line.match(BULLET);
     if (bullet) {
       flushParagraph(paragraph);
-      const items: string[] = [];
-      while (i < lines.length) {
-        const next = lines[i].match(/^\s*[-*+]\s+(.*)$/);
-        if (!next) break;
-        items.push(next[1]);
-        i += 1;
-      }
+      const { items, end } = collectList(lines, i, BULLET);
+      i = end;
       blocks.push({ kind: "ul", items });
       continue;
     }
 
-    const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    const numbered = line.match(NUMBERED);
     if (numbered) {
       flushParagraph(paragraph);
-      const items: string[] = [];
-      while (i < lines.length) {
-        const next = lines[i].match(/^\s*\d+[.)]\s+(.*)$/);
-        if (!next) break;
-        items.push(next[1]);
-        i += 1;
-      }
-      blocks.push({ kind: "ol", items });
+      const { items, end } = collectList(lines, i, NUMBERED);
+      i = end;
+      /* Numbered by position from the first number written, so "1. 1. 1." and
+         a list split by blank lines both read 1, 2, 3. */
+      blocks.push({ kind: "ol", items, start: Number(numbered[1]) || 1 });
       continue;
     }
 
@@ -276,11 +281,69 @@ export function RichText({ text }: { text: string }) {
           );
         }
 
+        if (block.kind === "table") {
+          /* From sm up a real table, scrolling inside its own box if it must;
+             on a phone each row is a card of label and value, so the page
+             never scrolls sideways (ui-ux-pro-max: table handling). */
+          return (
+            <div key={b} className="mt-3 first:mt-0">
+              <div className="hidden overflow-x-auto rounded-xl border border-border sm:block">
+                <table className="w-full border-collapse text-left text-[14px]">
+                  <thead className="bg-surface">
+                    <tr>
+                      {block.header.map((h, c) => (
+                        <th key={c} scope="col" className="px-3 py-2 align-bottom font-medium">
+                          {inline(h, `th-${b}-${c}`)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {block.rows.map((row, r) => (
+                      <tr key={r} className="border-t border-border">
+                        {row.map((cell, c) =>
+                          c === 0 ? (
+                            <th key={c} scope="row" className="px-3 py-2 align-top font-medium">
+                              {inline(cell, `td-${b}-${r}-${c}`)}
+                            </th>
+                          ) : (
+                            <td key={c} className="px-3 py-2 align-top leading-relaxed">
+                              {inline(cell, `td-${b}-${r}-${c}`)}
+                            </td>
+                          ),
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <ul className="space-y-2 sm:hidden">
+                {block.rows.map((row, r) => (
+                  <li key={r} className="rounded-xl border border-border px-3 py-2.5">
+                    <p className="font-medium">{inline(row[0] ?? "", `mc-${b}-${r}`)}</p>
+                    <dl className="mt-1.5 space-y-1 text-[14px]">
+                      {block.header.slice(1).map((h, c) =>
+                        row[c + 1] ? (
+                          <div key={c}>
+                            <dt className="text-[12px] text-muted">{h}</dt>
+                            <dd className="leading-relaxed">{inline(row[c + 1], `md-${b}-${r}-${c}`)}</dd>
+                          </div>
+                        ) : null,
+                      )}
+                    </dl>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        }
+
         if (block.kind === "ul" || block.kind === "ol") {
           const Tag = block.kind === "ul" ? "ul" : "ol";
           return (
             <Tag
               key={b}
+              start={block.kind === "ol" && block.start !== 1 ? block.start : undefined}
               className={
                 block.kind === "ul"
                   ? "mt-3 space-y-1.5 first:mt-0"

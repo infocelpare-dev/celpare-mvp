@@ -11,12 +11,15 @@ import {
 } from "lucide-react";
 import { SparkIcon } from "@/components/ui/spark-icon";
 import { RichText } from "./rich-text";
+import { ResearchActivity, ResearchTrail, type ResearchSummary } from "./research-line";
 import { ModelCards, ToolCards, type ModelCardData, type ToolCitation } from "./tool-cards";
 import { Composer, type Grants, type ModeKey, type Modes } from "./composer";
 import { useNewChatToken } from "./new-chat";
+import { rememberAskModes } from "@/app/actions/settings";
 import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 type WebSource = { title: string; url: string; snippet: string };
+
 
 type Turn = {
   id: string;
@@ -34,6 +37,14 @@ type Turn = {
      answer was built from rather than what the latest one is doing. */
   steps?: string[];
   sources?: WebSource[];
+  /* Deep research fact check (D231): prices or percentages no source held. */
+  unconfirmed?: string[];
+  /* Deep research summary, shown above the answer once the stages are gone. */
+  research?: ResearchSummary | null;
+  /* Deep research running: the report is held back and the live activity is
+     shown until the stream ends (founder 2026-11-04). */
+  researching?: boolean;
+  startedAt?: number | null;
   /* Set when the turn ended badly, so it renders as a notice rather than as an
      answer the model actually gave. */
   notice?: "refused" | "limit" | "error";
@@ -191,6 +202,13 @@ export function AskChat({
               setGrants(event.grants as Grants);
             }
 
+            if (event.t === "meta" && (event.used as { deepResearch?: boolean } | undefined)?.deepResearch) {
+              const startedAt = Date.now();
+              setTurns((prev) =>
+                prev.map((t) => (t.id === replyId ? { ...t, researching: true, startedAt } : t)),
+              );
+            }
+
             if (event.t === "cards") {
               /* The card record is the public one and carries more than the
                  model was given. Falling back to the citations keeps the cards
@@ -223,6 +241,26 @@ export function AskChat({
                 prev.map((t) =>
                   t.id === replyId ? { ...t, steps: [...(t.steps ?? []), label] } : t,
                 ),
+              );
+            }
+
+            if (event.t === "research" && event.v && typeof event.v === "object") {
+              const v = event.v as Partial<ResearchSummary>;
+              const research: ResearchSummary = {
+                kind: v.kind === "build" ? "build" : "choose",
+                searches: Number(v.searches) || 0,
+                pagesRead: Number(v.pagesRead) || 0,
+                compared: Number(v.compared) || 0,
+              };
+              setTurns((prev) =>
+                prev.map((t) => (t.id === replyId ? { ...t, research } : t)),
+              );
+            }
+
+            if (event.t === "verify") {
+              const unconfirmed = Array.isArray(event.v) ? (event.v as unknown[]).map(String).slice(0, 8) : [];
+              setTurns((prev) =>
+                prev.map((t) => (t.id === replyId ? { ...t, unconfirmed } : t)),
               );
             }
 
@@ -292,6 +330,11 @@ export function AskChat({
           fail("Ask Celpare could not reach the model. Try again in a moment.", "error");
         }
       } finally {
+        /* The report is released whole when the stream ends, done, stopped or
+           failed alike, so a held answer is never stuck behind the panel. */
+        setTurns((prev) =>
+          prev.map((t) => (t.id === replyId && t.researching ? { ...t, researching: false } : t)),
+        );
         inFlight.current = false;
         setBusy(false);
         abortRef.current = null;
@@ -368,9 +411,16 @@ export function AskChat({
             modes={modes}
             grants={grants}
             signedIn={signedIn}
-            onToggle={(key: ModeKey, next: boolean) =>
-              setModes((prev) => ({ ...prev, [key]: next }))
-            }
+            onToggle={(key: ModeKey, next: boolean) => {
+              const updated = { ...modes, [key]: next };
+              setModes(updated);
+              /* Kept as the person left it, on the account (D233): leaving
+                 Ask, a new chat or another device keeps these switches.
+                 Catalogue search is always on and is not stored. */
+              if (signedIn && key !== "toolSearch") {
+                void rememberAskModes({ webSearch: updated.webSearch, deepResearch: updated.deepResearch }).catch(() => {});
+              }
+            }}
           />
           {!signedIn ? (
             <p className="mt-3 text-center text-[13px] text-muted">
@@ -432,6 +482,20 @@ function Answer({
   const empty = turn.content.length === 0;
   const steps = turn.steps ?? [];
 
+  /* Deep research in progress: only the live activity, the report comes whole
+     at the end. */
+  if (turn.researching) {
+    return (
+      <div>
+        <div className="mb-2 flex items-center gap-2 text-[13px] font-medium text-muted">
+          <SparkIcon className="size-3.5 text-accent" />
+          Celpare
+        </div>
+        <ResearchActivity steps={steps} startedAt={turn.startedAt ?? null} writing={!empty} />
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-2 flex items-center gap-2 text-[13px] font-medium text-muted">
@@ -473,6 +537,11 @@ function Answer({
         </ol>
       ) : null}
 
+      {/* Once the answer is written the stages make way for it; this line
+          stays, so a deep research answer never reads as a catalogue only one
+          (founder 2026-11-04). */}
+      {turn.research && !empty ? <ResearchTrail research={turn.research} steps={steps} /> : null}
+
       {empty && busy && steps.length === 0 ? (
         <p className="text-[15px] text-muted" aria-live="polite">
           Thinking
@@ -494,8 +563,19 @@ function Answer({
 
       {turn.models?.length ? <ModelCards models={turn.models} /> : null}
 
+      {turn.unconfirmed?.length && !empty ? (
+        <p className="mt-3 flex gap-2 rounded-xl border border-border bg-surface px-3 py-2.5 text-[13px] leading-relaxed text-muted">
+          <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+          <span>
+            <span className="font-medium text-foreground">Check before you rely on these:</span>{" "}
+            {turn.unconfirmed.join(", ")} {turn.unconfirmed.length === 1 ? "was" : "were"} not found in the Celpare
+            catalogue or the sources read for this answer.
+          </span>
+        </p>
+      ) : null}
+
       {turn.sources && turn.sources.length > 0 && !empty ? (
-        <Sources sources={turn.sources} />
+        <Sources sources={turn.sources} open={Boolean(turn.research)} />
       ) : null}
 
       {/* Actions appear once the answer is finished. Offering copy halfway
@@ -559,15 +639,20 @@ function CopyButton({ text }: { text: string }) {
 
 /* The web pages an answer was built from. Listed rather than summarised,
    because the point of showing a source is that someone can go and check it. */
-function Sources({ sources }: { sources: WebSource[] }) {
+function Sources({ sources, open = false }: { sources: WebSource[]; open?: boolean }) {
   return (
-    <details className="mt-4 rounded-xl border border-border">
+    <details className="mt-4 rounded-xl border border-border" open={open}>
       <summary className="cursor-pointer list-none px-4 py-3 text-[13px] font-medium text-muted transition-colors duration-200 hover:text-foreground">
-        Sources
+        Sources ({sources.length})
       </summary>
-      <ul className="space-y-3 border-t border-border px-4 py-3">
-        {sources.map((source) => (
-          <li key={source.url}>
+      {/* Numbered, so a [2] in a deep research answer finds its source. */}
+      <ol className="space-y-3 border-t border-border px-4 py-3">
+        {sources.map((source, i) => (
+          <li key={source.url} className="flex gap-2.5">
+            <span className="mt-0.5 w-5 shrink-0 text-right text-[13px] tabular-nums text-muted" aria-hidden>
+              {i + 1}
+            </span>
+            <div className="min-w-0">
             <a
               href={source.url}
               target="_blank"
@@ -580,9 +665,10 @@ function Sources({ sources }: { sources: WebSource[] }) {
               <ExternalLink className="mt-1 size-3 shrink-0" aria-hidden />
             </a>
             <p className="mt-0.5 text-[13px] leading-relaxed text-muted">{source.snippet}</p>
+            </div>
           </li>
         ))}
-      </ul>
+      </ol>
     </details>
   );
 }

@@ -54,13 +54,13 @@ export const CELPARE_DOCS: DocSection[] = [
     id: "plans",
     title: "Plans and pricing",
     keywords: ["pricing", "price", "plan", "plans", "cost", "subscription", "free", "pro", "premium", "how much", "upgrade", "limits", "quota"],
-    body: `There are three user plans. Free includes the assistant, tool pages, community access, trending tools and up to 5 saved tools. Pro at 7.99 a month adds more messages, up to 15 saved tools, 10 collections, advanced filters, advanced comparison and priority recommendations. Premium at 19.99 a month adds research mode, unlimited saved tools and collections, and exclusive AI ranking. Developer plans are separate: Free with up to 2 tools, Pro at 20 a month with up to 5 tools and better placement, and Elite at 50 a month with unlimited tools, the developer badge, and the right to request a verified blue tick for their tools, which Celpare reviews before granting. Payments are not built yet, so everybody is on the free plan today.`,
+    body: `There are three user plans. Free includes the assistant, tool pages, community access, trending tools and up to 5 saved tools. Pro at 7.99 a month adds more messages, up to 15 saved tools, 10 collections, advanced filters, advanced comparison and priority recommendations. Premium at 19.99 a month adds Deep match, unlimited saved tools and collections, and exclusive AI ranking. Developer plans are separate: Free with up to 2 tools, Pro at 20 a month with up to 5 tools and better placement, and Elite at 50 a month with unlimited tools, the developer badge, and the right to request a verified blue tick for their tools, which Celpare reviews before granting. Payments are not built yet, so everybody is on the free plan today.`,
   },
   {
     id: "ask-limits",
     title: "Assistant usage limits",
     keywords: ["how many messages", "limit", "run out", "rate limit", "quota", "daily", "reset", "used up"],
-    body: `Message limits are per day and reset at midnight. Signed out visitors get 5 questions a day and their chats are not saved. Free accounts get 25 a day, Pro 150 and Premium 500. Longer answers, more conversation history and a higher token ceiling come with the higher plans. Searching the Celpare catalogue is on every plan, including signed out. Web search is available to any account, so Free, Pro and Premium. Deep research, which searches several angles and answers from all of them, is Premium only.`,
+    body: `Message limits are per day and reset at midnight. Signed out visitors get 5 questions a day and their chats are not saved. Free accounts get 25 a day, Pro 150 and Premium 500. Longer answers, more conversation history and a higher token ceiling come with the higher plans. Searching the Celpare catalogue is on every plan, including signed out. Web search is available to any account, so Free, Pro and Premium. Deep match, which compares catalogue tools and checks the web before giving the best fit or a build roadmap, is Premium only.`,
   },
   {
     id: "accounts",

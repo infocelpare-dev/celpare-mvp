@@ -73,9 +73,9 @@ export async function composerConfig(): Promise<{
     defaults: {
       toolSearch: grants.toolSearch.allowed,
       webSearch: grants.webSearch.allowed && identity.settings.webSearch !== false,
-      // Never on by default. It costs several searches, and a mode that expensive
-      // is opted into rather than out of.
-      deepResearch: false,
+      // Off until the person turns it on; then it stays as they left it (D233).
+      // It costs several searches, so it is opted into, never defaulted on.
+      deepResearch: grants.deepResearch.allowed && identity.settings.deepResearch === true,
     },
   };
 }

@@ -146,6 +146,30 @@ export function recommend(input: PipelineInput): RecommendationResult {
     scored.push({ entity: e, s, value: valueOf(s.parts, objective), hits });
   }
 
+  /* 3b. A fit question that names a use case keeps to it (D230): once enough
+     candidates serve the use case, the rest are dropped, and the category cap
+     does not apply because the question chose the category. */
+  const goalQuestion = strategy === "fit" && constraints.some((c) => c.kind === "usecase");
+  if (goalQuestion) {
+    /* Listed for the use case (category or tags) beats only able to do it by
+       a recorded fact: with enough listed coding tools, a general assistant
+       that can also code is not a coding answer (founder 2026-11-04). */
+    const satisfiedGoals = (x: (typeof scored)[number]) =>
+      x.s.constraintResults.filter((r) => r.constraint.kind === "usecase" && r.status === "satisfied").map((r) => String(r.constraint.value));
+    const listedOnGoal = (x: (typeof scored)[number]) => satisfiedGoals(x).some((g) => (x.entity.listedGoals ?? []).includes(g));
+    const anyOnGoal = (x: (typeof scored)[number]) => satisfiedGoals(x).length > 0;
+    const onGoal = scored.filter(listedOnGoal).length >= TMR_V1.FIT_ON_GOAL_MIN ? listedOnGoal : anyOnGoal;
+    if (scored.filter(onGoal).length >= TMR_V1.FIT_ON_GOAL_MIN) {
+      for (let i = scored.length - 1; i >= 0; i--) {
+        if (!onGoal(scored[i])) {
+          reject(scored[i].entity.key, "off_goal");
+          scored.splice(i, 1);
+        }
+      }
+    }
+  }
+  const caps = goalQuestion ? { ...TMR_V1.CAPS[strategy], perCategory: 99 } : TMR_V1.CAPS[strategy];
+
   /* 4. MMR and caps. One slot is held back for exploration when the list is
      long enough, the strategy discovers (personalized), and the person is known. */
   const wantExploration = strategy === "personalized" && !user.cold && limit >= TMR_V1.EXPLORATION_MIN_LIST;
@@ -153,7 +177,7 @@ export function recommend(input: PipelineInput): RecommendationResult {
   const byKey = new Map(scored.map((x) => [x.entity.key, x]));
   const exploreKeys = new Set(scored.filter((x) => x.hits.some((h) => h.source === "exploration")).map((x) => x.entity.key));
   const mainItems: MmrItem[] = scored.filter((x) => !exploreKeys.has(x.entity.key) || !wantExploration).map((x) => ({ entity: x.entity, value: x.value }));
-  const { picked, dropped } = mmr(mainItems, index, TMR_V1.MMR_LAMBDA[strategy], mainLimit, TMR_V1.CAPS[strategy]);
+  const { picked, dropped } = mmr(mainItems, index, TMR_V1.MMR_LAMBDA[strategy], mainLimit, caps);
   for (const d of dropped) reject(d.key, d.reason, d.detail);
 
   let explorationPick: MmrItem | null = null;

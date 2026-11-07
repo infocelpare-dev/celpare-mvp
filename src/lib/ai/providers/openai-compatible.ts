@@ -27,6 +27,8 @@ export type EndpointConfig = {
   extraHeaders?: Record<string, string>;
   /* OpenRouter returns token usage in the final stream chunk when asked. */
   requestUsageInStream?: boolean;
+  /* Null to allow the model, or why not. Checked before every request (D229). */
+  checkModel?: (model: string) => string | null;
 };
 
 type Delta = {
@@ -104,6 +106,9 @@ export function createOpenAiCompatibleProvider(cfg: EndpointConfig) {
   }
 
   async function callOnce(req: AiRequest, stream: boolean) {
+    /* Before fetch, so a refused model never reaches the network. */
+    const refusal = cfg.checkModel?.(req.model);
+    if (refusal) throw new Error(refusal);
     const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
       method: "POST",
       headers: headers(),

@@ -293,6 +293,27 @@ export const RESEARCH_MAX_RESULTS = 12;
 export const RESEARCH_USES_FULL_CEILING = true;
 
 /*
+  Deep research v2 (phase DR, D231, founder 2026-11-04). On top of the planned
+  queries: targeted follow ups for what the catalogue is missing, the best pages
+  read in full, a wider catalogue pool run through the Compare engine.
+
+  Serper is the only paid step, so its total per research is a hard cap
+  (planned plus gap queries). Reading pages costs nothing but time, so pages are
+  capped by count, size and a timeout each.
+*/
+export const RESEARCH_MAX_SEARCHES = 8;
+export const RESEARCH_GAP_QUERIES = 4;
+export const RESEARCH_PAGES = 6;
+export const RESEARCH_PAGE_CHARS = 6000;
+export const RESEARCH_PAGE_TIMEOUT_MS = 6000;
+export const RESEARCH_PAGE_MAX_BYTES = 1_500_000;
+export const RESEARCH_CATALOGUE_LIMIT = 12;
+export const RESEARCH_COMPARE_MAX = 6;
+/* A build question asks the catalogue once per stack slot. */
+export const RESEARCH_BUILD_NEEDS = 6;
+export const RESEARCH_PER_NEED = 3;
+
+/*
   When the catalogue counts as having answered.
 
   Founder instruction on 2026-09-13: if tool search does not find the

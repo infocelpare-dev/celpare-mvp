@@ -23,6 +23,46 @@ const schema = z.object({
   saveHistory: z.coerce.boolean(),
 });
 
+/* Own ask_settings, read through my_profile_private (the column is not
+   readable from the table, D194). Unknown or failed is an empty object. */
+async function currentAskSettings(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase.rpc("my_profile_private");
+  if (error) {
+    console.error("[settings] read failed", error.code, error.message);
+    return {};
+  }
+  const s = (data as { ask_settings?: unknown } | null)?.ask_settings;
+  return s && typeof s === "object" && !Array.isArray(s) ? (s as Record<string, unknown>) : {};
+}
+
+/*
+  The Ask composer's switches, remembered as the person left them (founder
+  2026-11-04, D233): leave Ask and come back, open another chat or another
+  device, and web search and deep research are as they were. Catalogue search
+  is always on and is not stored. Saved on every toggle; a failed save only
+  means the switch is not remembered, never that the answer changes.
+*/
+const modesSchema = z.object({ webSearch: z.boolean(), deepResearch: z.boolean() });
+
+export async function rememberAskModes(modes: { webSearch: boolean; deepResearch: boolean }): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const parsed = modesSchema.safeParse(modes);
+  if (!parsed.success) return;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  const current = await currentAskSettings(supabase);
+  const { error } = await supabase
+    .from("profiles")
+    .update({ ask_settings: { ...current, ...parsed.data } })
+    .eq("id", user.id);
+  if (error) console.error("[settings] remembering ask modes failed", error.code, error.message);
+}
+
 export async function saveAskSettings(
   _prev: SettingsState,
   formData: FormData,
@@ -53,10 +93,12 @@ export async function saveAskSettings(
   }
 
   // The update grant on profiles lists only the columns a person may write, so
-  // this cannot reach plan or role even if the payload tried.
+  // this cannot reach plan or role even if the payload tried. Merged, so a
+  // key this form does not own (the composer's deepResearch, D233) survives.
+  const current = await currentAskSettings(supabase);
   const { error } = await supabase
     .from("profiles")
-    .update({ ask_settings: parsed.data })
+    .update({ ask_settings: { ...current, ...parsed.data } })
     .eq("id", user.id);
 
   if (error) {

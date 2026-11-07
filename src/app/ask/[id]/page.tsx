@@ -61,6 +61,12 @@ export default async function SavedChatPage({
         content: m.content,
         citations: m.citations,
         models: m.models,
+        /* Saved with the answer since 2026-11-04 (D231), so a reopened deep
+           research chat still shows its sources, its summary and its check. */
+        sources: m.sources,
+        research: m.research,
+        unconfirmed: m.unconfirmed,
+        steps: m.trail,
         question:
           m.role === "assistant" && conversation.messages[i - 1]?.role === "user"
             ? conversation.messages[i - 1].content

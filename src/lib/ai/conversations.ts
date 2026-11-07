@@ -43,13 +43,40 @@ export async function listConversations(limit = 100): Promise<ConversationSummar
 /* Models share messages.citations with tools, marked kind "model" (2026-10-07). */
 export type StoredModel = ModelCardData & { kind: "model" };
 
+/*
+  What an answer was built from, kept in messages.tool_calls (always [] before
+  2026-11-04): the web sources shown under it, and for deep research a summary
+  of the work and the figures the fact check could not confirm. Without it a
+  reopened deep research chat showed [n] markers with nothing behind them and
+  read as a catalogue only answer (founder, D231).
+*/
+export type ResearchMeta = { kind: "choose" | "build"; searches: number; pagesRead: number; compared: number };
+export type AnswerRecord = {
+  type: "answer";
+  sources: { title: string; url: string; snippet: string }[];
+  research: ResearchMeta | null;
+  unconfirmed: string[];
+  /* Deep research only: every activity line, shown under View research. */
+  trail?: string[];
+};
+
 export type StoredMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   citations: ToolCitation[];
   models: ModelCardData[];
+  sources: AnswerRecord["sources"];
+  research: ResearchMeta | null;
+  unconfirmed: string[];
+  trail: string[];
 };
+
+function recordOf(raw: unknown): AnswerRecord | null {
+  if (!Array.isArray(raw)) return null;
+  const r = raw.find((x) => x && typeof x === "object" && (x as { type?: unknown }).type === "answer") as AnswerRecord | undefined;
+  return r ?? null;
+}
 
 export async function loadConversation(
   id: string,
@@ -72,7 +99,7 @@ export async function loadConversation(
 
   const { data: messages, error } = await supabase
     .from("messages")
-    .select("id, role, content, citations")
+    .select("id, role, content, citations, tool_calls")
     .eq("conversation_id", id)
     .order("created_at", { ascending: true });
 
@@ -83,8 +110,14 @@ export async function loadConversation(
 
   return {
     title: conversation.title,
-    messages: (messages ?? []).map((m) => ({
+    messages: (messages ?? []).map((m) => {
+      const record = recordOf(m.tool_calls);
+      return {
       id: m.id,
+      sources: record?.sources ?? [],
+      research: record?.research ?? null,
+      unconfirmed: record?.unconfirmed ?? [],
+      trail: Array.isArray(record?.trail) ? record.trail.filter((x): x is string => typeof x === "string").slice(0, 60) : [],
       role: m.role,
       content: m.content,
       citations: ((m.citations ?? []) as (ToolCitation | StoredModel)[]).filter(
@@ -97,7 +130,8 @@ export async function loadConversation(
           void kind;
           return card;
         }),
-    })),
+      };
+    }),
   };
 }
 
@@ -201,6 +235,7 @@ export async function saveTurn(opts: {
   question: string;
   answer: string;
   citations: (ToolCitation | StoredModel)[];
+  record?: AnswerRecord | null;
   model: string;
   provider: string;
   inputTokens: number;
@@ -223,6 +258,7 @@ export async function saveTurn(opts: {
       role: "user",
       content: opts.question,
       citations: [],
+      tool_calls: [],
       model: null,
       provider: null,
       input_tokens: 0,
@@ -233,6 +269,7 @@ export async function saveTurn(opts: {
       role: "assistant",
       content: opts.answer,
       citations: opts.citations,
+      tool_calls: opts.record ? [opts.record] : [],
       model: opts.model,
       provider: opts.provider,
       input_tokens: opts.inputTokens,

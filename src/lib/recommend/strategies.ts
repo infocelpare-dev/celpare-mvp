@@ -147,7 +147,14 @@ export function scoreFor(strategy: Strategy, e: ToolModelEntity, ctx: PartsConte
     case "fit": {
       const results = ctx.constraints.map((c) => ({ constraint: c, ...evaluateConstraint(e, c, ctx.index) }));
       const scored = results.filter((r) => r.constraint.kind !== "exclude" && r.constraint.kind !== "entity_type");
-      const satisfied = scored.filter((r) => r.status === "satisfied").length;
+      /* A use case the listing claims counts whole; one only a fact supports
+         counts FIT_FACT_ONLY_USECASE (D230). */
+      const listedFor = (goal: string) => (e.listedGoals ?? []).includes(goal);
+      const satisfied = scored.reduce((sum, r) => {
+        if (r.status !== "satisfied") return sum;
+        if (r.constraint.kind === "usecase" && !listedFor(String(r.constraint.value))) return sum + TMR_V1.FIT_FACT_ONLY_USECASE;
+        return sum + 1;
+      }, 0);
       const constraints = scored.length ? satisfied / scored.length : 0;
       const query = queryRelevance(e, ctx);
       return {

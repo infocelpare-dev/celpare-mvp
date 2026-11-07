@@ -1,4 +1,5 @@
 import { createOpenAiCompatibleProvider } from "./openai-compatible";
+import { paidModelRefusal } from "./free-only";
 
 /*
   OpenRouter, the provider for Celpare v1 (D34, revised 2026-09-13).
@@ -18,6 +19,8 @@ export const openrouterProvider = createOpenAiCompatibleProvider({
     "X-Title": "Celpare",
   },
   requestUsageInStream: true,
+  /* Free models only until there is revenue (D229). */
+  checkModel: (model) => paidModelRefusal(model, process.env),
 });
 
 export function isOpenRouterConfigured() {

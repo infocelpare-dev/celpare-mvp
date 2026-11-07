@@ -114,9 +114,13 @@ export function parseConstraints(question: string, index: CatalogueIndex): Parse
   const entityTypes: EntityType[] = wantsModel && !wantsTool ? ["model"] : wantsTool && !wantsModel ? ["tool"] : ["tool", "model"];
   if (entityTypes.length === 1) constraints.push({ kind: "entity_type", value: entityTypes[0], hard: true, phrase: entityTypes[0] });
 
-  /* Use case: soft, relevance decides (a video tool is not "violating" coding). */
+  /* Use case: soft, relevance decides (a video tool is not "violating" coding).
+     "I can't code" or "no code" says the person does NOT want coding tools;
+     read as coding it filled a salon booking site's answer with Cursor and
+     Claude Code (founder test 2026-11-04). */
+  const goalText = q.replace(/\b(can'?t|cannot|don'?t|do not|no|without|never)\s+(know how to\s+|really\s+)?cod(e|ing)\b|\bno[- ]code\b|\bnon[- ]technical\b/g, " ");
   for (const [goal, re] of GOAL_PATTERNS) {
-    const m = re.exec(q);
+    const m = re.exec(goalText);
     if (m) constraints.push({ kind: "usecase", value: goal, hard: false, phrase: m[0] });
   }
 

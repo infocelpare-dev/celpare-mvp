@@ -14,9 +14,14 @@ import { filterInput } from "./input-filter";
 import { OutputFilter } from "./output-filter";
 import { buildChatPrompt, buildResearchPrompt, buildSystemPrompt, newCanary } from "./prompt";
 import { grantsFor } from "./modes";
-import { runDeepResearch } from "./research";
+import { runDeepResearch, type ResearchResult } from "./research";
+import { skillLevel } from "./deep-research/kinds";
+import { unverifiedFigures } from "./deep-research/verify";
+import { loadDeclared } from "@/lib/onboarding/server";
+import { createClient } from "@/lib/supabase/server";
 import { smallTalkReply } from "./small-talk";
 import { getProvider, models, providerName } from "./providers";
+import { paidModelRefusal } from "./providers/free-only";
 import { checkIdentityLimits, countIdentityMessage, countIdentityTokens } from "./ratelimit";
 import { loadToolCards, type ToolCard } from "./tool-search";
 import { getSponsoredCampaigns, serveSponsored, viewerKeyFrom } from "@/lib/sponsored/server";
@@ -29,7 +34,7 @@ import { recordAiCall } from "./observability";
 import { webSearch } from "./web-search";
 import { searchModels } from "./model-search";
 import { providerLogo } from "@/lib/models/provider-logo";
-import type { StoredModel } from "./conversations";
+import type { AnswerRecord, ResearchMeta, StoredModel } from "./conversations";
 import type {
   AiFeature,
   ChatMessage,
@@ -89,6 +94,12 @@ type Event =
   | { t: "sources"; v: WebResult[] }
   | { t: "text"; v: string }
   | { t: "error"; v: string }
+  /* Deep research only (D231): prices or percentages in the answer that no
+     source given to the model contains. Shown under the answer, never edited in. */
+  | { t: "verify"; v: string[] }
+  /* Deep research only: what the research did, shown with the answer and saved
+     with it, so the work is visible after the stages give way to the text. */
+  | { t: "research"; v: ResearchMeta }
   | { t: "done"; conversationId: string | null };
 
 /*
@@ -149,6 +160,16 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
     inputTokens: 0,
     outputTokens: 0,
   };
+
+  /* Free models only (D229). The provider refuses a paid slug anyway; checking
+     here turns that into a plain message instead of a failed stream. */
+  if (providerName() === "openrouter") {
+    const refusal = paidModelRefusal(main, process.env);
+    if (refusal) {
+      console.error("[ai] blocked", refusal);
+      return { ok: false, kind: "error", message: "Ask Celpare is not available right now." };
+    }
+  }
 
   // 4, before 3, because rejecting junk should not consume anyone's allowance.
   const cleaned = filterInput(input.message);
@@ -401,6 +422,14 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
       let citations: ToolCitation[] = [];
       /* Models the catalogue search matched, as cards, saved with the turn. */
       let modelCards: StoredModel[] = [];
+      /* The cards on screen. Deep research gives the model a wider pool, but
+         the saved turn keeps only what was shown (founder 2026-11-04: a
+         reopened research chat showed twelve catalogue cards). */
+      let shownTools: ToolCitation[] = [];
+      /* Sources, research summary and unconfirmed figures, saved with the turn. */
+      let answerRecord: AnswerRecord | null = null;
+      /* Deep research activity lines, saved as the trail behind View research. */
+      const trail: string[] = [];
       /* External search calls made for this answer, counted for the billing
          record: one for a plain web search, one per planned angle for deep
          research, none for an answer that came from the catalogue alone. */
@@ -486,22 +515,43 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
         }
 
         citations = tools;
+        shownTools = tools;
 
         let research: WebResult[] = web;
         let researchQuestions: string[] = [];
+        let deep: ResearchResult | null = null;
+        let skill = "unknown";
 
         if (doDeepResearch) {
-          const result = await runDeepResearch({
-            question: cleaned.text,
-            topic: classification.topic,
-            /* The research module reports each stage. They are useful in the
-               server log and too much detail on screen, so they are not
-               forwarded: the reader already knows it is searching. */
-            onStep: () => {},
+          /* Named stages for deep research (founder 2026-11-04, D231): it is
+             premium and takes a minute, so the wait should show the work.
+             Ordinary answers keep the single "Searching". */
+          const [result, declared] = await Promise.all([
+            runDeepResearch({
+              question: cleaned.text,
+              topic: classification.topic,
+              viewerId: identity.userId,
+              onStep: (label) => {
+                trail.push(label);
+                emit(controller, { t: "step", v: label });
+              },
+            }),
+            identity.userId
+              ? createClient().then((db) => loadDeclared(db, identity.userId)).catch(() => null)
+              : Promise.resolve(null),
+          ]);
+          deep = result;
+          emit(controller, {
+            t: "research",
+            v: { kind: result.kind, searches: result.searches, pagesRead: result.pagesRead, compared: result.compared },
           });
-          research = result.web;
+          research = result.web.map(({ title, url, snippet }) => ({ title, url, snippet }));
           researchQuestions = result.queries;
-          searchCalls += result.queries.length;
+          searchCalls += result.searches;
+          skill = skillLevel(cleaned.text, declared?.role ?? null);
+          /* The report draws on the wider pool; the cards stay the normal six. */
+          const have = new Set(tools.map((t) => t.slug));
+          citations = [...tools, ...result.tools.filter((t) => !have.has(t.slug))];
         }
 
         /*
@@ -566,10 +616,19 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
 
         /* The benchmark sources go in the same strip as web sources, so a
            number in the answer can be followed back to where it was published. */
-        const shown = [...evidenceSources(evidence), ...research];
+        /* Deep research cites sources as [n], so they are shown in that order
+           and the benchmark sources follow them. */
+        const shown = deep ? [...research, ...evidenceSources(evidence)] : [...evidenceSources(evidence), ...research];
         if (shown.length > 0) {
           emit(controller, { t: "sources", v: shown });
         }
+        answerRecord = {
+          type: "answer",
+          sources: shown.map(({ title, url, snippet }) => ({ title, url, snippet })),
+          research: deep ? { kind: deep.kind, searches: deep.searches, pagesRead: deep.pagesRead, compared: deep.compared } : null,
+          unconfirmed: [],
+          trail: deep ? trail : undefined,
+        };
 
         /*
           The prompt is built here, after retrieval, and which builder runs is
@@ -581,11 +640,15 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
           : doDeepResearch
             ? buildResearchPrompt({
                 canary,
+                kind: deep?.kind,
                 tools: citations,
                 models: catalogueModels,
                 evidence,
+                comparison: deep?.evidence ?? null,
+                slots: deep?.slots,
+                skill,
                 docs,
-                web: research,
+                web: deep?.web ?? [],
                 bio: identity.bio,
                 interests: identity.interests,
                 skills: identity.skills,
@@ -609,6 +672,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
 
         /* Retrieval is over and the model has the question. */
         emit(controller, { t: "step", v: "Thinking" });
+        if (deep) trail.push("Thinking and writing the report");
 
         // 7 and 8, together: every chunk goes through the filter before it is
         // ever enqueued, so nothing unfiltered reaches the browser.
@@ -649,6 +713,21 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
           the model: a link the model writes can be cut off by the length budget
           or mistyped, and this one is built from the rows that were retrieved.
         */
+        /* The fact check (D231): prices and percentages no source contains. */
+        if (deep && answer.trim().length > 0 && !filter.canaryTripped) {
+          emit(controller, { t: "step", v: "Checking facts" });
+          trail.push("Checked prices and figures against every source");
+          const unconfirmed = unverifiedFigures(answer, [
+            JSON.stringify(deep.evidence ?? {}),
+            JSON.stringify(citations),
+            JSON.stringify(catalogueModels),
+            JSON.stringify(evidence ?? {}),
+            ...deep.web.map((w) => `${w.snippet}\n${w.text ?? ""}`),
+          ]);
+          if (unconfirmed.length) emit(controller, { t: "verify", v: unconfirmed });
+          if (answerRecord) answerRecord.unconfirmed = unconfirmed;
+        }
+
         if (evidence?.compareHref && answer.trim().length > 0 && !filter.canaryTripped) {
           const link = `\n\n[See these models side by side in Compare](${evidence.compareHref})`;
           answer += link;
@@ -720,7 +799,8 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
               conversationId,
               question: cleaned.text,
               answer,
-              citations: [...citations, ...modelCards],
+              citations: [...shownTools, ...modelCards],
+              record: answerRecord && (answerRecord.sources.length > 0 || answerRecord.research) ? answerRecord : null,
               model: main,
               provider: providerName(),
               inputTokens,

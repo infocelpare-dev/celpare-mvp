@@ -90,6 +90,9 @@ export type ToolModelEntity = {
   /* Tokens of the name, for resolving "Cursor" in a sentence to this entity. */
   aliases: string[];
   attrs: Partial<Record<AttrSet, Attr[]>>;
+  /* Use cases the listing itself claims (category or tags), even where a fact
+     recorded the same use case first in attrs. Fit counts these whole (D230). */
+  listedGoals?: string[];
   /* compare_facts by attribute, so a recorded "no" is told apart from "not
      recorded". A constraint is violated only by a recorded no. */
   facts: Record<string, FactValue>;
@@ -217,6 +220,7 @@ export type RejectionCode =
   | "context_gate"
   | "failed_constraint"
   | "insufficient_relevance"
+  | "off_goal"
   | "diversity_limit"
   | "wrong_type"
   | "seed"
