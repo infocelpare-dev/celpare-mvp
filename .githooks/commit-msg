@@ -1,0 +1,5 @@
+#!/bin/sh
+# Celpare commit-msg gate. Conventional Commit header (release-please reads it
+# to pick the next version), no em dashes, no Co-Authored-By trailer.
+# See scripts/check-commit-msg.mjs and CONTRIBUTING.md.
+exec node scripts/check-commit-msg.mjs "$1"

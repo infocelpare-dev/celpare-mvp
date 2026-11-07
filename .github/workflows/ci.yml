@@ -132,6 +132,20 @@ jobs:
           fi
           git diff --name-status --no-renames "$BASE_SHA" HEAD -- supabase/migrations | npm run -s check:migrations
 
+      # Every commit in the PR and the PR title follow the commit format, so
+      # release-please can read them whether the PR is merged or squashed.
+      # The title reaches the script through env only, never inside the shell
+      # line, so a crafted title cannot run as a command.
+      - name: Check commit messages and PR title
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          git log --format='%an%x1f%B%x1e' "$BASE_SHA..$HEAD_SHA" | node scripts/check-commit-msg.mjs --stdin
+          node scripts/check-commit-msg.mjs --title
+
       # New dependencies with known vulnerabilities or a disallowed licence fail
       # the PR. Needs the dependency graph, on by default for public repos.
       - name: Review dependency changes
