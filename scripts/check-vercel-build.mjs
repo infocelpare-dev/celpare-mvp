@@ -16,19 +16,34 @@
      never from the build.
   3. Prints the static and function sizes, and fails a single function bundle
      over 200 MiB (Vercel's limit is 250 MB uncompressed).
+  4. Files a function borrows from the project (filePathMap in .vc-config.json:
+     .next chunks, node_modules). `vercel deploy --prebuilt` uploads them from
+     the working tree, so they ship as much as the output does. Each one must
+     exist, stay inside the project and never be an .env file. The compiled
+     .next ones get the secret scan of rule 1 (node_modules comes from the
+     lockfile and holds test fixtures that look like keys). Their sizes count
+     toward the function guard.
+
+  --list <file> writes every borrowed path, one per line, so CI can pack them
+  with the output: the deploy job then ships exactly the tested files.
 
   No dependencies, no child_process. Exit 1 on any failure. Prints names and
   paths only, never a value.
 */
-import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
-import { join, relative } from "node:path";
+import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from "node:fs";
+import { join, relative, basename, isAbsolute, normalize } from "node:path";
 
-const OUT = process.argv[2] ?? join(".vercel", "output");
+const args = process.argv.slice(2);
+const listAt = args.indexOf("--list");
+const LIST = listAt >= 0 ? args[listAt + 1] : null;
+if (listAt >= 0) args.splice(listAt, 2);
+const OUT = args[0] ?? join(".vercel", "output");
 const FUNCTION_LIMIT_MIB = 200;
 const TEXT = /\.(js|mjs|cjs|html|json|txt|map|rsc|css|body|meta)$/;
 
 const failures = [];
 const notes = [];
+const borrowedBy = new Map(); // function -> project paths from filePathMap
 
 function walk(dir) {
   const out = [];
@@ -79,15 +94,57 @@ for (const f of files) {
   }
   if (rel.endsWith(".vc-config.json")) {
     try {
-      const env = JSON.parse(text).environment ?? {};
+      const config = JSON.parse(text);
+      const env = config.environment ?? {};
       const bad = Object.keys(env).filter((k) => !k.startsWith("NEXT_PUBLIC_"));
       if (bad.length) failures.push(`${rel}: build time environment holds server keys: ${bad.join(", ")}.`);
+      const func = rel.replace(/[\\/]\.vc-config\.json$/, "").replace(/^functions[\\/]/, "");
+      borrowedBy.set(func, Object.values(config.filePathMap ?? {}));
     } catch {
       failures.push(`${rel}: could not read the function config.`);
     }
   }
 }
 notes.push(`secrets: ${scanned} text files checked`);
+
+// Rule 4: files the functions borrow from the project.
+const borrowed = new Map(); // path -> size
+for (const [func, paths] of borrowedBy) {
+  for (const p of paths) {
+    const clean = normalize(p);
+    if (isAbsolute(clean) || clean.startsWith("..")) {
+      failures.push(`${func}: borrows ${p}, outside the project.`);
+      continue;
+    }
+    if (/^\.env/.test(basename(clean))) {
+      failures.push(`${func}: borrows ${p}, an environment file.`);
+      continue;
+    }
+    if (borrowed.has(p)) continue;
+    if (!existsSync(p)) {
+      failures.push(`${func}: borrows ${p}, which does not exist here.`);
+      continue;
+    }
+    borrowed.set(p, statSync(p).size);
+  }
+}
+let borrowedScanned = 0;
+for (const [p, size] of borrowed) {
+  if (p.startsWith("node_modules/") || !TEXT.test(p) || size > 50 * 1024 * 1024) continue;
+  const text = readFileSync(p, "utf8");
+  borrowedScanned++;
+  for (const s of SHAPES) {
+    if (s.re.test(text)) failures.push(`${p} (borrowed): looks like a ${s.name}.`);
+  }
+  for (const m of text.matchAll(JWT_RE)) {
+    if (isServiceRoleJwt(m[1])) failures.push(`${p} (borrowed): a service_role JWT.`);
+  }
+}
+notes.push(`borrowed: ${borrowed.size} files from the project, ${borrowedScanned} compiled files checked for secrets`);
+if (LIST) {
+  writeFileSync(LIST, [...borrowed.keys()].sort().join("\n") + "\n");
+  notes.push(`borrowed list written to ${LIST}`);
+}
 
 const mib = (n) => (n / 1024 / 1024).toFixed(2);
 const staticBytes = files.filter((f) => relative(OUT, f.path).startsWith("static")).reduce((n, f) => n + f.size, 0);
@@ -102,6 +159,10 @@ if (existsSync(funcDir)) {
     const m = rel.match(/^(.*?\.func)[\\/]/);
     if (!m) continue;
     funcs.set(m[1], (funcs.get(m[1]) ?? 0) + f.size);
+  }
+  for (const [func, paths] of borrowedBy) {
+    const extra = [...new Set(paths)].reduce((n, p) => n + (borrowed.get(p) ?? 0), 0);
+    funcs.set(func, (funcs.get(func) ?? 0) + extra);
   }
   let biggest = ["", 0];
   for (const [name, bytes] of funcs) {
