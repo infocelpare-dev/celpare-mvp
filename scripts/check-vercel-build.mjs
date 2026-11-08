@@ -32,6 +32,7 @@
 */
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from "node:fs";
 import { join, relative, basename, isAbsolute, normalize } from "node:path";
+import { createHash } from "node:crypto";
 
 const args = process.argv.slice(2);
 const listAt = args.indexOf("--list");
@@ -63,7 +64,26 @@ const SHAPES = [
   { name: "Resend key", re: /\bre_[A-Za-z0-9]{8,}_[A-Za-z0-9]{16,}\b/ },
   { name: "private key block", re: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/ },
 ];
-const JWT_RE = /\beyJ[A-Za-z0-9_-]{8,}\.([A-Za-z0-9_-]{8,})\.[A-Za-z0-9_-]{8,}/g;
+/*
+  Invented values the app ships on purpose, by SHA-256 so the literal is not
+  repeated here. Only an exact match is skipped; any other string of the same
+  shape still fails.
+  - src/lib/ai/providers/mock.ts `__leak_key`: an sk-proj- shape never issued
+    by anyone, emitted by the mock AI provider so the output filter is tested
+    against the real pattern. The mock provider is imported statically, so the
+    string sits in a server chunk even though AI_PROVIDER=mock never runs live.
+*/
+const KNOWN_FAKES = new Set(["e9ceb72986c7e1143bf0c899abe168364eb9d84069a42bdab86a628327387b4f"]);
+const sha256 = (s) => createHash("sha256").update(s).digest("hex");
+function hasRealShape(shape, text) {
+  const re = new RegExp(shape.re.source, shape.re.flags.includes("g") ? shape.re.flags : shape.re.flags + "g");
+  for (const m of text.matchAll(re)) {
+    if (!KNOWN_FAKES.has(sha256(m[0]))) return true;
+  }
+  return false;
+}
+
+const JWT_RE =/\beyJ[A-Za-z0-9_-]{8,}\.([A-Za-z0-9_-]{8,})\.[A-Za-z0-9_-]{8,}/g;
 
 function isServiceRoleJwt(payloadPart) {
   try {
@@ -87,7 +107,7 @@ for (const f of files) {
   scanned++;
   const rel = relative(OUT, f.path);
   for (const s of SHAPES) {
-    if (s.re.test(text)) failures.push(`${rel}: looks like a ${s.name}.`);
+    if (hasRealShape(s, text)) failures.push(`${rel}: looks like a ${s.name}.`);
   }
   for (const m of text.matchAll(JWT_RE)) {
     if (isServiceRoleJwt(m[1])) failures.push(`${rel}: a service_role JWT.`);
@@ -134,7 +154,7 @@ for (const [p, size] of borrowed) {
   const text = readFileSync(p, "utf8");
   borrowedScanned++;
   for (const s of SHAPES) {
-    if (s.re.test(text)) failures.push(`${p} (borrowed): looks like a ${s.name}.`);
+    if (hasRealShape(s, text)) failures.push(`${p} (borrowed): looks like a ${s.name}.`);
   }
   for (const m of text.matchAll(JWT_RE)) {
     if (isServiceRoleJwt(m[1])) failures.push(`${p} (borrowed): a service_role JWT.`);
