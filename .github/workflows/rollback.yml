@@ -157,7 +157,7 @@ jobs:
         if: ${{ !inputs.dry_run }}
         env:
           URL: ${{ steps.target.outputs.url }}
-        run: npx vercel rollback "$URL" --yes --token "$VERCEL_TOKEN"
+        run: node scripts/vercel-traffic.mjs rollback "$URL"
 
       - name: Smoke test the restored deployment
         id: smoke
