@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { clientIpFrom } from "@/lib/edge/origin";
 import type { Plan } from "./types";
 
 /*
@@ -75,20 +76,12 @@ export function hashIp(ip: string): string {
 }
 
 /*
-  cf-connecting-ip first, because Cloudflare (D15) sets it and a client cannot. The
-  leftmost X-Forwarded-For entry is whatever the client wrote, and proxies append
-  to it rather than replacing it, so trusting it first would let a script choose a
-  new address, and a new allowance, on every request.
+  cf-connecting-ip only when src/proxy.ts proved the request came through
+  Cloudflare (D254); a script could otherwise choose a new address, and a new
+  allowance, on every request. Rules in lib/edge/origin.ts.
 */
 export async function clientIp(): Promise<string> {
-  const h = await headers();
-  const cf = h.get("cf-connecting-ip")?.trim();
-  if (cf) return cf;
-  const real = h.get("x-real-ip")?.trim();
-  if (real) return real;
-  const forwarded = h.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return "unknown";
+  return clientIpFrom(await headers()) ?? "unknown";
 }
 
 /* Per person Ask Celpare preferences. Every field optional: an account created

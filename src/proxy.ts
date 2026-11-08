@@ -10,6 +10,7 @@ import {
   sessionClaims,
 } from "@/lib/auth/second-factor";
 import { cleanRef, REF_COOKIE, REF_MAX_AGE } from "@/lib/onboarding/options";
+import { EDGE_HEADER, TRUSTED_HEADER, edgeVerdict } from "@/lib/edge/origin";
 
 /*
   Refreshes the auth session on every request and writes the rotated cookies
@@ -20,6 +21,24 @@ import { cleanRef, REF_COOKIE, REF_MAX_AGE } from "@/lib/onboarding/options";
   marketing pages still render.
 */
 export async function proxy(request: NextRequest) {
+  /*
+    Origin authentication first (D254). On Vercel production a request that did
+    not come through Cloudflare is refused before any work is done. Whatever a
+    client sent as the trusted mark is removed, and the mark is set only here,
+    so lib/edge/origin.ts clientIpFrom can believe cf-connecting-ip when it is
+    present. The secret itself is removed too, so no route can log it.
+  */
+  const verdict = edgeVerdict(request.headers.get(EDGE_HEADER));
+  if (verdict === "reject") {
+    return new NextResponse("Forbidden", {
+      status: 403,
+      headers: { "cache-control": "no-store", "content-type": "text/plain; charset=utf-8" },
+    });
+  }
+  request.headers.delete(EDGE_HEADER);
+  request.headers.delete(TRUSTED_HEADER);
+  request.headers.set(TRUSTED_HEADER, "1");
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return NextResponse.next({ request });
