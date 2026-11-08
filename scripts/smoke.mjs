@@ -45,6 +45,16 @@ const TIMEOUT_MS = 20_000;
 const WARMUP_ROUNDS = Math.max(0, Number(process.env.SMOKE_WARMUP_ROUNDS ?? 3) || 0);
 const WARMUP_GAP_S = 5;
 
+/* Testing a Vercel deployment by its own URL, before it takes celpare.com
+   traffic (D253): Vercel's Deployment Protection wants the automation bypass
+   header, and the app's origin check wants the edge header Cloudflare would
+   add (D254). Both values come from env, never from arguments, and are never
+   printed. Unset, nothing extra is sent, as for celpare.com itself. */
+const EXTRA_HEADERS = {
+  ...(process.env.SMOKE_BYPASS ? { "x-vercel-protection-bypass": process.env.SMOKE_BYPASS } : {}),
+  ...(process.env.SMOKE_EDGE ? { "x-celpare-edge": process.env.SMOKE_EDGE } : {}),
+};
+
 async function get(path) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -52,7 +62,7 @@ async function get(path) {
     return await fetch(base + path, {
       redirect: "manual",
       signal: ctrl.signal,
-      headers: { "User-Agent": "celpare-smoke/1", "Cache-Control": "no-cache" },
+      headers: { "User-Agent": "celpare-smoke/1", "Cache-Control": "no-cache", ...EXTRA_HEADERS },
     });
   } finally {
     clearTimeout(t);

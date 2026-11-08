@@ -1,38 +1,39 @@
 name: Rollback
 
-# Manual rollback of production (phase OPS, step 5).
+# Manual rollback of production on Vercel (phase OPS step 5, D247, D253).
 #
-# Actions, Rollback, Run workflow. Leave version_id empty to restore the most
-# recent healthy version before the live one, or paste a Worker version id
-# (wrangler versions list, or the Deployments page on GitHub).
+# Actions, Rollback, Run workflow. Leave deployment empty to restore the most
+# recent healthy deployment before the live one, or paste a deployment URL
+# (https://...vercel.app, from the Deployments page on GitHub or vercel ls).
 #
 #   founder approves (environment "production")
-#     -> validate: the id exists for worker celpare, is not the live one, and
-#        has a GitHub Deployment that reached success and never failed
-#     -> wrangler rollback <id>        (once, never in a loop)
-#     -> scripts/smoke.mjs <site> <that version's own commit>
-#     -> record a Deployment for it (success or failure), and mark the
-#        version rolled away from as failed, so neither an automatic nor a
-#        manual rollback picks it again until it is redeployed
+#     -> validate: the URL is a deployment of this project, is not the one
+#        celpare.com serves, and has a GitHub Deployment that reached success
+#        and never failed
+#     -> vercel rollback <url>        (once, never in a loop)
+#     -> scripts/smoke.mjs <site> <that deployment's own commit>
+#     -> record a Deployment for it (success or failure), and mark the one
+#        rolled away from as failed, so no rollback picks it again until it is
+#        redeployed
 #
-# A rollback restores CODE only. Worker secrets keep their current values, and
-# the database is untouched (migrations are additive by rule, so the older
-# code still runs on the newer schema). Cloudflare refuses a rollback across a
-# change of bindings (wrangler.jsonc); the step then fails with its message and
-# nothing changes. Routes are not part of a version, so celpare.com stays bound.
+# A rollback restores CODE only. Vercel environment variables keep their current
+# values, and the database is untouched (D246: migrations are additive, so the
+# older code still runs on the newer schema). On the Hobby plan Vercel may only
+# allow rolling back to the previous production deployment; if it refuses, the
+# step fails with Vercel's message and nothing changes.
 
 on:
   workflow_dispatch:
     inputs:
-      version_id:
-        description: "Worker version id to restore. Empty: the last healthy version before the live one."
+      deployment:
+        description: "Deployment URL to restore (https://...vercel.app). Empty: the last healthy one before the live one."
         required: false
         default: ""
       reason:
-        description: "Why you are rolling back. Goes into the Worker message and the deployment record."
+        description: "Why you are rolling back. Goes into the deployment record."
         required: true
       dry_run:
-        description: "Only check and report which version would be restored. Changes nothing."
+        description: "Only check and report which deployment would be restored. Changes nothing."
         type: boolean
         default: false
 
@@ -58,12 +59,13 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
-      WRANGLER_SEND_METRICS: "false"
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_TELEMETRY_DISABLED: "1"
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       # Inputs reach the shell through env only, never inside the script text,
       # so a crafted value cannot run as a command.
-      INPUT_ID: ${{ inputs.version_id }}
+      INPUT_URL: ${{ inputs.deployment }}
       REASON: ${{ inputs.reason }}
     steps:
       - name: Checkout repository
@@ -77,11 +79,11 @@ jobs:
           node-version: 24
           cache: npm
 
-      # wrangler is a pinned devDependency; nothing is built.
+      # vercel is a pinned devDependency; nothing is built.
       - name: Install dependencies
         run: npm ci
 
-      - name: Choose and check the version to restore
+      - name: Choose and check the deployment to restore
         id: target
         run: |
           set -euo pipefail
@@ -91,80 +93,73 @@ jobs:
           fi
           echo "reason=$reason" >> "$GITHUB_OUTPUT"
 
-          npx wrangler deployments status --json > "$RUNNER_TEMP/status.json"
-          npx wrangler versions list --json > "$RUNNER_TEMP/versions.json"
-          current=$(node -e '
-            const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-            const v = [...(s.versions ?? [])].sort((a, b) => b.percentage - a.percentage)[0];
-            if (!v) process.exit(1);
-            console.log(v.version_id);
-          ' "$RUNNER_TEMP/status.json")
-          echo "current=$current" >> "$GITHUB_OUTPUT"
+          # Vercel's own answer to "which deployment serves celpare.com".
+          # Every caller passes a path ending in "?".
+          api() { curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com${1}teamId=$VERCEL_ORG_ID"; }
+          host=${SITE_URL#https://}; host=${host%%/*}
+          current_id=$(api "/v4/aliases/$host?" | node -e 'const a=JSON.parse(require("fs").readFileSync(0));console.log(a.deploymentId||a.alias?.deploymentId||"")')
+          if [ -z "$current_id" ]; then echo "::error::Could not find the deployment behind $host."; exit 1; fi
+          echo "current=$current_id" >> "$GITHUB_OUTPUT"
 
-          # Healthy versions, newest record first: a deployment written by
-          # deploy.yml or this workflow (it carries worker_version_id) that
-          # reached success and never failed. "id sha" per line.
+          # Healthy deployments, newest record first: written by deploy.yml or
+          # this workflow (they carry vercel_url), reached success, never failed.
           : > "$RUNNER_TEMP/healthy.txt"
           for dep in $(gh api "repos/$GH_REPO/deployments?environment=production&per_page=100" \
-                         --jq '.[] | select(.payload.worker_version_id != null) | .id'); do
+                         --jq '.[] | select(.payload.vercel_url != null) | .id'); do
             state=$(gh api "repos/$GH_REPO/deployments/$dep/statuses?per_page=100" \
                       --jq 'if any(.[]; .state == "failure" or .state == "error") then "bad"
                             elif any(.[]; .state == "success") then "ok" else "none" end')
             if [ "$state" = "ok" ]; then
-              gh api "repos/$GH_REPO/deployments/$dep" --jq '"\(.payload.worker_version_id) \(.sha)"' >> "$RUNNER_TEMP/healthy.txt"
+              gh api "repos/$GH_REPO/deployments/$dep" --jq '"\(.payload.vercel_url) \(.sha) \(.payload.version)"' >> "$RUNNER_TEMP/healthy.txt"
             fi
           done
 
-          if [ -z "$INPUT_ID" ]; then
-            line=$(grep -v "^$current " "$RUNNER_TEMP/healthy.txt" | head -n1 || true)
+          # Resolve each candidate URL to its id, to compare with the live one.
+          id_of() { api "/v13/deployments/${1#https://}?" | node -e 'const d=JSON.parse(require("fs").readFileSync(0));if(d.projectId!==process.env.VERCEL_PROJECT_ID)process.exit(2);console.log(d.id)'; }
+
+          line=""
+          if [ -z "$INPUT_URL" ]; then
+            while read -r url sha ver; do
+              id=$(id_of "$url" || true)
+              if [ -n "$id" ] && [ "$id" != "$current_id" ]; then line="$url $sha $ver"; break; fi
+            done < "$RUNNER_TEMP/healthy.txt"
             if [ -z "$line" ]; then
-              echo "::error::No healthy version other than the live one is recorded. Nothing to roll back to."; exit 1
+              echo "::error::No healthy deployment other than the live one is recorded. Nothing to roll back to."; exit 1
             fi
           else
-            if ! printf '%s' "$INPUT_ID" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; then
-              echo "::error::version_id is not a Worker version id."; exit 1
+            if ! printf '%s' "$INPUT_URL" | grep -Eq '^https://[a-z0-9.-]+\.vercel\.app$'; then
+              echo "::error::deployment must be a https://...vercel.app deployment URL."; exit 1
             fi
-            if [ "$INPUT_ID" = "$current" ]; then
-              echo "::error::That version is already live."; exit 1
-            fi
-            line=$(grep "^$INPUT_ID " "$RUNNER_TEMP/healthy.txt" | head -n1 || true)
+            id=$(id_of "$INPUT_URL" || true)
+            if [ -z "$id" ]; then echo "::error::That URL is not a deployment of this project."; exit 1; fi
+            if [ "$id" = "$current_id" ]; then echo "::error::That deployment is already live."; exit 1; fi
+            line=$(grep "^$INPUT_URL " "$RUNNER_TEMP/healthy.txt" | head -n1 || true)
             if [ -z "$line" ]; then
-              echo "::error::That version has no successful deployment on record, so it is not a safe target."; exit 1
+              echo "::error::That deployment has no successful deploy on record, so it is not a safe target."; exit 1
             fi
           fi
-          id=${line%% *}
-          sha=${line##* }
-
-          node -e '
-            const list = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-            const v = list.find((x) => x.id === process.argv[2]);
-            if (!v) { console.error("not in wrangler versions list"); process.exit(1); }
-            console.log(`version=${(v.annotations?.["workers/message"] ?? "").replace(/^v/, "").split("+")[0] || "unknown"}`);
-          ' "$RUNNER_TEMP/versions.json" "$id" >> "$GITHUB_OUTPUT" || {
-            echo "::error::Version $id is no longer kept by Cloudflare (it keeps the last 100)."; exit 1; }
-
-          echo "id=$id" >> "$GITHUB_OUTPUT"
+          read -r url sha ver <<< "$line"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
           {
-            echo "Live now: $current"
-            echo "Restoring: $id (commit ${sha:0:7})"
+            echo "Live now: $current_id"
+            echo "Restoring: $url (v$ver, commit ${sha:0:7})"
             echo "Reason: $reason"
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Dry run, nothing changed
         if: inputs.dry_run
-        run: echo "Dry run. Checks passed; the version above would be restored. Nothing was changed." | tee -a "$GITHUB_STEP_SUMMARY"
+        run: echo "Dry run. Checks passed; the deployment above would be restored. Nothing was changed." | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Roll back
         id: rb
         if: ${{ !inputs.dry_run }}
         env:
-          ID: ${{ steps.target.outputs.id }}
-          MSG: ${{ steps.target.outputs.reason }}
-        run: |
-          npx wrangler rollback "$ID" --message "Manual rollback, $MSG" --yes
+          URL: ${{ steps.target.outputs.url }}
+        run: npx vercel rollback "$URL" --yes --token "$VERCEL_TOKEN"
 
-      - name: Smoke test the restored version
+      - name: Smoke test the restored deployment
         id: smoke
         if: steps.rb.outcome == 'success'
         continue-on-error: true
@@ -173,12 +168,11 @@ jobs:
         run: node scripts/smoke.mjs "$SITE_URL" "$SHA"
 
       - name: Record the rollback
-        # Only after a rollback that actually happened. If wrangler refused
-        # (for example across a binding change), nothing changed and nothing is
-        # recorded; the failed step above says why.
+        # Only after a rollback that actually happened. If Vercel refused,
+        # nothing changed and nothing is recorded; the failed step says why.
         if: always() && steps.rb.outcome == 'success'
         env:
-          ID: ${{ steps.target.outputs.id }}
+          URL: ${{ steps.target.outputs.url }}
           SHA: ${{ steps.target.outputs.sha }}
           VERSION: ${{ steps.target.outputs.version }}
           FROM: ${{ steps.target.outputs.current }}
@@ -192,24 +186,29 @@ jobs:
             required_contexts: [], transient_environment: false, production_environment: true,
             description: `Rollback to v${process.env.VERSION}`.slice(0, 140),
             payload: { version: process.env.VERSION, sha: process.env.SHA,
-                       worker_version_id: process.env.ID, url: process.env.SITE_URL,
+                       vercel_url: process.env.URL, url: process.env.SITE_URL,
                        timestamp: new Date().toISOString(), rollback: true,
                        rolled_back_from: process.env.FROM, reason: process.env.MSG } }))')
           dep=$(echo "$payload" | gh api "repos/$GH_REPO/deployments" --input - --jq .id)
           gh api "repos/$GH_REPO/deployments/$dep/statuses" -f state="$state" \
             -f environment_url="$SITE_URL" -f description="Manual rollback, smoke $SMOKE" >/dev/null
 
-          # The version rolled away from is no longer a rollback target.
+          # The deployment rolled away from is no longer a rollback target.
+          api() { curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com$1?teamId=$VERCEL_ORG_ID"; }
           for old in $(gh api "repos/$GH_REPO/deployments?environment=production&per_page=100" \
-                         --jq ".[] | select(.payload.worker_version_id == \"$FROM\") | .id"); do
-            gh api "repos/$GH_REPO/deployments/$old/statuses" -f state=failure \
-              -f description="Rolled back by hand" >/dev/null
+                         --jq '.[] | select(.payload.vercel_url != null) | "\(.id) \(.payload.vercel_url)"' | tr ' ' '|'); do
+            gid=${old%%|*}; ourl=${old#*|}
+            oid=$(api "/v13/deployments/${ourl#https://}" | node -e 'try{console.log(JSON.parse(require("fs").readFileSync(0)).id)}catch{}' || true)
+            if [ "$oid" = "$FROM" ]; then
+              gh api "repos/$GH_REPO/deployments/$gid/statuses" -f state=failure \
+                -f description="Rolled back by hand" >/dev/null
+            fi
           done
 
           if [ "$state" = "success" ]; then
-            echo "Restored v$VERSION ($ID), smoke test passed." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "Restored v$VERSION ($URL), smoke test passed." | tee -a "$GITHUB_STEP_SUMMARY"
           else
-            echo "::error::Rolled back to $ID, but its smoke test failed. Check the site now; no further automatic step is taken."
-            echo "Rolled back to $ID; smoke test FAILED." >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Rolled back to $URL, but its smoke test failed. Check the site now; no further automatic step is taken."
+            echo "Rolled back to $URL; smoke test FAILED." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi

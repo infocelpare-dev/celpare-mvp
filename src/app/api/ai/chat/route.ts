@@ -7,6 +7,9 @@ import { isEnabled } from "@/lib/platform/settings";
 /* Reads cookies and streams, so it must never be prerendered or cached. */
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+/* Deep match plans, searches and reads pages before it answers. 300 s is the
+   ceiling on Vercel Hobby with fluid compute (D253); measured on the spike. */
+export const maxDuration = 300;
 
 const schema = z.object({
   message: z.string().min(1).max(INPUT_MAX_CHARS * 2),
