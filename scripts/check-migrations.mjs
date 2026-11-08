@@ -89,11 +89,12 @@ for (const line of lines) {
     failures.push(`${path}: an applied migration was deleted. History stays; write a new migration instead.`);
     continue;
   }
+  /* A file already on the base branch has been applied (it is written,
+     applied by hand, then committed in the same change), so any change to
+     it fails, whatever its version. A file new in this diff shows as A. */
   if (status === "M") {
-    if (m && m[1] <= IMPORTED_THROUGH) {
-      failures.push(`${path}: an applied migration was changed. Write a new migration instead.`);
-      continue;
-    }
+    failures.push(`${path}: an applied migration was changed. Write a new migration instead.`);
+    continue;
   }
   if (!m) {
     failures.push(`${path}: name must be <14 digit version>_<snake_case>.sql.`);

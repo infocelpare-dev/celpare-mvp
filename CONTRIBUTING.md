@@ -42,6 +42,24 @@ The hooks live in `.githooks`. Turn them on once per clone:
 git config core.hooksPath .githooks
 ```
 
+## Database migrations
+
+`supabase/migrations` holds every migration applied to production, one file per
+row of `supabase_migrations.schema_migrations`, named `<version>_<name>.sql`
+with the version Supabase recorded.
+
+1. Write the new migration in the repo first.
+2. Apply it by hand (Supabase MCP `apply_migration`). If Supabase records a
+   different version than the file name, rename the file to match.
+3. Commit it in the same change as the code that needs it.
+
+No workflow ever runs a migration, and neither a deploy nor a rollback touches
+the database. A rollback swaps code only, so a migration must leave the
+previous app version working: add first, ship the code, remove later in a
+separate reviewed change. CI (`npm run check:migrations`) fails when an
+applied migration is changed or deleted, and when a new one drops, truncates,
+renames or retypes without a `-- celpare:destructive-approved <reason>` line.
+
 ## Releases
 
 `release-please` keeps one open Release PR with the next version and its
