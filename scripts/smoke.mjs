@@ -37,6 +37,13 @@ const HEADERS = [
 ];
 const WAITS_S = [0, 5, 10, 20, 30];
 const TIMEOUT_MS = 20_000;
+/* Warm up before judging (2026-11-07). A fresh Worker version starts cold on
+   every Cloudflare server, and on the free plan's 10 ms CPU limit the first
+   requests often fail with 1102 while warm ones pass; deploy #17 was rolled
+   back for exactly that. Each round requests every page once and ignores the
+   result. Real breakage still fails every attempt after it. 0 turns it off. */
+const WARMUP_ROUNDS = Math.max(0, Number(process.env.SMOKE_WARMUP_ROUNDS ?? 3) || 0);
+const WARMUP_GAP_S = 5;
 
 async function get(path) {
   const ctrl = new AbortController();
@@ -85,6 +92,22 @@ async function attempt() {
   }
 
   return { problems, health };
+}
+
+for (let round = 1; round <= WARMUP_ROUNDS; round++) {
+  const codes = [];
+  for (const path of ["/api/health?db=1", ...PAGES]) {
+    try {
+      const res = await get(path);
+      codes.push(res.status);
+      await res.arrayBuffer().catch(() => {});
+    } catch {
+      codes.push("x");
+    }
+  }
+  const bad = codes.filter((c) => c !== 200).length;
+  console.log(`smoke: warm up ${round} of ${WARMUP_ROUNDS}, ${bad} of ${codes.length} not 200 (not judged)`);
+  if (round < WARMUP_ROUNDS) await new Promise((r) => setTimeout(r, WARMUP_GAP_S * 1000));
 }
 
 for (let i = 0; i < WAITS_S.length; i++) {
