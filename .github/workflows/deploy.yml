@@ -210,7 +210,7 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_URL: ${{ steps.upload.outputs.url }}
-        run: npx vercel promote "$VERCEL_URL" --yes --token "$VERCEL_TOKEN"
+        run: node scripts/vercel-traffic.mjs promote "$VERCEL_URL"
 
       # Through Cloudflare, as visitors see it. Only once celpare.com points at
       # Vercel; before the cutover it still serves the Cloudflare Worker.
@@ -252,7 +252,7 @@ jobs:
             echo "::error::Smoke test failed and there is no earlier healthy deployment. The new one is still live. Investigate now."
             exit 1
           fi
-          npx vercel rollback "$LAST_URL" --yes --token "$VERCEL_TOKEN"
+          node scripts/vercel-traffic.mjs rollback "$LAST_URL"
           if node scripts/smoke.mjs "$SITE_URL" "$LAST_SHA"; then
             outcome="Smoke failed; rolled back to $LAST_URL, which passed its smoke test"
           else
