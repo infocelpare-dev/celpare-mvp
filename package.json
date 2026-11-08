@@ -41,7 +41,8 @@
     "test:ai": "node --import ./scripts/test-loader.mjs --test \"src/lib/ai/__tests__/*.test.ts\"",
     "test:onboarding": "node --import ./scripts/test-loader.mjs --test \"src/lib/onboarding/__tests__/*.test.ts\"",
     "test:billing": "node --import ./scripts/test-loader.mjs --test \"src/lib/billing/__tests__/*.test.ts\"",
-    "test:edge": "node --import ./scripts/test-loader.mjs --test \"src/lib/edge/__tests__/*.test.ts\""
+    "test:edge": "node --import ./scripts/test-loader.mjs --test \"src/lib/edge/__tests__/*.test.ts\"",
+    "check:vercel": "node scripts/check-vercel-build.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -78,6 +79,7 @@
     "remotion": "^4.0.532",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "vercel": "65.2.0",
     "wrangler": "4.157.0"
   },
   "overrides": {
