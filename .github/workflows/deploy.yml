@@ -110,7 +110,11 @@ jobs:
       - name: Download the build CI made
         if: steps.fresh.outputs.ship == 'true'
         run: |
-          gh run download "$CI_RUN_ID" --name "vercel-$SHA" --dir .vercel/output
+          # The tar holds .vercel/output plus the files its functions borrow
+          # (.next chunks, node_modules), exactly as CI tested them. Unpacked
+          # over the npm ci tree, the same lockfile makes those identical.
+          gh run download "$CI_RUN_ID" --name "vercel-$SHA" --dir "$RUNNER_TEMP/bundle"
+          tar -xf "$RUNNER_TEMP/bundle/vercel-bundle.tar"
           node -e 'require("fs").writeFileSync(".vercel/project.json", JSON.stringify({
             projectId: process.env.VERCEL_PROJECT_ID, orgId: process.env.VERCEL_ORG_ID,
             settings: { framework: "nextjs", nodeVersion: "24.x" } }))'
