@@ -209,10 +209,19 @@ jobs:
         run: npx vercel build --prod --yes
 
       # No secret shape anywhere in the output, no server key in a function's
-      # build time environment, function size under the guard line. See
-      # scripts/check-vercel-build.mjs.
+      # build time environment, function size under the guard line, and every
+      # file a function borrows from the project (filePathMap: .next chunks,
+      # node_modules) present, inside the project and never an .env file. See
+      # scripts/check-vercel-build.mjs. The borrowed list feeds the pack below.
       - name: Check the Vercel build
-        run: npm run -s check:vercel
+        run: npm run -s check:vercel -- --list vercel-files.txt
+
+      # vercel deploy --prebuilt uploads the output AND the borrowed files from
+      # the working tree, so both travel together. A tar keeps the function
+      # symlinks the output uses (upload-artifact would copy each target).
+      - name: Pack the Vercel build with its borrowed files
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: tar -cf vercel-bundle.tar .vercel/output -T vercel-files.txt
 
       # Kept only for main, where deploy.yml picks it up by run id and ships it
       # with vercel deploy --prebuilt, so the deployed code is the tested code
@@ -222,8 +231,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: vercel-${{ github.sha }}
-          path: .vercel/output
-          include-hidden-files: true
+          path: vercel-bundle.tar
           retention-days: 14
           if-no-files-found: error
 
