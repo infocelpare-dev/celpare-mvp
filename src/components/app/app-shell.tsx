@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { PanelLeft, Search } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { AppSidebar } from "./app-sidebar";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { UpgradeIcon } from "./upgrade-icon";
 import { SignInButton } from "@/components/auth/sign-in-prompt";
+import { useScrollMemory } from "./use-scroll-memory";
 
 /*
   The frame every page inside Celpare sits in: a thin bar across the top, the
@@ -53,6 +54,9 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  /* Back and forward return to where the main column was scrolled. */
+  const mainRef = useRef<HTMLElement>(null);
+  useScrollMemory(mainRef, !fullHeight);
 
   return (
     /* dvh rather than vh: on a phone the browser chrome collapses, and vh
@@ -141,6 +145,7 @@ export function AppShell({
           {asideStart}
 
           <main
+            ref={mainRef}
             className={
               fullHeight
                 ? "flex min-h-0 min-w-0 flex-1 flex-col"
