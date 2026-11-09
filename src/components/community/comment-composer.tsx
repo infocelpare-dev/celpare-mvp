@@ -4,6 +4,7 @@ import { useActionState, useEffect, useLayoutEffect, useRef, useState } from "re
 import { ArrowUp, Loader2 } from "lucide-react";
 import { createComment, type CommentState } from "@/app/actions/community";
 import { cn } from "@/lib/utils";
+import { useMentionPicker } from "./mention-picker";
 
 /*
   The one comment box, for a post, a reply and the video sheet (founder,
@@ -65,6 +66,8 @@ export function CommentComposer({
   const seen = useRef(0);
   const dark = tone === "dark";
   const id = `comment-${parentId ?? postId}`;
+  /* Type @ to mention someone; the database notifies them when it is saved. */
+  const mention = useMentionPicker({ setValue, fieldRef });
 
   /* A finished attempt: success clears and tells the parent, an error keeps
      the text and shows why. The adjustment happens in an effect because it
@@ -108,7 +111,7 @@ export function CommentComposer({
 
       <div
         className={cn(
-          "flex items-end gap-2 rounded-3xl border py-1.5 pe-1.5 ps-4 transition-colors duration-200 ease-out",
+          "relative flex items-end gap-2 rounded-3xl border py-1.5 pe-1.5 ps-4 transition-colors duration-200 ease-out",
           /* The site's focus ring, drawn on the whole pill while the field has
              focus, rather than on the bare textarea inside it. */
           "has-[textarea:focus]:outline-2 has-[textarea:focus]:outline-offset-2 has-[textarea:focus]:outline-[var(--ring)] has-[textarea:focus]:outline-solid",
@@ -117,6 +120,7 @@ export function CommentComposer({
             : "border-border bg-surface focus-within:border-foreground/40",
         )}
       >
+        {mention.list(tone)}
         <label htmlFor={id} className="sr-only">
           {label}
         </label>
@@ -126,8 +130,14 @@ export function CommentComposer({
           name="body"
           rows={1}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          {...mention.fieldProps}
+          onChange={(e) => {
+            setValue(e.target.value);
+            mention.sync();
+          }}
           onKeyDown={(e) => {
+            /* While the people list is open, its keys come first. */
+            if (mention.onKeyDown(e)) return;
             /* Enter sends, Shift+Enter is a new line. Not while an IME is
                composing a word, or Enter would send half of it. */
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {

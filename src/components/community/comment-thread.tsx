@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { personName, relativeTime } from "@/lib/format";
 import { deleteComment } from "@/app/actions/community";
 import { CommentComposer } from "./comment-composer";
+import { MentionText } from "./mention-text";
 import { hideComment } from "@/app/actions/comments";
 import type { Comment } from "@/lib/community/queries";
 import type { CommentNode } from "@/lib/community/thread";
@@ -263,7 +264,7 @@ function CommentRow({
                   dark && "text-white/90",
                 )}
               >
-                {node.body}
+                <MentionText text={node.body} className={dark ? "text-white" : undefined} />
               </p>
             )}
 

@@ -5,6 +5,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Link2 } from "lucide-react";
 import { hostOf } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { splitMentions } from "@/lib/community/mentions";
 
 /*
   The caption under a video: the body, its hashtags, and the link if there is one.
@@ -36,13 +37,33 @@ function renderBody(body: string): React.ReactNode[] {
   let last = 0;
   let key = 0;
 
+  /* Plain text between hashtags may hold @mentions, which link to the person
+     (lib/community/mentions.ts, the same rule the database notifies by). */
+  function pushText(text: string) {
+    for (const part of splitMentions(text)) {
+      if (part.kind === "text") {
+        out.push(part.text);
+      } else {
+        out.push(
+          <Link
+            key={`at-${key++}`}
+            href={`/u/${part.username}`}
+            className="font-medium text-white underline decoration-white/40 underline-offset-4 hover:decoration-white"
+          >
+            {part.text}
+          </Link>,
+        );
+      }
+    }
+  }
+
   for (const match of body.matchAll(HASHTAG)) {
     const index = match.index ?? 0;
     const lead = match[1] ?? "";
     const tag = match[2] ?? "";
     const start = index + lead.length;
 
-    if (start > last) out.push(body.slice(last, start));
+    if (start > last) pushText(body.slice(last, start));
 
     out.push(
       <Link
@@ -56,7 +77,7 @@ function renderBody(body: string): React.ReactNode[] {
     last = start + tag.length;
   }
 
-  if (last < body.length) out.push(body.slice(last));
+  if (last < body.length) pushText(body.slice(last));
   return out;
 }
 
