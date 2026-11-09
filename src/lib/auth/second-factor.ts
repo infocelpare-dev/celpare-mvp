@@ -31,31 +31,68 @@ export const LOGIN_PENDING_TTL_S = 15 * 60;
 export const SECOND_FACTOR_TTL_S = 60 * 60 * 24 * 30;
 
 const encoder = new TextEncoder();
-let keyPromise: Promise<CryptoKey> | null = null;
 
-/* Derived from the service role key with a label, so no new env var is needed
-   and the value is useless for anything but this. No key, no enforcement: local
-   development without Supabase secrets keeps working. */
-function secret(): string | null {
+/*
+  THE SIGNING KEY, AND WHY IT MOVED (founder, 2026-11-09: "sometimes it logs
+  you out while you are using it").
+
+  v1 derived the key from SUPABASE_SERVICE_ROLE_KEY. That value was replaced
+  three times during the move to Vercel (2026-11-08), and every replacement
+  made every cp_2fa cookie unverifiable, so the proxy signed out every email
+  login at once. Rotating a database key must not end everybody's session.
+
+  v2 derives it from CELPARE_SECRET, an app secret that exists for signing and
+  has no other reason to change. Cookies signed with v1 are still ACCEPTED, so
+  the switch itself logs nobody out; everything new is signed with v2. Drop v1
+  once every cp_2fa cookie has been reissued (30 days after this shipped).
+
+  Whether the second factor is enforced at all is unchanged: only where the
+  service role key is set, so local development without Supabase secrets keeps
+  working.
+*/
+function signingSecret(): string | null {
+  const app = process.env.CELPARE_SECRET?.trim();
+  if (app) return `celpare-second-factor-v2:${app}`;
+  return legacySecret();
+}
+
+function legacySecret(): string | null {
   const k = process.env.SUPABASE_SERVICE_ROLE_KEY;
   return k ? `celpare-second-factor-v1:${k}` : null;
 }
 
 export function secondFactorEnabled(): boolean {
-  return secret() !== null;
+  return legacySecret() !== null;
+}
+
+const keyCache = new Map<string, Promise<CryptoKey>>();
+
+function importKey(s: string): Promise<CryptoKey> {
+  let k = keyCache.get(s);
+  if (!k) {
+    k = crypto.subtle.importKey("raw", encoder.encode(s), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    keyCache.set(s, k);
+  }
+  return k;
 }
 
 function key(): Promise<CryptoKey> {
-  const s = secret();
+  const s = signingSecret();
   if (!s) throw new Error("Second factor secret is not configured.");
-  keyPromise ??= crypto.subtle.importKey(
-    "raw",
-    encoder.encode(s),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  return keyPromise;
+  return importKey(s);
+}
+
+/* Every key a cookie may have been signed with: the current one first. */
+function verifyKeys(): Promise<CryptoKey>[] {
+  const seen = new Set<string>();
+  const out: Promise<CryptoKey>[] = [];
+  for (const s of [signingSecret(), legacySecret()]) {
+    if (s && !seen.has(s)) {
+      seen.add(s);
+      out.push(importKey(s));
+    }
+  }
+  return out;
 }
 
 function toB64url(bytes: Uint8Array): string {
@@ -73,6 +110,17 @@ function fromB64url(s: string): string {
 async function sign(payload: string): Promise<string> {
   const sig = await crypto.subtle.sign("HMAC", await key(), encoder.encode(payload));
   return toB64url(new Uint8Array(sig));
+}
+
+/* True when `sig` matches the payload under the current key or the previous
+   one. Every key is tried, so the time taken does not say which one matched. */
+async function verify(sig: string, payload: string): Promise<boolean> {
+  let ok = false;
+  for (const k of verifyKeys()) {
+    const expected = toB64url(new Uint8Array(await crypto.subtle.sign("HMAC", await k, encoder.encode(payload))));
+    if (same(sig, expected)) ok = true;
+  }
+  return ok;
 }
 
 /* Constant time over the whole string, so a near miss takes as long as a miss. */
@@ -102,7 +150,7 @@ export async function readPendingLogin(
   const [e, exp, sig] = value.split(".");
   if (!e || !exp || !sig || !/^\d+$/.test(exp)) return null;
   if (Number(exp) < nowS(now)) return null;
-  if (!same(sig, await sign(`pending|${e}|${exp}`))) return null;
+  if (!(await verify(sig, `pending|${e}|${exp}`))) return null;
   try {
     return fromB64url(e);
   } catch {
@@ -129,7 +177,7 @@ export async function hasSecondFactor(
   const [exp, sig] = value.split(".");
   if (!exp || !sig || !/^\d+$/.test(exp)) return false;
   if (Number(exp) < nowS(now)) return false;
-  return same(sig, await sign(`2fa|${userId}|${sessionId}|${exp}`));
+  return verify(sig, `2fa|${userId}|${sessionId}|${exp}`);
 }
 
 /*
@@ -156,7 +204,7 @@ export async function hasRecovery(
   const [exp, sig] = value.split(".");
   if (!exp || !sig || !/^\d+$/.test(exp)) return false;
   if (Number(exp) < nowS(now)) return false;
-  return same(sig, await sign(`recovery|${userId}|${sessionId}|${exp}`));
+  return verify(sig, `recovery|${userId}|${sessionId}|${exp}`);
 }
 
 export type SessionClaims = { userId: string; sessionId: string; methods: string[] };

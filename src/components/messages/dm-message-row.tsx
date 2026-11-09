@@ -8,6 +8,7 @@ import { hostOf, relativeTime } from "@/lib/format";
 import { deleteMessage } from "@/app/actions/messages";
 import { cn } from "@/lib/utils";
 import type { DmMessage, DmPerson } from "@/lib/messages/queries";
+import { MentionText } from "@/components/community/mention-text";
 
 /*
   One message in a thread.
@@ -287,7 +288,9 @@ function Body({ message, mine }: { message: DmMessage; mine: boolean }) {
       <div>
         {message.body ? (
           <div className="mb-1.5">
-            <ClampedText>{message.body}</ClampedText>
+            <ClampedText>
+              <MentionText text={message.body} className="text-current" />
+            </ClampedText>
           </div>
         ) : null}
         <a

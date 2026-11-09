@@ -31,6 +31,7 @@ import {
   voiceExtension,
 } from "@/lib/messages/shared";
 import { formatBytes } from "@/lib/format";
+import { useMentionPicker } from "@/components/community/mention-picker";
 
 /*
   The composer, redesigned from the founder's reference (4BA): a paperclip in a
@@ -83,6 +84,15 @@ export function DmComposer({ threadId }: { threadId: string }) {
   const [hasText, setHasText] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  /* Type @ to mention someone. The field is uncontrolled (the keyed remount
+     clears it after a send), so the picker writes the DOM value directly. */
+  const mention = useMentionPicker({
+    fieldRef: bodyRef,
+    setValue: (next) => {
+      if (bodyRef.current) bodyRef.current.value = next;
+      setHasText(next.trim().length > 0);
+    },
+  });
   const formRef = useRef<HTMLFormElement>(null);
 
   /*
@@ -344,7 +354,8 @@ export function DmComposer({ threadId }: { threadId: string }) {
         </button>
 
         {/* The pill: the text, and the microphone or send at its end. */}
-        <div className="flex min-h-12 min-w-0 flex-1 items-end gap-1 rounded-[24px] border border-border bg-elevated py-1.5 pe-1.5 ps-4 transition-colors duration-200 focus-within:border-foreground">
+        <div className="relative flex min-h-12 min-w-0 flex-1 items-end gap-1 rounded-[24px] border border-border bg-elevated py-1.5 pe-1.5 ps-4 transition-colors duration-200 focus-within:border-foreground">
+          {mention.list()}
           <label htmlFor="dm-body" className="sr-only">
             Message
           </label>
@@ -354,8 +365,14 @@ export function DmComposer({ threadId }: { threadId: string }) {
             name="body"
             rows={1}
             defaultValue={state.body}
-            onInput={(e) => setHasText(e.currentTarget.value.trim().length > 0)}
+            {...mention.fieldProps}
+            onInput={(e) => {
+              setHasText(e.currentTarget.value.trim().length > 0);
+              mention.sync();
+            }}
             onKeyDown={(e) => {
+              /* While the people list is open, its keys come first. */
+              if (mention.onKeyDown(e)) return;
               /* Enter sends and Shift and Enter is a new line, as on WhatsApp
                  Web. A held key repeats and Enter confirming an IME composition
                  is not a send, so neither fires one. */

@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { createComment, type CommentState } from "@/app/actions/community";
 import { loadComments, type ThreadResult } from "@/app/actions/comments";
 import { RankedComments } from "../ranked-comments";
+import { CommentComposer } from "../comment-composer";
 import { SignInButton } from "@/components/auth/sign-in-prompt";
 
 /*
@@ -191,6 +191,7 @@ export function VideoComments({
   );
 }
 
+/* The shared comment box (comment-composer.tsx), on the dark sheet. */
 function TopLevelComposer({
   postId,
   onPosted,
@@ -198,60 +199,13 @@ function TopLevelComposer({
   postId: string;
   onPosted: () => void;
 }) {
-  const [state, action, pending] = useActionState<CommentState, FormData>(createComment, {
-    status: "idle",
-    message: "",
-    body: "",
-    attempt: 0,
-  });
-  const seen = useRef(0);
-
-  useEffect(() => {
-    if (state.attempt > seen.current) {
-      seen.current = state.attempt;
-      if (state.status === "idle") onPosted();
-    }
-  }, [state, onPosted]);
-
   return (
-    <form action={action} key={state.attempt} className="flex items-end gap-2">
-      <input type="hidden" name="postId" value={postId} />
-      {/* No parentId: this is the top of the thread. */}
-
-      <div aria-hidden className="hidden">
-        <label htmlFor="video-comment-website">Website</label>
-        <input id="video-comment-website" name="website" type="text" tabIndex={-1} autoComplete="off" />
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <label htmlFor="video-comment-body" className="sr-only">
-          Add a comment
-        </label>
-        <textarea
-          id="video-comment-body"
-          name="body"
-          rows={1}
-          required
-          maxLength={1000}
-          defaultValue={state.body}
-          placeholder="Add a comment"
-          /* 16px below sm, per D91. */
-          className="w-full resize-none rounded-2xl border border-white/25 bg-white/10 px-3.5 py-2.5 text-[16px] text-white placeholder:text-white/50 sm:text-[14px]"
-        />
-        {state.status === "error" && state.message ? (
-          <p role="alert" className="mt-1 text-[13px] text-white">
-            {state.message}
-          </p>
-        ) : null}
-      </div>
-
-      <button
-        type="submit"
-        disabled={pending}
-        className="inline-flex h-11 shrink-0 cursor-pointer items-center rounded-full bg-white px-4 text-[14px] font-medium text-black disabled:opacity-50"
-      >
-        {pending ? "Posting" : "Post"}
-      </button>
-    </form>
+    <CommentComposer
+      postId={postId}
+      tone="dark"
+      placeholder="Add a comment"
+      label="Comment on this video"
+      onPosted={onPosted}
+    />
   );
 }

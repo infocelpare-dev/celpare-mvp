@@ -5,6 +5,7 @@ import { CircleAlert, ImagePlus, Video } from "lucide-react";
 import { MAX_POST_IMAGES } from "@/lib/community/media";
 import { cn } from "@/lib/utils";
 import { MediaGrid, usePostMedia } from "./post-media-upload";
+import { useMentionPicker } from "./mention-picker";
 
 /*
   The writing area of a post: text, previews and the attach buttons in one
@@ -32,6 +33,9 @@ export function PostComposer({
 }) {
   const [body, setBody] = useState(defaultBody);
   const [dragging, setDragging] = useState(false);
+  /* Type @ to mention someone; tg_post_intake records it and notifies them. */
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
+  const mention = useMentionPicker({ setValue: setBody, fieldRef });
   /* dragenter and dragleave fire for every child crossed, so a counter, not a
      boolean, decides when the pointer has really left the card. */
   const depth = useRef(0);
@@ -85,10 +89,18 @@ export function PostComposer({
           Your post
         </label>
         <textarea
+          ref={fieldRef}
           id="post-body"
           name="body"
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          {...mention.fieldProps}
+          onChange={(e) => {
+            setBody(e.target.value);
+            mention.sync();
+          }}
+          onKeyDown={(e) => {
+            mention.onKeyDown(e);
+          }}
           onPaste={(e) => {
             /* A pasted screenshot attaches; pasted text is left alone. */
             const files = Array.from(e.clipboardData.files);
@@ -143,6 +155,8 @@ export function PostComposer({
             {over ? `${used - limit} over` : `${used.toLocaleString()} / ${limit.toLocaleString()}`}
           </span>
         </div>
+
+        {mention.list("light", "below")}
 
         {dragging ? (
           <div className="pointer-events-none absolute inset-0 grid place-items-center rounded-2xl border-2 border-dashed border-foreground bg-elevated/90">

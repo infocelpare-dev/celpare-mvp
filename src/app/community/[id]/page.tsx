@@ -29,6 +29,7 @@ import {
   PostMediaGallery,
 } from "@/components/community/post-media";
 import { CommentForm } from "@/components/community/comment-form";
+import { MentionText } from "@/components/community/mention-text";
 import { RankedComments } from "@/components/community/ranked-comments";
 import { CommentDebug } from "@/components/community/comment-debug";
 import { loadCommentPage } from "@/lib/comments/intelligence/server/engine";
@@ -184,7 +185,7 @@ export default async function PostPage({ params, searchParams }: PageProps<"/com
           </div>
 
           <p className="mt-4 whitespace-pre-wrap break-words text-[16px] leading-relaxed">
-            {post.body}
+            <MentionText text={post.body} />
           </p>
 
           <PostMediaGallery media={post.media} postId={post.id} className="mt-4" />

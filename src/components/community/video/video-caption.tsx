@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link2 } from "lucide-react";
 import { hostOf } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { splitMentions } from "@/lib/community/mentions";
 
 /*
   The caption under a video: the body, its hashtags, and the link if there is one.
@@ -35,13 +37,33 @@ function renderBody(body: string): React.ReactNode[] {
   let last = 0;
   let key = 0;
 
+  /* Plain text between hashtags may hold @mentions, which link to the person
+     (lib/community/mentions.ts, the same rule the database notifies by). */
+  function pushText(text: string) {
+    for (const part of splitMentions(text)) {
+      if (part.kind === "text") {
+        out.push(part.text);
+      } else {
+        out.push(
+          <Link
+            key={`at-${key++}`}
+            href={`/u/${part.username}`}
+            className="font-medium text-white underline decoration-white/40 underline-offset-4 hover:decoration-white"
+          >
+            {part.text}
+          </Link>,
+        );
+      }
+    }
+  }
+
   for (const match of body.matchAll(HASHTAG)) {
     const index = match.index ?? 0;
     const lead = match[1] ?? "";
     const tag = match[2] ?? "";
     const start = index + lead.length;
 
-    if (start > last) out.push(body.slice(last, start));
+    if (start > last) pushText(body.slice(last, start));
 
     out.push(
       <Link
@@ -55,39 +77,64 @@ function renderBody(body: string): React.ReactNode[] {
     last = start + tag.length;
   }
 
-  if (last < body.length) out.push(body.slice(last));
+  if (last < body.length) pushText(body.slice(last));
   return out;
 }
 
 export function VideoCaption({ body, linkUrl }: { body: string; linkUrl: string | null }) {
   const [expanded, setExpanded] = useState(false);
+  const [clamped, setClamped] = useState(false);
+  const textRef = useRef<HTMLParagraphElement>(null);
 
-  /* Whether a `more` control is worth drawing at all. Measuring the rendered
-     height would be exact and would also mean a layout read on every slide; this
-     is the cheap approximation, and being slightly generous only means the
-     button appears over text that did happen to fit. */
-  const long = body.length > 120 || body.split("\n").length > 2;
+  /*
+    Whether the two line clamp is actually hiding anything, MEASURED (founder,
+    2026-11-09: "see more isn't working at reels"). The old guess (over 120
+    characters or 2 lines) drew no button for a shorter caption that a phone
+    still cut to two lines, and tapping the cut text did nothing, which a replay
+    recorded. Re-measured when the width changes (rotation, resize).
+  */
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (!el || expanded) return;
+    const measure = () => setClamped(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [body, expanded]);
+
+  const canToggle = clamped || expanded;
 
   return (
     <div className="text-[14px] leading-relaxed text-white">
       <p
-        className={
+        ref={textRef}
+        /* Tapping the caption itself opens and closes it, which is what people
+           try first. A hashtag inside it still goes to its search. */
+        onClick={(e) => {
+          if (!canToggle || (e.target as HTMLElement).closest("a")) return;
+          setExpanded((v) => !v);
+        }}
+        className={cn(
+          "whitespace-pre-wrap break-words",
+          canToggle && "cursor-pointer",
           expanded
-            ? "whitespace-pre-wrap break-words"
-            : "line-clamp-2 whitespace-pre-wrap break-words"
-        }
+            ? /* Open, but never over the whole video: it scrolls past this. */
+              "max-h-[45dvh] overflow-y-auto overscroll-contain"
+            : "line-clamp-2",
+        )}
       >
         {renderBody(body)}
       </p>
 
-      {long ? (
+      {canToggle ? (
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          className="mt-1 inline-flex min-h-11 cursor-pointer items-center text-[13px] font-medium text-white/80 transition-colors duration-200 ease-out hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className="mt-0.5 flex min-h-11 cursor-pointer items-center text-[13px] font-semibold text-white/85 transition-colors duration-200 ease-out hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
         >
-          {expanded ? "Show less" : "Show more"}
+          {expanded ? "See less" : "See more"}
         </button>
       ) : null}
 

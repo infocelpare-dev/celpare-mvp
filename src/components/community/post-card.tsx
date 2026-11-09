@@ -10,6 +10,7 @@ import { PostActions } from "./post-actions";
 import { PostAttachment, PostKindBadge, PostMediaGallery } from "./post-media";
 import { FeedbackMenu } from "./feed-intelligence";
 import { explainReason } from "@/lib/community/intelligence/explain";
+import { MentionText } from "./mention-text";
 
 /* feed_v3 social proof: why a post from somebody you do not follow is here.
    Counts only, never who, and only when it is the reason the ranker used. */
@@ -152,7 +153,7 @@ export function PostCard({
             href={href}
             className="mt-1.5 block whitespace-pre-wrap break-words text-[15px] leading-relaxed text-foreground"
           >
-            {post.body}
+            <MentionText text={post.body} links={false} />
           </Link>
 
           <PostMediaGallery media={post.media} postId={post.id} className="mt-3" />
