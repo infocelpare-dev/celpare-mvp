@@ -1,7 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import { Container, Section } from "@/components/ui/container";
 import { ButtonLink } from "@/components/ui/button";
-import { WaitlistForm } from "./waitlist-form";
 
 /*
   The closing call to action, on the page canvas like every other section.
@@ -29,16 +28,8 @@ export function CTA() {
               Request a demo
             </ButtonLink>
           </div>
-          {/* The pre launch waitlist (D198): a section of the page, not its purpose (D17). */}
-          <div id="waitlist" className="mx-auto mt-12 max-w-[520px] scroll-mt-24 border-t border-border pt-10">
-            <h3 className="font-display text-[20px] font-medium tracking-tight text-foreground">
-              Celpare is coming. Join the waitlist.
-            </h3>
-            <p className="mt-2 text-[15px] text-muted">One email when we launch. Nothing else.</p>
-            <div className="mt-5">
-              <WaitlistForm />
-            </div>
-          </div>
+          {/* The pre launch waitlist (D198) was removed 2026-11-09 by the founder:
+              Celpare is live, so there is nothing to wait for. */}
         </div>
       </Container>
     </Section>
