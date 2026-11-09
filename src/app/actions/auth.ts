@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import { afterLogin, markPlansDue } from "@/lib/auth/after-login";
+import { afterSignOutPath } from "@/lib/auth/after-sign-out";
 import { PLANS_COOKIE } from "@/lib/pricing/due";
 import { withinBurst } from "@/lib/security/burst";
 import { newPassword } from "@/lib/auth/password-rules";
@@ -592,5 +593,13 @@ export async function signOut() {
     await supabase.auth.signOut();
   }
   (await cookies()).delete(PLANS_COOKIE);
-  redirect("/");
+
+  /* Stay inside Celpare (founder, 2026-11-09): back to the page you were on as
+     a guest, or the feed when that page was your account. Never the landing
+     page. lib/auth/after-sign-out.ts decides, from the Referer. */
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const origin = host ? `${proto}://${host}` : "";
+  redirect(afterSignOutPath(h.get("referer"), origin));
 }
