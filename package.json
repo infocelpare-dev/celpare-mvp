@@ -76,7 +76,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.5",
-    "remotion": "^4.0.532",
+    "remotion": "^4.0.541",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vercel": "65.2.0",
