@@ -79,6 +79,14 @@ export function SearchInput({
   const abortRef = useRef<AbortController | null>(null);
   const seqRef = useRef(0);
   const listId = useId();
+  /*
+    Suggestions are for somebody typing, not for a page that loaded. A results
+    page renders with its query already in the field; fetching suggestions for
+    that and opening the list unasked put a dropdown over the results on every
+    search, and on a phone it covered the page. So nothing is fetched until the
+    person edits the field, and the list only opens while the field has focus.
+  */
+  const typedRef = useRef(false);
 
   /*
     THE FIELD FOLLOWS THE URL, AND THIS IS NOT AN EFFECT.
@@ -98,6 +106,7 @@ export function SearchInput({
   }
 
   useEffect(() => {
+    if (!typedRef.current) return;
     const q = value.trim();
     /*
       Too short to suggest anything. Nothing is CLEARED here on purpose: a
@@ -124,7 +133,7 @@ export function SearchInput({
           const next = data.suggestions ?? [];
           setSuggestions(next);
           setActive(-1);
-          setOpen(next.length > 0);
+          setOpen(next.length > 0 && document.activeElement === inputRef.current);
         })
         .catch(() => {
           /* An aborted request is the normal case here, not a failure. A real
@@ -161,8 +170,14 @@ export function SearchInput({
     formRef.current?.requestSubmit();
   }
 
-  function choose(suggestion: Suggestion) {
+  /* A search that ran is no longer being typed; the next page starts quiet. */
+  function finish() {
+    typedRef.current = false;
     close();
+  }
+
+  function choose(suggestion: Suggestion) {
+    finish();
     /* A suggestion either runs a search or opens a thing. Both are real URLs, so
        both are a navigation rather than a state change. */
     router.push(suggestion.href);
@@ -207,7 +222,7 @@ export function SearchInput({
 
   return (
     <div className="relative flex-1">
-      <form ref={formRef} action="/search" method="get" role="search" onSubmit={close}>
+      <form ref={formRef} action="/search" method="get" role="search" onSubmit={finish}>
         {/*
           A visible label would be a second heading on a page whose whole subject
           is this field, so the name is sr-only text rather than an aria-label:
@@ -231,10 +246,13 @@ export function SearchInput({
           name="q"
           type="search"
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            typedRef.current = true;
+            setValue(e.target.value);
+          }}
           onKeyDown={onKeyDown}
           onFocus={() => {
-            if (suggestions.length > 0) setOpen(true);
+            if (typedRef.current && suggestions.length > 0) setOpen(true);
           }}
           onBlur={() => {
             /* Deferred, or a click on a suggestion is cancelled by the blur that
@@ -326,7 +344,9 @@ export function SearchInput({
           id={listId}
           role="listbox"
           aria-label="Suggestions"
-          className="absolute inset-x-0 top-[calc(100%+6px)] z-20 overflow-hidden rounded-xl border border-border bg-background py-1"
+          /* Capped and scrollable, so a long list on a phone ends above the
+             keyboard instead of running off the screen. */
+          className="absolute inset-x-0 top-[calc(100%+6px)] z-20 max-h-[min(60vh,420px)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-background py-1"
         >
           {suggestions.map((s, i) => {
             const Icon = ICONS[s.kind] ?? Search;
