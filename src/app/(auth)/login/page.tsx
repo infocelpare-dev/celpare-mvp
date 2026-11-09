@@ -51,7 +51,10 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       )}
 
       <div className="mt-8">
-        <GoogleButton label="Continue with Google" />
+        <GoogleButton
+          label="Continue with Google"
+          next={typeof params?.next === "string" ? params.next : undefined}
+        />
         <AuthDivider />
         <LoginForm />
         <p className="mt-4 text-center text-[14px]">
