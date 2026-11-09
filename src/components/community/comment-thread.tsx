@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, CornerDownRight, Ellipsis, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { personName, relativeTime } from "@/lib/format";
-import { createComment, deleteComment, type CommentState } from "@/app/actions/community";
+import { deleteComment } from "@/app/actions/community";
+import { CommentComposer } from "./comment-composer";
 import { hideComment } from "@/app/actions/comments";
 import type { Comment } from "@/lib/community/queries";
 import type { CommentNode } from "@/lib/community/thread";
@@ -518,28 +519,7 @@ function ReplyForm({
   signedIn: boolean;
   onDone: () => void;
 }) {
-  const [state, action, pending] = useActionState<CommentState, FormData>(createComment, {
-    status: "idle",
-    message: "",
-    body: "",
-    attempt: 0,
-  });
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const seen = useRef(0);
   const dark = tone === "dark";
-
-  useEffect(() => {
-    ref.current?.focus();
-  }, []);
-
-  /* A successful reply comes back with an empty body and a bumped attempt. That
-     is the only signal the action gives, so it is what closes the box. */
-  useEffect(() => {
-    if (state.attempt > seen.current) {
-      seen.current = state.attempt;
-      if (state.status === "idle") onDone();
-    }
-  }, [state, onDone]);
 
   if (!signedIn) {
     return (
@@ -552,67 +532,19 @@ function ReplyForm({
     );
   }
 
+  /* The shared box (comment-composer.tsx). A successful reply closes it;
+     Cancel and Escape close it without sending. */
   return (
-    <form action={action} key={state.attempt} className="mt-2">
-      <input type="hidden" name="postId" value={postId} />
-      <input type="hidden" name="parentId" value={parentId} />
-
-      {/* The honeypot, the same shape every other form in this codebase uses. */}
-      <div aria-hidden className="hidden">
-        <label htmlFor={`reply-website-${parentId}`}>Website</label>
-        <input id={`reply-website-${parentId}`} name="website" type="text" tabIndex={-1} autoComplete="off" />
-      </div>
-
-      <label htmlFor={`reply-${parentId}`} className="sr-only">
-        Reply to {replyingTo}
-      </label>
-      <textarea
-        ref={ref}
-        id={`reply-${parentId}`}
-        name="body"
-        rows={2}
-        required
-        maxLength={1000}
-        defaultValue={state.body}
-        placeholder={`Reply to ${replyingTo}`}
-        /* 16px below sm, per D91: iOS zooms the page for anything smaller and
-           never zooms back out. */
-        className={cn(
-          "w-full rounded-xl border px-3 py-2 text-[16px] sm:text-[14px]",
-          dark
-            ? "border-white/25 bg-white/10 text-white placeholder:text-white/50"
-            : "border-border bg-background text-foreground placeholder:text-muted",
-        )}
-      />
-
-      {state.status === "error" && state.message ? (
-        <p role="alert" className={cn("mt-1 text-[13px]", dark ? "text-white" : "text-foreground")}>
-          {state.message}
-        </p>
-      ) : null}
-
-      <div className="mt-1.5 flex gap-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className={cn(
-            "inline-flex h-9 cursor-pointer items-center rounded-full px-4 text-[13px] font-medium disabled:opacity-50",
-            dark ? "bg-white text-black" : "bg-foreground text-background",
-          )}
-        >
-          {pending ? "Posting" : "Reply"}
-        </button>
-        <button
-          type="button"
-          onClick={onDone}
-          className={cn(
-            "inline-flex h-9 cursor-pointer items-center rounded-full px-3 text-[13px]",
-            dark ? "text-white/70 hover:text-white" : "text-muted hover:text-foreground",
-          )}
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
+    <CommentComposer
+      postId={postId}
+      parentId={parentId}
+      tone={tone}
+      placeholder={`Reply to ${replyingTo}`}
+      label={`Reply to ${replyingTo}`}
+      autoFocus
+      onPosted={onDone}
+      onCancel={onDone}
+      className="mt-2"
+    />
   );
 }
