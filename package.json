@@ -45,7 +45,7 @@
     "check:vercel": "node scripts/check-vercel-build.mjs"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.9.1",
+    "@hookform/resolvers": "^7.0.3",
     "@sentry/nextjs": "^11.11.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.0",
