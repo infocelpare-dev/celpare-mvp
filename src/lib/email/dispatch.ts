@@ -4,8 +4,6 @@ import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import {
   billingActivatedEmail,
   billingAlertEmail,
-  billingInvoiceSentEmail,
-  billingReceivedEmail,
   type BillingAlertInput,
   type BillingEmailInput,
   demoEmail,
@@ -286,20 +284,14 @@ export function emailNewFollower(followerId: string, targetId: string) {
   never to the billing email typed into the form.
 */
 
-export type BillingStep = "received" | "invoice_sent" | "activated";
+export type BillingStep = "activated";
 
-export function emailBillingCustomer(userId: string | null, step: BillingStep, input: BillingEmailInput) {
-  return safely(`billing ${step}`, async () => {
+export function emailBillingCustomer(userId: string | null, _step: BillingStep, input: BillingEmailInput) {
+  return safely("billing activated", async () => {
     if (!userId) return;
     const to = await addressOf(userId);
     if (!to) return;
-    const email =
-      step === "received"
-        ? billingReceivedEmail(input)
-        : step === "invoice_sent"
-          ? billingInvoiceSentEmail(input)
-          : billingActivatedEmail(input);
-    await sendEmail(to, email);
+    await sendEmail(to, billingActivatedEmail(input));
   });
 }
 

@@ -13,8 +13,18 @@ export type BillingKind = (typeof BILLING_KINDS)[number];
 export const BILLING_PERIODS = ["monthly", "yearly"] as const;
 export type BillingPeriod = (typeof BILLING_PERIODS)[number];
 
-/* Statuses on the request (D239). */
-export const REQUEST_STATUSES = ["pending", "under_review", "invoice_sent", "paid", "rejected"] as const;
+/* Statuses on the request. pending, under_review and invoice_sent are the
+   Payoneer flow (D239), kept for history; the rest are the USDT checkout (D256). */
+export const REQUEST_STATUSES = [
+  "pending",
+  "under_review",
+  "invoice_sent",
+  "awaiting_payment",
+  "partially_paid",
+  "expired",
+  "paid",
+  "rejected",
+] as const;
 export type RequestStatus = (typeof REQUEST_STATUSES)[number];
 
 /* Statuses on the subscription. */
@@ -23,6 +33,9 @@ export type SubscriptionStatus = "active" | "expired" | "cancelled";
 /* The one label a person sees, across request and subscription. */
 export type DisplayStatus =
   | "Pending"
+  | "Awaiting Payment"
+  | "Partly Paid"
+  | "Not Paid"
   | "Under Review"
   | "Invoice Sent"
   | "Paid"
@@ -59,6 +72,9 @@ export function displayStatus(
   subscription?: { status: SubscriptionStatus } | null,
 ): DisplayStatus {
   if (request.status === "rejected") return "Rejected";
+  if (request.status === "awaiting_payment") return "Awaiting Payment";
+  if (request.status === "partially_paid") return "Partly Paid";
+  if (request.status === "expired") return "Not Paid";
   if (request.status === "paid" && request.activated_at) {
     if (subscription?.status === "expired") return "Expired";
     return "Active";
@@ -78,8 +94,11 @@ export function displayStatus(
 /* What the person should expect next, in one sentence. */
 export const NEXT_STEP: Record<DisplayStatus, string> = {
   Pending: "We received your request and will review it shortly.",
+  "Awaiting Payment": "Finish paying in USDT on the NOWPayments page. Your plan turns on as soon as the payment confirms.",
+  "Partly Paid": "Less than the price arrived, so nothing was switched on. We will email you to settle it.",
+  "Not Paid": "This checkout closed without a payment. Nothing was charged.",
   "Under Review": "We are checking your details before sending an invoice.",
-  "Invoice Sent": "An invoice was sent to your billing email by Payoneer. Pay it from the link in that email.",
+  "Invoice Sent": "An invoice was sent to your billing email by Payoneer.",
   Paid: "Your payment is confirmed. Your plan is being switched on.",
   Active: "Your plan is active.",
   Rejected: "This request was not accepted. The reason is shown below.",

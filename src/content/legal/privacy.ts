@@ -12,8 +12,8 @@ export const privacy: Doc = {
   title: "Privacy Policy",
   description:
     "What personal data Celpare collects, why, who processes it, how long it is kept, and how to see, download or delete it.",
-  version: "1.3",
-  effective: "2026-11-07",
+  version: "1.4",
+  effective: "2026-11-10",
   summary: [
     "We collect what you give us (your account, profile, posts, messages and questions) and what using Celpare produces (searches, views, devices). We do not sell it and we run no advertising trackers.",
     "Your posts, comments and public profile are visible to anyone. Your email, messages, Ask Celpare chats, searches and devices are not.",
@@ -57,7 +57,7 @@ export const privacy: Doc = {
             "Voice search: only when you press the microphone in search. If voice search is switched on for signed in accounts, your recording is sent to Google Cloud Speech-to-Text (in the EU for English, the Netherlands for Somali) to be turned into text, then discarded: Celpare does not store the audio or the transcript, and has not opted in to Google's speech data logging, so Google uses the audio only to provide the transcription. Otherwise your browser's own speech recognition is used, which in Chrome and Edge sends the audio to Google or Microsoft under their terms. Either way Celpare receives only the text, and it is searched like typed text.",
             "Comment activity: which comments were shown to you and in what position, and comments you liked, replied to, hid, marked Not interested or reported. We use these only to order comments for you. Nobody else can see them.",
             "Ask Celpare usage: how many questions you asked, which features were used (catalogue search, web search, research) and the size of each answer, so plan limits can be applied.",
-            "Billing, only if you request a paid plan: the name and email for the invoice, your country, and if you give them your company, billing address, tax number and a note; the plan, price and dates; the Payoneer invoice reference and payment transaction id; and each status change. We use these to send the invoice, confirm the payment and run your plan. Because they are financial records, we keep them after you delete your account for as long as the law requires accounting records to be kept, without linking them to a Celpare account.",
+            "Billing, only if you buy a paid plan: the name and email for your receipt, your country, and if you give them your company, billing address and tax number; the plan, price and dates; the NOWPayments invoice and payment ids, the coin, network and amount paid, and the blockchain transaction id; and each status change. We use these to confirm the payment, run your plan and handle refunds. Because they are financial records, we keep them after you delete your account for as long as the law requires accounting records to be kept, without linking them to a Celpare account.",
             "Devices and security: a random browser id stored in a cookie, the browser and operating system from your user agent, and for security events the IP address. We use these to tell you about a new login (that email shows the browser and a partly masked network address) and to protect accounts.",
             "Errors: if something breaks, an error report with technical details about the page and browser. It never includes the content of your posts, messages or questions.",
           ],
@@ -66,7 +66,7 @@ export const privacy: Doc = {
         {
           list: [
             "We do not use analytics or advertising trackers, and we do not build an advertising profile of you.",
-            "We do not collect your precise location, contacts, or payment card or bank details. Paid plans are invoiced and paid through Payoneer, which handles the payment itself under its own privacy policy; Celpare sees only the invoice reference, the transaction id and whether it was paid.",
+            "We do not collect your precise location, contacts, or payment card or bank details. Paid plans are paid in USDT through NOWPayments, which handles the payment under its own privacy policy. Celpare never sees your wallet keys. A blockchain transaction is public by nature: anyone can see the sending address, the amount and the time on the blockchain, though not that it was for Celpare.",
             "We do not ask for your date of birth.",
           ],
         },
@@ -235,6 +235,7 @@ export const privacy: Doc = {
     },
   ],
   changes: [
+    { version: "1.4", date: "2026-11-10", note: "Paid plans are paid in USDT through NOWPayments: what payment data we keep, and that blockchain transactions are public. Payoneer is no longer used." },
     { version: "1.3", date: "2026-11-07", note: "Paid plans: the billing details we collect, that Payoneer handles payments, and that billing records are kept as financial records." },
     { version: "1.2", date: "2026-11-04", note: "Privacy and data requests now go to reports@celpare.com." },
     { version: "1.1", date: "2026-10-31", note: "Added the questions after sign up: what we ask, why, and that every answer is optional and private." },

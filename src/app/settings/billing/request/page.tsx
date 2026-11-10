@@ -24,7 +24,7 @@ import { SPONSORSHIP_PRICE_CENTS } from "@/lib/sponsored/config";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Request a plan",
+  title: "Pay for a plan",
   robots: { index: false },
 };
 
@@ -91,7 +91,7 @@ export default async function BillingRequestPage({
       <Container className="max-w-[560px] py-10 sm:py-14">
         <BackLink href="/pricing" label="Back to pricing" className="mb-5" />
         <h1 className="text-[clamp(1.6rem,4vw,2.1rem)] font-medium leading-tight tracking-[-0.03em]">
-          Request a plan
+          Pay for a plan
         </h1>
 
         {!valid || cents === null ? (
@@ -120,8 +120,8 @@ export default async function BillingRequestPage({
         ) : (
           <>
             <p className="mt-3 text-[15px] leading-relaxed text-muted">
-              Send us your billing details. We check them by hand and send an invoice through Payoneer. Your plan
-              starts as soon as we confirm the payment.
+              Add your details for the receipt, then pay in USDT on the NOWPayments page. Your plan switches on by
+              itself as soon as the payment confirms on the blockchain, usually within minutes.
             </p>
 
             <dl className="mt-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-2xl border border-border p-5 text-[15px]">

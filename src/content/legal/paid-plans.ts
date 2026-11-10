@@ -2,9 +2,10 @@ import type { Doc } from "../types";
 import { OPERATOR } from "../operator";
 
 /*
-  Paid Plans Terms, version 1.1 (phase BILL, 2026-11-07). Paid plans are sold
-  by manual invoice through Payoneer (D239): a request, a review, an invoice,
-  a payment the founder verifies in Payoneer, then activation. Nothing renews
+  Paid Plans Terms, version 1.2 (phase CRYPTO, 2026-11-10). Paid plans are paid in
+  USDT through a NOWPayments page (D256 to D260); the plan switches on when the
+  signed NOWPayments webhook confirms the payment. Payoneer (D239, version 1.1)
+  is no longer used. Nothing renews
   by itself (no card is stored), an ended plan returns to Free on its end date
   (D240), and the refund window is 24 hours (D243, the founder's rule,
   superseding D208's 14 days). Prices are not repeated here; the pricing page
@@ -14,11 +15,11 @@ import { OPERATOR } from "../operator";
 export const paidPlans: Doc = {
   slug: "paid-plans",
   title: "Paid Plans Terms",
-  description: "How Celpare's paid plans for individuals and developers are requested, invoiced, started, ended and refunded.",
-  version: "1.1",
-  effective: "2026-11-07",
+  description: "How Celpare's paid plans for individuals and developers are paid for in USDT, started, ended and refunded.",
+  version: "1.2",
+  effective: "2026-11-10",
   summary: [
-    "You request a paid plan, we send an invoice through Payoneer, and your plan starts once we confirm the payment.",
+    "You pay for a plan in USDT on a NOWPayments page, and your plan starts by itself once the payment is confirmed.",
     "Plans do not renew automatically. When a plan ends, your account returns to the Free plan unless you have paid for the next period.",
     "You can ask for a full refund within 24 hours of the payment being confirmed. After that, payments are not refunded except where the law requires it.",
   ],
@@ -29,14 +30,15 @@ export const paidPlans: Doc = {
       blocks: [
         {
           list: [
-            "Choose a plan on the [pricing page](/pricing) and send a request with your billing details. Nothing is charged when you send it.",
-            "We review the request by hand. If we can accept it, we send an invoice for the price shown to your billing email through Payoneer.",
-            "You pay the invoice from the link in the email from Payoneer.",
-            "When we have confirmed the payment in our Payoneer account, we switch the plan on and email you. We never switch a plan on from a screenshot, a forwarded email or a message saying a payment was made.",
+            "Choose a plan on the [pricing page](/pricing), add the details for your receipt, and you are taken to a payment page run by NOWPayments, our payment provider.",
+            "You pay in USDT (the Tether US dollar stablecoin), on a network the page offers, from a wallet or exchange you control. Celpare never holds or sees your wallet, keys or funds.",
+            "When NOWPayments confirms the payment to us, your plan switches on by itself and we email you. This usually takes minutes, and depends on the blockchain. We never switch a plan on from a screenshot, a forwarded email or a message saying a payment was made.",
+            "If less than the price arrives, the plan is not switched on. We contact you to settle it: you send the rest, or we refund what arrived.",
+            "A payment page that is not paid in time expires. Nothing is charged, and you can start again.",
           ],
         },
-        "We may decline a request, for example when a payment cannot be invoiced under Payoneer's rules. We tell you why, and you are not charged.",
-        "Celpare never asks for card details, bank logins or payment screenshots by email, chat or message. If someone does, it is not us. Report it to " +
+        "Blockchain payments cannot be reversed by Celpare or by NOWPayments once sent. Check the amount, the network and the address on the payment page before you pay. Coins sent on the wrong network or to the wrong address may be lost.",
+        "Celpare never asks for card details, wallet keys, seed phrases or payment screenshots by email, chat or message. If someone does, it is not us. Report it to " +
           `[${OPERATOR.contact}](mailto:${OPERATOR.contact}).`,
       ],
     },
@@ -44,7 +46,7 @@ export const paidPlans: Doc = {
       id: "prices",
       heading: "2. Prices and what a plan includes",
       blocks: [
-        "Prices are in US dollars and are shown on the pricing page with what each plan includes. The amount on your invoice is the price shown when you sent the request. Yearly prices, where offered, are paid once for twelve months. Payoneer or your bank may add their own fees or currency conversion.",
+        "Prices are in US dollars and are shown on the pricing page with what each plan includes. You pay the same amount in USDT, at the rate on the payment page. Celpare pays the NOWPayments fee. The network fee for sending USDT from your wallet or exchange is yours. Yearly prices, where offered, are paid once for twelve months.",
         "Usage on paid plans is described relative to other plans. Limits are applied fairly to keep Celpare working for everyone and are shown in the app.",
       ],
     },
@@ -55,9 +57,9 @@ export const paidPlans: Doc = {
         {
           list: [
             "A plan starts when we confirm your payment and runs for the period you paid for: one month or one year.",
-            "Plans do not renew automatically, and no card is kept on file. To keep a plan, request a new invoice before it ends; a renewal paid before the end date adds a full period after it.",
+            "Plans do not renew automatically, and nothing is kept on file to charge you. To keep a plan, pay for the next period before it ends; a renewal paid before the end date adds a full period after it.",
             "When a plan ends without a renewal, your account returns to the Free plan that day. Nothing you created is deleted, but the limits of the Free plan apply, and items over those limits become read only.",
-            "If we change the price of a plan, the new price applies only to requests sent after the change.",
+            "If we change the price of a plan, the new price applies only to payments started after the change.",
           ],
         },
       ],
@@ -73,14 +75,14 @@ export const paidPlans: Doc = {
             "If we close your account for breaking the [Terms](/legal/terms), the current period is not refunded.",
           ],
         },
-        `Ask for a refund at [${OPERATOR.contact}](mailto:${OPERATOR.contact}) from the address on your account. Refunds are paid back through Payoneer to the payer. Consumer rights under Kenyan law, and under the law where you live, are not affected.`,
+        `Ask for a refund at [${OPERATOR.contact}](mailto:${OPERATOR.contact}) from the address on your account. Refunds are paid in USDT, for the US dollar price you paid, to a wallet address you give us on the same network. Network fees for the refund are paid by Celpare. Consumer rights under Kenyan law, and under the law where you live, are not affected.`,
       ],
     },
     {
       id: "records",
       heading: "5. Billing records",
       blocks: [
-        "We keep each request, invoice and payment reference as a financial record, including after you delete your account, for as long as the law requires us to keep accounting records. The [Privacy Policy](/legal/privacy) explains what this includes.",
+        "We keep each payment, its NOWPayments reference and its blockchain transaction id as a financial record, including after you delete your account, for as long as the law requires us to keep accounting records. The [Privacy Policy](/legal/privacy) explains what this includes.",
       ],
     },
     {
@@ -92,6 +94,7 @@ export const paidPlans: Doc = {
     },
   ],
   changes: [
+    { version: "1.2", date: "2026-11-10", note: "Plans are paid in USDT through NOWPayments and switch on when the payment is confirmed. Payoneer is no longer used. How part payments, expired payment pages, fees and USDT refunds work." },
     { version: "1.1", date: "2026-11-07", note: "Plans are sold by invoice through Payoneer and do not renew automatically. The refund window is 24 hours from the confirmed payment. Billing records section added." },
     { version: "1.0", date: "2026-10-07", note: "First version, before paid plans open." },
   ],

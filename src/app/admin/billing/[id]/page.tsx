@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/admin/guard";
 import { ActionForm } from "@/components/admin/action-form";
-import { InvoiceSentForm, MarkPaidForm } from "@/components/admin/billing-step-forms";
 import {
   ErrorState,
   Field,
@@ -14,13 +13,7 @@ import {
   When,
 } from "@/components/admin/ui";
 import { BILLING_STATUS_TONE } from "@/components/admin/billing-status";
-import {
-  billingActivate,
-  billingMarkInvoiceSent,
-  billingMarkPaid,
-  billingReject,
-  billingStartReview,
-} from "@/app/actions/billing";
+import { billingActivate, billingReject } from "@/app/actions/billing";
 import {
   displayStatus,
   formatMoney,
@@ -35,11 +28,12 @@ import {
 export const dynamic = "force-dynamic";
 
 /*
-  One billing request (phase BILL, D239 to D242). Shows what was asked, who
-  asked, the invoice and the history, and offers only the next allowed step:
-  review, record the invoice, mark paid (super_admin, D242), activate, or
-  reject. Every step is an audited database function that refuses anything out
-  of order, so the buttons shown here are a convenience, not the gate.
+  One billing request (phase CRYPTO, D256 to D260). Shows what was asked, who
+  asked, the NOWPayments invoice, every payment NOWPayments reported, and the
+  history. Payment and activation happen through the signed webhook; the only
+  steps left here are closing a checkout that will not complete, and activating
+  by hand a paid request the webhook could not activate. Old Payoneer requests
+  (D239) still render, read only.
 */
 
 type Row = {
@@ -67,9 +61,12 @@ type Row = {
 
 const EVENT_LABEL: Record<string, string> = {
   pending: "Request submitted",
+  awaiting_payment: "Checkout opened",
+  partially_paid: "Partly paid",
+  expired: "Closed unpaid",
   under_review: "Review started",
   invoice_sent: "Invoice recorded as sent",
-  paid: "Payment verified",
+  paid: "Payment received",
   active: "Plan activated",
   rejected: "Rejected",
 };
@@ -79,7 +76,7 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
-  const [req, inv, events] = await Promise.all([
+  const [req, inv, events, pays] = await Promise.all([
     session.db
       .from("billing_requests")
       .select(
@@ -89,7 +86,7 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
       .maybeSingle<Row>(),
     session.db
       .from("invoices")
-      .select("number, provider_invoice_ref, status, sent_at, due_at, paid_at, payment_ref")
+      .select("number, provider, provider_invoice_ref, payment_url, status, sent_at, due_at, paid_at, payment_ref")
       .eq("request_id", id)
       .maybeSingle(),
     session.db
@@ -97,6 +94,11 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
       .select("id, to_status, note, created_at")
       .eq("request_id", id)
       .order("id"),
+    session.db
+      .from("crypto_payments")
+      .select("payment_id, status, pay_currency, pay_amount, actually_paid, outcome_amount, outcome_currency, payin_hash, updated_at")
+      .eq("request_id", id)
+      .order("updated_at", { ascending: false }),
   ]);
 
   if (req.error) {
@@ -126,7 +128,8 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
   const amount = formatMoney(r.amount_cents, r.currency);
   const canManage = session.can("billing.manage");
   const canVerify = session.can("billing.verify");
-  const rejectable = ["pending", "under_review", "invoice_sent"].includes(r.status);
+  const rejectable = ["pending", "under_review", "invoice_sent", "awaiting_payment", "partially_paid"].includes(r.status);
+  const crypto = inv.data?.provider === "nowpayments";
 
   return (
     <>
@@ -158,7 +161,7 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
                   ) : null}
                 </Field>
                 <Field label="Billing">{periodLabel(r.period)}</Field>
-                <Field label="Amount to invoice">{amount}</Field>
+                <Field label="Price">{amount}</Field>
                 <Field label="Account">
                   {r.user_id ? (
                     <Link href={`/admin/users/${r.user_id}`} className="hover:underline">
@@ -175,7 +178,7 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
             </Panel>
           </Section>
 
-          <Section title="Billing details" lead="Send the Payoneer invoice to this name and email.">
+          <Section title="Billing details" lead="What the customer gave for the receipt.">
             <Panel className="px-4">
               <FieldList>
                 <Field label="Name">{r.billing_name}</Field>
@@ -198,7 +201,7 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
                   <Field label="Celpare reference" mono>
                     {inv.data.number}
                   </Field>
-                  <Field label="Payoneer invoice" mono>
+                  <Field label={crypto ? "NOWPayments invoice" : "Payoneer invoice"} mono>
                     {inv.data.provider_invoice_ref}
                   </Field>
                   <Field label="Status">{inv.data.status}</Field>
@@ -216,12 +219,49 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
                     </Field>
                   ) : null}
                   {inv.data.payment_ref ? (
-                    <Field label="Payoneer transaction" mono>
+                    <Field label={crypto ? "NOWPayments payment" : "Payoneer transaction"} mono>
                       {inv.data.payment_ref}
                     </Field>
                   ) : null}
                 </FieldList>
               </Panel>
+            </Section>
+          ) : null}
+
+          {crypto ? (
+            <Section title="Payments" lead="What NOWPayments reported, re-read from its API on every webhook.">
+              {pays.error ? (
+                <ErrorState what="the payments" />
+              ) : (pays.data ?? []).length === 0 ? (
+                <p className="text-[13px] text-muted">No payment yet.</p>
+              ) : (
+                <Panel className="px-4">
+                  {(pays.data ?? []).map((p) => (
+                    <FieldList key={p.payment_id}>
+                      <Field label="Payment" mono>
+                        {p.payment_id}
+                      </Field>
+                      <Field label="Status">{p.status}</Field>
+                      <Field label="Paid" mono>
+                        {p.actually_paid ?? 0} of {p.pay_amount ?? "?"} {String(p.pay_currency ?? "").toUpperCase()}
+                      </Field>
+                      {p.outcome_amount != null ? (
+                        <Field label="You receive" mono>
+                          {p.outcome_amount} {String(p.outcome_currency ?? "").toUpperCase()}
+                        </Field>
+                      ) : null}
+                      {p.payin_hash ? (
+                        <Field label="Transaction hash" mono>
+                          {p.payin_hash}
+                        </Field>
+                      ) : null}
+                      <Field label="Updated">
+                        <When iso={p.updated_at} time />
+                      </Field>
+                    </FieldList>
+                  ))}
+                </Panel>
+              )}
             </Section>
           ) : null}
 
@@ -248,52 +288,35 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
         <div className="space-y-4">
           <Section title="Next step">
             <Panel className="space-y-4 p-4">
-              {r.status === "pending" ? (
-                canManage ? (
-                  <>
-                    <p className="text-[13px] text-muted">
-                      Check the details, and that this transaction is one Payoneer lets you invoice.
-                    </p>
-                    <ActionForm action={billingStartReview} fields={{ requestId: r.id }} label="Start review" tone="primary" />
-                  </>
-                ) : (
-                  <p className="text-[13px] text-muted">Your role cannot review billing requests.</p>
-                )
+              {r.status === "awaiting_payment" ? (
+                <p className="text-[13px] text-muted">
+                  Waiting for the customer to pay on NOWPayments. The plan turns on by itself when the payment finishes.
+                </p>
               ) : null}
 
-              {r.status === "under_review" ? (
-                canManage ? (
-                  <>
-                    <p className="text-[13px] text-muted">
-                      In Payoneer, send an invoice for {amount} to {r.billing_email}, then record it here. The customer
-                      gets an email.
-                    </p>
-                    <InvoiceSentForm requestId={r.id} action={billingMarkInvoiceSent} />
-                  </>
-                ) : (
-                  <p className="text-[13px] text-muted">Your role cannot record invoices.</p>
-                )
+              {r.status === "partially_paid" ? (
+                <p className="text-[13px] text-muted">
+                  Less than {amount} arrived, so nothing was switched on. Settle it with the customer in NOWPayments
+                  (refund, or ask them to send the rest), then close this request with the reason.
+                </p>
               ) : null}
 
-              {r.status === "invoice_sent" ? (
-                canVerify ? (
-                  <>
-                    <p className="text-[13px] text-muted">
-                      Open your Payoneer account and find the payment for this invoice. Mark it paid only when you see
-                      the funds there.
-                    </p>
-                    <MarkPaidForm requestId={r.id} amount={amount} action={billingMarkPaid} />
-                  </>
-                ) : (
-                  <p className="text-[13px] text-muted">Waiting for the founder to verify the payment in Payoneer.</p>
-                )
+              {r.status === "expired" ? (
+                <p className="text-[13px] text-muted">Closed without a payment. Nothing to do.</p>
+              ) : null}
+
+              {["pending", "under_review", "invoice_sent"].includes(r.status) ? (
+                <p className="text-[13px] text-muted">
+                  An old Payoneer request. Payoneer is no longer used (D256): close it with a reason.
+                </p>
               ) : null}
 
               {r.status === "paid" && !r.activated_at ? (
                 canVerify ? (
                   <>
                     <p className="text-[13px] text-muted">
-                      Payment verified. Activating switches the plan on now and emails the customer.
+                      The payment finished but the plan did not switch on. Activating switches it on now and emails the
+                      customer.
                     </p>
                     <ActionForm
                       action={billingActivate}
@@ -333,11 +356,11 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
                   <ActionForm
                     action={billingReject}
                     fields={{ requestId: r.id }}
-                    label="Reject"
+                    label="Close request"
                     tone="danger"
                     requireReason
                     reasonLabel="Reason, shown to the customer"
-                    reasonHint="For example: this payment is not eligible for a Payoneer invoice. Any invoice already recorded is voided."
+                    reasonHint="For example: part payment refunded on 10 November. The open NOWPayments invoice is voided here; refunds are sent from NOWPayments."
                   />
                 </div>
               ) : null}

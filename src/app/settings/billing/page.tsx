@@ -58,7 +58,14 @@ type Sub = {
   current_period_end: string;
   tools: { name: string } | null;
 };
-type Inv = { request_id: string; number: string; status: string; sent_at: string; paid_at: string | null };
+type Inv = {
+  request_id: string;
+  number: string;
+  status: string;
+  sent_at: string;
+  paid_at: string | null;
+  payment_url: string | null;
+};
 type Ev = { request_id: string; to_status: string; created_at: string };
 
 const day = (iso: string) =>
@@ -66,6 +73,9 @@ const day = (iso: string) =>
 
 const EVENT_LABEL: Record<string, string> = {
   pending: "Request sent",
+  awaiting_payment: "Checkout opened",
+  partially_paid: "Part payment received",
+  expired: "Closed unpaid",
   under_review: "Under review",
   invoice_sent: "Invoice sent",
   paid: "Payment confirmed",
@@ -73,7 +83,12 @@ const EVENT_LABEL: Record<string, string> = {
   rejected: "Not accepted",
 };
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ checkout?: string }>;
+}) {
+  const checkout = (await searchParams).checkout;
   if (!isSupabaseConfigured()) redirect("/community");
   const supabase = await createClient();
   const {
@@ -97,7 +112,7 @@ export default async function BillingPage() {
       .order("current_period_end", { ascending: false })
       .limit(50)
       .returns<Sub[]>(),
-    supabase.from("invoices").select("request_id, number, status, sent_at, paid_at").limit(100).returns<Inv[]>(),
+    supabase.from("invoices").select("request_id, number, status, sent_at, paid_at, payment_url").limit(100).returns<Inv[]>(),
     supabase.from("billing_events").select("request_id, to_status, created_at").order("id").limit(500).returns<Ev[]>(),
   ]);
 
@@ -115,6 +130,26 @@ export default async function BillingPage() {
       <Container className="max-w-[640px] py-10 sm:py-14">
         <BackLink href="/settings" label="Back to settings" className="mb-5" />
         <h1 className="text-[clamp(1.6rem,4vw,2.1rem)] font-medium leading-tight tracking-[-0.03em]">Billing</h1>
+
+        {/* Back from NOWPayments. The return page proves nothing: only the
+            signed webhook confirms a payment, so this only says what to expect. */}
+        {checkout === "paid" || checkout === "partial" ? (
+          <div role="status" className="mt-6 rounded-2xl border border-border p-5">
+            <p className="text-[15px] font-medium">
+              {checkout === "paid" ? "Payment sent. Waiting for confirmation." : "Part of the payment arrived."}
+            </p>
+            <p className="mt-1 text-[14px] text-muted">
+              {checkout === "paid"
+                ? "Your plan switches on by itself once the blockchain confirms the payment, usually within minutes. We email you when it does. Reload this page to see it."
+                : "Less than the price arrived, so the plan is not on yet. Send the rest from the same NOWPayments page, or write to billing@celpare.com."}
+            </p>
+          </div>
+        ) : checkout === "cancelled" ? (
+          <div role="status" className="mt-6 rounded-2xl border border-border p-5">
+            <p className="text-[15px] font-medium">Payment not finished</p>
+            <p className="mt-1 text-[14px] text-muted">Nothing was charged. You can pay again from the checkout below or from pricing.</p>
+          </div>
+        ) : null}
 
         {failed ? (
           <div role="alert" className="mt-6 rounded-2xl border border-foreground p-5">
@@ -140,7 +175,7 @@ export default async function BillingPage() {
                       </div>
                       <p className="mt-2 text-[14px] text-muted">
                         Since {day(s.current_period_start)}. Active until {day(s.current_period_end)}. It does not
-                        renew automatically: request a new invoice before it ends to keep it.
+                        renew automatically: pay for the next period from pricing before it ends to keep it.
                       </p>
                     </li>
                   ))}
@@ -156,7 +191,7 @@ export default async function BillingPage() {
             </section>
 
             <section className="mt-12 border-t border-border pt-10">
-              <h2 className="text-[17px] font-medium tracking-[-0.01em]">Requests and invoices</h2>
+              <h2 className="text-[17px] font-medium tracking-[-0.01em]">Payments</h2>
               {requests.length ? (
                 <ul className="mt-4 space-y-4">
                   {requests.map((r) => {
@@ -179,6 +214,15 @@ export default async function BillingPage() {
                           <StatusBadge label={label} />
                         </div>
                         <p className="mt-3 text-[14px]">{NEXT_STEP[label]}</p>
+                        {r.status === "awaiting_payment" && inv?.payment_url && inv.payment_url.startsWith("https://") ? (
+                          <a
+                            href={inv.payment_url}
+                            rel="noopener noreferrer"
+                            className="mt-3 inline-flex h-10 items-center rounded-full bg-primary px-5 text-[14px] font-medium text-on-primary transition-colors duration-200 hover:bg-primary-hover"
+                          >
+                            Continue to payment
+                          </a>
+                        ) : null}
                         {r.status === "rejected" && r.reject_reason ? (
                           <p className="mt-2 text-[14px] text-muted">Reason: {r.reject_reason}</p>
                         ) : null}
@@ -204,12 +248,13 @@ export default async function BillingPage() {
                   })}
                 </ul>
               ) : (
-                <p className="mt-3 text-[15px] text-muted">No requests yet.</p>
+                <p className="mt-3 text-[15px] text-muted">No payments yet.</p>
               )}
             </section>
 
             <p className="mt-10 text-[13px] leading-relaxed text-muted">
-              Celpare invoices through Payoneer and never asks for card details, bank logins or payment screenshots.
+              Celpare takes payment in USDT through NOWPayments and never asks for card details, wallet keys, seed
+              phrases or payment screenshots.
               Questions:{" "}
               <Link href="mailto:billing@celpare.com" className="underline underline-offset-2">
                 billing@celpare.com

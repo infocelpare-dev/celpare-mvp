@@ -27,7 +27,7 @@ export function SponsorToolPicker({
   price: string;
   /* slug to "1 November 2026", formatted on the server (rule: pin the timezone). */
   endsFormatted: Record<string, string>;
-  /* slug to tool id, for the Request invoice link (phase BILL). */
+  /* slug to tool id, for the Pay with USDT link (phase CRYPTO). */
   toolIds?: Record<string, string>;
   /* Paid requests are open (isBillingOpen, fails closed). */
   billingOpen?: boolean;
@@ -120,7 +120,7 @@ export function SponsorToolPicker({
             className="w-full"
             aria-describedby="sponsored-note"
           >
-            Request invoice
+            Pay with USDT
             <span className="sr-only"> to sponsor {chosen?.name}</span>
           </ButtonLink>
         ) : (

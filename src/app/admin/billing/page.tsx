@@ -35,12 +35,11 @@ export const dynamic = "force-dynamic";
 /*
   Plans and billing.
 
-  Billing is by manual invoice (phase BILL, D239): a customer requests a paid
-  plan, an admin reviews it and records the Payoneer invoice, the founder
-  verifies the payment in Payoneer and activates (D242). The queue below is
-  that work, by status; each row opens the request, where the next step is.
-  There is no card on file and nothing renews by itself, so there is no
-  churn or failed payment to report.
+  Billing is USDT through NOWPayments (phase CRYPTO, D256 to D260): the
+  customer pays on a NOWPayments page and the signed webhook switches the plan
+  on. The queue is mostly to watch, not to work: part payments and old Payoneer
+  requests (D239) are the only ones that need a person. Nothing renews by
+  itself, so there is no churn or failed renewal to report.
 
   Also here, as before: accounts by plan, the AI cost each plan generates, and
   every plan change with its reason. A plan can still be granted by hand from
@@ -48,11 +47,11 @@ export const dynamic = "force-dynamic";
 */
 
 const QUEUE_TABS: { key: string; label: string; statuses: RequestStatus[] }[] = [
-  { key: "pending", label: "Pending", statuses: ["pending"] },
-  { key: "under_review", label: "Under review", statuses: ["under_review"] },
-  { key: "invoice_sent", label: "Invoice sent", statuses: ["invoice_sent"] },
+  { key: "partially_paid", label: "Needs attention", statuses: ["partially_paid", "pending", "under_review", "invoice_sent"] },
+  { key: "awaiting_payment", label: "Awaiting payment", statuses: ["awaiting_payment"] },
   { key: "paid", label: "Paid", statuses: ["paid"] },
-  { key: "rejected", label: "Rejected", statuses: ["rejected"] },
+  { key: "expired", label: "Not paid", statuses: ["expired"] },
+  { key: "rejected", label: "Closed", statuses: ["rejected"] },
 ];
 
 type QueueRow = {
@@ -145,7 +144,7 @@ export default async function AdminBillingPage({
 
       <Section
         title="Billing queue"
-        lead="Requests by status, oldest first. Open one to take the next step. Invoices go out through Payoneer; only the founder marks a payment as received."
+        lead="Checkouts by status, oldest first. Plans switch on by themselves when the USDT payment finishes; Needs attention is anything a person must settle."
       >
         {billingMissing ? (
           <Panel className="px-4 py-4 text-[13px] text-muted">
@@ -157,7 +156,7 @@ export default async function AdminBillingPage({
           <>
             <nav aria-label="Billing status" className="mb-3 flex flex-wrap gap-2">
               {QUEUE_TABS.map((t) => {
-                const n = t.key === "paid" ? tally.get("paid") ?? 0 : tally.get(t.key) ?? 0;
+                const n = t.statuses.reduce((sum, st) => sum + (tally.get(st) ?? 0), 0);
                 const active = t.key === tab.key;
                 return (
                   <Link
@@ -269,7 +268,7 @@ export default async function AdminBillingPage({
             )}
           </Section>
 
-          <Section title="Payment history" lead="Invoices verified as paid in Payoneer, newest first.">
+          <Section title="Payment history" lead="Paid invoices, newest first. NOWPayments payment ids, or Payoneer transactions for the old ones.">
             {(payments.data ?? []).length === 0 ? (
               <EmptyState title="No payments yet" />
             ) : (
@@ -280,7 +279,7 @@ export default async function AdminBillingPage({
                       <Th>Paid</Th>
                       <Th>Reference</Th>
                       <Th numeric>Amount</Th>
-                      <Th>Payoneer transaction</Th>
+                      <Th>Payment</Th>
                     </tr>
                   </thead>
                   <tbody>
