@@ -25,6 +25,11 @@ export type PlanLimits = {
   historyTurns: number;
   toolSearch: boolean;
   webSearch: boolean;
+  /* One web search when the catalogue has too little to answer from, so the
+     answer comes from the web and not from the model's memory. Separate from
+     webSearch, which is the person's own toggle for searching on every
+     question. */
+  webFallback: boolean;
   researchMode: boolean;
   savesHistory: boolean;
   /* Catalogue caps, from 05-pricing-plans.md. Infinity means unlimited, which
@@ -74,6 +79,11 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     historyTurns: 4,
     toolSearch: true,
     webSearch: false,
+    // On by founder instruction 2026-11-10: launch visitors arrive signed out,
+    // and a question the catalogue could not answer was answered from memory
+    // ("Runway Gen-3"). Only the one fallback search, bounded by the 5
+    // messages a day above; the web search toggle stays locked.
+    webFallback: true,
     researchMode: false,
     savesHistory: false, // D36. Nothing anonymous is ever persisted.
     // Saving needs an account to own the row.
@@ -95,6 +105,7 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     // off for anonymous visitors, where the cost is unbounded and the abuse
     // surface is a public endpoint rather than an account.
     webSearch: true,
+    webFallback: true,
     researchMode: false,
     savesHistory: true,
     savedTools: 5,
@@ -113,6 +124,7 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     historyTurns: 16,
     toolSearch: true,
     webSearch: true,
+    webFallback: true,
     researchMode: false,
     savesHistory: true,
     savedTools: 15,
@@ -129,6 +141,7 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     historyTurns: 24,
     toolSearch: true,
     webSearch: true,
+    webFallback: true,
     researchMode: true,
     savesHistory: true,
     savedTools: Number.POSITIVE_INFINITY,
@@ -175,6 +188,7 @@ const MUST_NOT_DECREASE = [
 const MUST_NOT_BE_REVOKED = [
   "toolSearch",
   "webSearch",
+  "webFallback",
   "researchMode",
   "savesHistory",
 ] as const;

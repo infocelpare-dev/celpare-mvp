@@ -31,7 +31,7 @@ import { askCandidates, recordAskImpressions, type AskCandidates } from "./recom
 import { evidenceIntent, evidenceSources, loadModelEvidence } from "./model-evidence";
 import { estimateTokens, recordUsage } from "./usage";
 import { recordAiCall } from "./observability";
-import { webSearch } from "./web-search";
+import { isWebSearchConfigured, webSearch } from "./web-search";
 import { searchModels } from "./model-search";
 import { providerLogo } from "@/lib/models/provider-logo";
 import type { AnswerRecord, ResearchMeta, StoredModel } from "./conversations";
@@ -370,7 +370,21 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
     describe a product that has changed or never existed. One search is cheaper
     than a confident wrong recommendation.
   */
-  const mayFallBackToWeb = mayWebSearch && !doWebSearch && doToolSearch;
+  /*
+    Its own permission (webFallback), not the web search toggle, so a signed
+    out visitor gets it too (founder, 2026-11-10): they have no toggle and were
+    being answered from memory. A person who CAN toggle web search and turned
+    it off is respected.
+  */
+  const mayFallBackToWeb =
+    !conversational &&
+    !doDeepResearch &&
+    !doWebSearch &&
+    doToolSearch &&
+    feature.canWebSearch &&
+    limits.webFallback &&
+    isWebSearchConfigured() &&
+    (grants.webSearch.allowed ? wants.webSearch : true);
 
   /* The third source. Always searched, because it costs nothing: it is a
      keyword scan over a dozen sections in memory, not a network call. Pulled
@@ -493,9 +507,13 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
 
         let web = searched;
 
+        /* Coverage is judged on the tools that answer the question, not on
+           the cards: the engine fills its slots whether or not they fit
+           (coveredSlugs in recommend-candidates). */
+        const coveredSlugs = (candidates as AskCandidates | null)?.coveredSlugs ?? tools.map((t) => t.slug);
         const thin =
           doToolSearch &&
-          tools.length < MIN_CATALOGUE_MATCH &&
+          coveredSlugs.length < MIN_CATALOGUE_MATCH &&
           catalogueModels.length === 0 &&
           !(evidence && evidence.rows.length > 0);
 
@@ -514,8 +532,13 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
           searchCalls += 1;
         }
 
-        citations = tools;
-        shownTools = tools;
+        /* When the catalogue does not cover the question, the engine's slot
+           fillers are not answers: "n8n, Claude Code, CrewAI" under a teacher's
+           worksheet question. Keep only the tools that cover it, for
+           the model and for the cards alike. */
+        const relevant = thin ? tools.filter((t) => coveredSlugs.includes(t.slug)) : tools;
+        citations = relevant;
+        shownTools = relevant;
 
         let research: WebResult[] = web;
         let researchQuestions: string[] = [];
@@ -550,8 +573,8 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
           searchCalls += result.searches;
           skill = skillLevel(cleaned.text, declared?.role ?? null);
           /* The report draws on the wider pool; the cards stay the normal six. */
-          const have = new Set(tools.map((t) => t.slug));
-          citations = [...tools, ...result.tools.filter((t) => !have.has(t.slug))];
+          const have = new Set(relevant.map((t) => t.slug));
+          citations = [...relevant, ...result.tools.filter((t) => !have.has(t.slug))];
         }
 
         /*
@@ -559,9 +582,9 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
           the model was given. It only happens when there is something to show,
           and losing it never fails the answer.
         */
-        if (tools.length > 0) {
-          const cards = await loadToolCards(tools.map((t) => t.slug));
-          emit(controller, { t: "cards", citations: tools, cards });
+        if (relevant.length > 0) {
+          const cards = await loadToolCards(relevant.map((t) => t.slug));
+          emit(controller, { t: "cards", citations: relevant, cards });
           if (candidates) void recordAskImpressions(candidates, identity.userId, cards.map((c) => c.slug));
         }
 
