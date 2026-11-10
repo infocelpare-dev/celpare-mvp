@@ -5,6 +5,9 @@ import type { DisplayStatus } from "@/lib/billing/catalog";
    request page. Waiting on us is warn; done is ok; refused is danger. */
 export const BILLING_STATUS_TONE: Record<DisplayStatus, Tone> = {
   Pending: "warn",
+  "Awaiting Payment": "neutral",
+  "Partly Paid": "warn",
+  "Not Paid": "neutral",
   "Under Review": "warn",
   "Invoice Sent": "neutral",
   Paid: "neutral",

@@ -4,8 +4,7 @@ import { escapeHtml, renderEmail } from "../layout";
 import {
   billingActivatedEmail,
   billingAlertEmail,
-  billingInvoiceSentEmail,
-  billingReceivedEmail,
+  billingPaymentLinkEmail,
   demoEmail,
   describeBrowser,
   maskIp,
@@ -126,36 +125,48 @@ describe("demo", () => {
   });
 });
 
-describe("billing (phase BILL)", () => {
+describe("billing (phase CRYPTO)", () => {
   const input = { plan: "Pro", period: "Monthly", amount: "$7.99", invoiceNumber: "CP-2026-0001", endsOn: "7 December 2026" };
 
-  it("warns to pay only through Payoneer and never asks for payment details", () => {
-    for (const e of [billingReceivedEmail(input), billingInvoiceSentEmail(input)]) {
-      assert.match(e.text, /Pay only through the link in the invoice email from Payoneer/);
-      assert.match(e.text, /never asks for card details/);
-      assert.doesNotMatch(e.text, /send (us )?(a )?screenshot/i);
-      assert.equal(e.kind, "billing");
-    }
+  it("confirms the payment, never asks for wallet keys or card details, and names the end date", () => {
+    const e = billingActivatedEmail(input);
+    assert.equal(e.kind, "billing");
+    assert.match(e.text, /payment is confirmed/);
+    assert.match(e.text, /never asks for card details, wallet keys, seed phrases/);
+    assert.match(e.text, /7 December 2026/);
+    assert.match(e.text, /CP-2026-0001/);
+    assert.match(e.text, /renews automatically/);
+    assert.doesNotMatch(e.text, /Payoneer/);
+  });
+
+  it("sends the payment reminder from billing@ to the billing page, never to a payment page (D262)", () => {
+    const e = billingPaymentLinkEmail(input);
+    assert.equal(e.kind, "billing");
+    assert.match(e.subject, /^Finish paying for Pro/);
+    assert.match(e.html, /\/settings\/billing/);
+    assert.doesNotMatch(e.html, /nowpayments\.io/);
+    assert.match(e.text, /BTC, ETH, BNB, XRP or USDT/);
+    assert.match(e.text, /\$7\.99/);
+    assert.doesNotMatch(billingPaymentLinkEmail({ ...input, plan: "Pro\r\nBcc: x@y.z" }).subject, /[\r\n]/);
   });
 
   it("keeps every subject on one line", () => {
     const weird = { ...input, plan: "Pro\r\nBcc: x@y.z" };
-    for (const e of [billingReceivedEmail(weird), billingInvoiceSentEmail(weird), billingActivatedEmail(weird)]) {
-      assert.doesNotMatch(e.subject, /[\r\n]/);
-    }
+    assert.doesNotMatch(billingActivatedEmail(weird).subject, /[\r\n]/);
+    const alert = billingAlertEmail({ ...weird, event: "paid", billingName: "A", billingEmail: "a@example.com", country: "KE", requestId: "abc" });
+    assert.doesNotMatch(alert.subject, /[\r\n]/);
   });
 
-  it("states the amount, the reference and the end date", () => {
-    assert.match(billingReceivedEmail(input).text, /\$7\.99/);
-    assert.match(billingInvoiceSentEmail(input).text, /CP-2026-0001/);
-    assert.match(billingActivatedEmail(input).text, /7 December 2026/);
-    assert.match(billingActivatedEmail(input).text, /not charge you automatically/);
-  });
-
-  it("alerts billing@ with a link to the request in the admin queue", () => {
-    const e = billingAlertEmail({ ...input, billingName: "A <b>", billingEmail: "a@example.com", country: "KE", requestId: "abc" });
-    assert.equal(e.kind, "billing_alert");
-    assert.match(e.html, /\/admin\/billing\/abc/);
-    assert.doesNotMatch(e.html, /<b>/);
+  it("alerts billing@ per event, with the payment and a link to the request", () => {
+    const base = { ...input, billingName: "A <b>", billingEmail: "a@example.com", country: "KE", requestId: "abc", paymentId: "123", paid: "7.99 USDTTRC20" };
+    const paid = billingAlertEmail({ ...base, event: "paid" });
+    assert.equal(paid.kind, "billing_alert");
+    assert.match(paid.subject, /^Paid: /);
+    assert.match(paid.html, /\/admin\/billing\/abc/);
+    assert.match(paid.text, /7\.99 USDTTRC20/);
+    assert.doesNotMatch(paid.html, /<b>/);
+    assert.match(billingAlertEmail({ ...base, event: "partial" }).text, /Nothing was switched on/);
+    assert.match(billingAlertEmail({ ...base, event: "mismatch" }).subject, /^Check payment: /);
+    assert.match(billingAlertEmail({ ...base, event: "refunded" }).subject, /^Refunded: /);
   });
 });

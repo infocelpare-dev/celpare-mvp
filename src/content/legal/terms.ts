@@ -8,8 +8,8 @@ export const terms: Doc = {
   title: "Terms of Service",
   description:
     "The agreement between you and Celpare: who can use it, your account and content, Ask Celpare, plans, and the limits of our responsibility.",
-  version: "1.3",
-  effective: "2026-11-07",
+  version: "1.4",
+  effective: "2026-11-10",
   summary: [
     "You must be at least 13. If you are under 18, you need a parent's or guardian's permission.",
     "You own what you post. You let us show it on Celpare so the service can work.",
@@ -112,7 +112,7 @@ export const terms: Doc = {
       heading: "9. Developers, plans and sponsorship",
       blocks: [
         "Listing a tool or model is governed by the [Developer Terms](/legal/developer-terms).",
-        "Paid plans and sponsorship are shown on the pricing page. When they are on sale, you request them and pay an invoice sent through Payoneer; the [Paid Plans Terms](/legal/paid-plans) and [Sponsorship Terms](/legal/sponsorship) apply to what you buy, and the price and billing period are shown before you send a request. Plans do not renew automatically.",
+        "Paid plans and sponsorship are shown on the pricing page. When they are on sale, you pay for them in crypto (BTC, ETH, BNB, XRP or USDT) through NOWPayments; the [Paid Plans Terms](/legal/paid-plans) and [Sponsorship Terms](/legal/sponsorship) apply to what you buy, and the price and billing period are shown before you pay. Plans do not renew automatically.",
       ],
     },
     {
@@ -337,5 +337,6 @@ export const terms: Doc = {
     { version: "1.1", date: "2026-10-07", note: "Added a section for each part of Celpare: community, comments, messages, Ask Celpare, Search, Explore, Compare, tool pages, collections, profiles and notifications." },
     { version: "1.2", date: "2026-11-04", note: "The contact address for questions, appeals and refunds is now reports@celpare.com. Deep research is now called Deep match." },
     { version: "1.3", date: "2026-11-07", note: "Paid plans are requested and paid by invoice through Payoneer, and do not renew automatically." },
+    { version: "1.4", date: "2026-11-10", note: "Paid plans and sponsorship are paid in crypto through NOWPayments instead of Payoneer." },
   ],
 };

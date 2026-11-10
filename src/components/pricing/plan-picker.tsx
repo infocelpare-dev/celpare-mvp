@@ -65,7 +65,7 @@ export function PlanPicker({
   signedIn: boolean;
   /* The plan this account is on for this audience; null when unknown. */
   currentId: string | null;
-  /* Paid plans can be requested by invoice (phase BILL, isBillingOpen). */
+  /* Paid plans can be bought in crypto (phase CRYPTO, isBillingOpen). */
   billingOpen?: boolean;
 }) {
   const { plans } = plansFor(audience);
@@ -132,7 +132,7 @@ export function PlanPicker({
       >
         <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
         {billingOpen
-          ? "Paid plans are invoiced through Payoneer. Nothing is charged until you pay the invoice. Prices in USD."
+          ? "Pay in BTC, ETH, BNB, XRP or USDT through NOWPayments. Prices in USD, charged as the same value in the coin you choose. Nothing renews automatically."
           : "Paid plans open soon. Prices in USD."}
       </p>
     </>

@@ -2,36 +2,40 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useRef } from "react";
-import { CheckCircle2 } from "lucide-react";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
-import { submitBillingRequest, type BillingFormState } from "@/app/actions/billing";
+import { startCheckout, type BillingFormState } from "@/app/actions/billing";
+import type { PayCoin } from "@/lib/billing/coins";
 import type { Country } from "@/lib/billing/countries";
 
 /*
-  The paid plan request (phase BILL, D239). Nothing is charged here: the
-  request goes to a person, who sends a Payoneer invoice to the billing email.
+  The checkout (phase CRYPTO, D256). The person picks the coin here (D263);
+  submitting creates the request and opens the NOWPayments page already set
+  to that coin (D261). Nothing is charged on
+  celpare.com, and the plan turns on only when the signed webhook confirms it.
 
   Accessibility (ui-ux-pro-max): every field has a visible label; a failed
   submit puts a summary at the top, moves focus to it and links each problem
   to its field, and the inline messages stay; the button says what is
-  happening while it works.
+  happening while it works. The coin choice is native radio buttons in a
+  fieldset with a legend, so it is one keyboard stop with arrow keys and is
+  announced as a group; each option is a 56px tall target with 8px gaps.
 */
 
 const IDLE: BillingFormState = { status: "idle", message: "" };
 
 const FIELD_LABEL: Record<string, string> = {
-  billingName: "Name on the invoice",
+  billingName: "Name on the receipt",
   billingEmail: "Billing email",
   country: "Country",
   company: "Company",
   address: "Billing address",
   taxId: "Tax or VAT number",
-  note: "Note",
   accept: "Billing and refunds",
   toolId: "Tool",
   plan: "Plan",
   period: "Billing period",
+  payCurrency: "Pay with",
 };
 
 const textarea =
@@ -45,6 +49,7 @@ export function BillingRequestForm({
   defaultName,
   defaultEmail,
   countries,
+  coins,
 }: {
   kind: string;
   plan: string;
@@ -53,29 +58,15 @@ export function BillingRequestForm({
   defaultName: string;
   defaultEmail: string;
   countries: Country[];
+  coins: PayCoin[];
 }) {
-  const [state, action, pending] = useActionState(submitBillingRequest, IDLE);
+  const [state, action, pending] = useActionState(startCheckout, IDLE);
   const summary = useRef<HTMLDivElement>(null);
   const fields = state.fields ?? {};
 
   useEffect(() => {
     if (state.status === "error") summary.current?.focus();
   }, [state]);
-
-  if (state.status === "success") {
-    return (
-      <div className="rounded-2xl border border-border p-6" role="status">
-        <CheckCircle2 className="size-6" aria-hidden />
-        <h2 className="mt-3 text-[18px] font-medium tracking-[-0.01em]">Request sent</h2>
-        <p className="mt-2 text-[15px] leading-relaxed text-muted">
-          {state.message} The invoice comes from Payoneer to your billing email. Nothing is charged until you pay it.
-        </p>
-        <ButtonLink href="/settings/billing" className="mt-5">
-          See your billing
-        </ButtonLink>
-      </div>
-    );
-  }
 
   const err = (name: string) =>
     fields[name] ? (
@@ -119,7 +110,7 @@ export function BillingRequestForm({
         <Field
           id="billingName"
           name="billingName"
-          label="Name on the invoice"
+          label="Name on the receipt"
           autoComplete="name"
           defaultValue={defaultName}
           required
@@ -136,7 +127,7 @@ export function BillingRequestForm({
           name="billingEmail"
           type="email"
           label="Billing email"
-          hint="Payoneer sends the invoice here. Your Celpare updates go to your account email."
+          hint="For your receipt. Your Celpare updates go to your account email."
           autoComplete="email"
           defaultValue={defaultEmail}
           required
@@ -214,21 +205,33 @@ export function BillingRequestForm({
         {err("taxId")}
       </div>
 
-      <div>
-        <label htmlFor="note" className="mb-1.5 block text-[14px] font-medium">
-          Note (optional)
-        </label>
-        <textarea
-          id="note"
-          name="note"
-          rows={3}
-          maxLength={1000}
-          aria-invalid={!!fields.note || undefined}
-          aria-describedby={describedBy("note")}
-          className={textarea}
-        />
-        {err("note")}
-      </div>
+      <fieldset id="payCurrency" aria-describedby={describedBy("payCurrency", true)}>
+        <legend className="mb-1.5 block text-[14px] font-medium">Pay with</legend>
+        <p id="payCurrency-hint" className="mb-3 text-[13px] text-muted">
+          Choose the coin you have. The payment page opens on it and shows the exact amount and address.
+        </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {coins.map((c) => (
+            <label
+              key={c.id}
+              className="flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-border px-3 py-2 transition-colors duration-200 hover:bg-surface has-[:checked]:border-foreground has-[:checked]:bg-surface has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
+            >
+              <input
+                type="radio"
+                name="payCurrency"
+                value={c.id}
+                required
+                className="size-4 shrink-0 accent-[var(--color-foreground)]"
+              />
+              <span className="min-w-0">
+                <span className="block text-[15px] font-medium leading-tight">{c.symbol}</span>
+                <span className="block text-[12px] leading-tight text-muted">{c.network}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        {err("payCurrency")}
+      </fieldset>
 
       <div className="rounded-xl border border-border p-4">
         <label htmlFor="accept" className="flex cursor-pointer gap-3 text-[14px] leading-relaxed">
@@ -242,9 +245,10 @@ export function BillingRequestForm({
             className="mt-1 size-4 shrink-0 accent-[var(--color-foreground)]"
           />
           <span>
-            I understand that Celpare sends an invoice through Payoneer, that my plan starts once the payment is
-            confirmed, that it does not renew automatically, and that I can ask for a full refund within 24 hours
-            of the payment being confirmed and not after. See the{" "}
+            I understand that I pay in the coin I chose on a NOWPayments page, that my plan starts once the payment is
+            confirmed on the blockchain, that it does not renew automatically, and that I can ask for a full refund
+            within 24 hours of the payment being confirmed and not after, paid back in USDT to an address I give. See
+            the{" "}
             <Link href="/legal/paid-plans" className="underline underline-offset-2">
               Paid Plans Terms
             </Link>
@@ -255,10 +259,10 @@ export function BillingRequestForm({
       </div>
 
       <Button type="submit" className="w-full" disabled={pending} aria-busy={pending}>
-        {pending ? "Sending your request..." : "Request invoice"}
+        {pending ? "Opening the payment page..." : "Pay with crypto"}
       </Button>
       <p className="text-center text-[13px] text-muted">
-        Nothing is charged now. Celpare never asks for card details or payment screenshots.
+        You pay on NOWPayments. Celpare never asks for card details, wallet keys or payment screenshots.
       </p>
     </form>
   );
