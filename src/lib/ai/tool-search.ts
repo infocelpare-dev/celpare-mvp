@@ -1,5 +1,6 @@
 import { createAnonClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { TOOL_SEARCH_LIMIT } from "./config";
+import { toCatalogueWords } from "./everyday-words";
 import type { ToolCitation } from "./types";
 
 /*
@@ -26,7 +27,8 @@ export async function searchTools(topic: string, limit = TOOL_SEARCH_LIMIT): Pro
   try {
     const supabase = createAnonClient();
     const { data, error } = await supabase.rpc("search_tools", {
-      q: topic,
+      /* "photo" becomes "image" and so on, so everyday words can match. */
+      q: toCatalogueWords(topic),
       lim: limit,
     });
 

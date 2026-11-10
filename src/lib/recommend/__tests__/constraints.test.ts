@@ -131,6 +131,27 @@ describe("a use case question keeps to its use case (D230)", () => {
     assert.ok(parseConstraints("best tool for coding", index).constraints.some((c) => c.kind === "usecase" && c.value === "coding"));
   });
 
+  it("reads a photo that should move as video, not image", () => {
+    const goals = (q: string) => parseConstraints(q, index).constraints.filter((c) => c.kind === "usecase").map((c) => c.value);
+    for (const q of [
+      "Is there an AI that can make my grandma's old photo move?",
+      "bring my old pictures to life",
+      "animate a photo of my dog",
+      "turn this image into a video",
+      "best image-to-video tool",
+    ]) {
+      const g = goals(q.toLowerCase());
+      assert.ok(g.includes("video") && !g.includes("image"), `${q}: ${g.join(", ")}`);
+    }
+    assert.deepEqual(goals("make a logo for my bakery"), ["image"]);
+    assert.ok(goals("edit my photos and make a video").includes("image"));
+  });
+
+  it("does not reject the image to video tools for the photo question", () => {
+    const r = ask("Is there an AI that can make my grandma's old photo move?".toLowerCase(), 8);
+    assert.ok(!r.rejected.some((x) => x.key === bySlug(index, "tool", "kling").key && x.code === "off_goal"), r.rejected.map((x) => x.key).join(", "));
+  });
+
   it("leaves a question with no use case as it was", () => {
     const r = ask("free tools under $10");
     assert.ok(!r.rejected.some((x) => x.code === "off_goal"));

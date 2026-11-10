@@ -53,12 +53,15 @@ type Turn = {
   question?: string;
 };
 
+/* Questions everyday people ask themselves, not builder questions (founder,
+   2026-11-10). The first three are the launch film's, word for word, so a
+   viewer who taps the spark finds the question they just watched. Each was
+   checked on Ask before it went here. Four keeps the two column grid even. */
 const STARTERS = [
-  "Find the best AI coding tools.",
-  "What is the best AI video generator?",
-  "Compare Claude and ChatGPT.",
-  "Find an AI tool for research.",
-  "What AI tools should I try?",
+  "I pay for ChatGPT. Do I need Claude or Gemini too?",
+  "Is there an AI that can make my grandma's old photo move?",
+  "Which AI answers with real sources so it doesn't make things up?",
+  "I make long YouTube videos. Which AI can turn them into short clips?",
 ];
 
 function uid() {

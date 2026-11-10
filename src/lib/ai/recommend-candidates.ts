@@ -5,6 +5,7 @@ import { getCatalogueIndex } from "@/lib/recommend/server/cache";
 import { getRecommendations } from "@/lib/recommend/server/engine";
 import { recordRecommendationEvents } from "@/lib/recommend/server/events";
 import { TOOL_SEARCH_LIMIT } from "./config";
+import { toCatalogueWords } from "./everyday-words";
 import { searchTools } from "./tool-search";
 import { getSponsoredCampaigns } from "@/lib/sponsored/server";
 import type { SponsoredCandidate } from "@/lib/sponsored/rank";
@@ -39,6 +40,19 @@ import type { ToolCitation } from "./types";
 
 export type AskCandidates = {
   citations: ToolCitation[];
+  /*
+    The tools that actually answer the question, as opposed to the ones that
+    fill a slot. The engine always fills its slots, which made "n8n, Claude
+    Code, CrewAI" count as an answer to a teacher's worksheet question
+    (2026-11-10). Two things earn a place here:
+    - a keyword lane match, which needs half the question's distinctive words;
+    - an engine pick when the question names a use case (image, writing,
+      video...), because the engine then rejects anything off that goal.
+    The keyword lane alone is too strict for a question with several needs
+    (the bakery one), so it is not the only test. The gateway reads this to
+    decide whether to go to the web, and which cards to keep when not.
+  */
+  coveredSlugs: string[];
   /* Set when the engine ran: the request, for attributing card impressions. */
   requestId: string | null;
   unresolved: string[];
@@ -71,7 +85,10 @@ export async function projection(slugs: string[]): Promise<ToolCitation[]> {
 }
 
 export async function askCandidates(question: string, topic: string, viewerId: string | null): Promise<AskCandidates> {
-  const keywordOnly = async (): Promise<AskCandidates> => ({ citations: await searchTools(topic), requestId: null, unresolved: [], engineRefs: new Map(), sponsored: [] });
+  const keywordOnly = async (): Promise<AskCandidates> => {
+    const citations = await searchTools(topic);
+    return { citations, coveredSlugs: citations.map((c) => c.slug), requestId: null, unresolved: [], engineRefs: new Map(), sponsored: [] };
+  };
   try {
     const { index } = await getCatalogueIndex();
     const parsed = parseConstraints(question, index);
@@ -83,7 +100,9 @@ export async function askCandidates(question: string, topic: string, viewerId: s
     const [keyword, view, deep] = await Promise.all([
       searchTools(topic),
       getRecommendations(
-        { surface: "ask", strategy: "fit", entityTypes: ["tool"], query: question, constraints: parsed.constraints, limit: TOOL_SEARCH_LIMIT, section: "ask" },
+        /* Everyday words in the catalogue's words for retrieval; the
+           constraints above were read from the question as asked. */
+        { surface: "ask", strategy: "fit", entityTypes: ["tool"], query: toCatalogueWords(question), constraints: parsed.constraints, limit: TOOL_SEARCH_LIMIT, section: "ask" },
         viewerId,
       ),
       /* Only searched when something is sponsored, so Ask pays nothing for
@@ -117,6 +136,7 @@ export async function askCandidates(question: string, topic: string, viewerId: s
     if (!view.ok) {
       return {
         citations: keyword,
+        coveredSlugs: keyword.map((k) => k.slug),
         requestId: null,
         unresolved: parsed.unresolved,
         engineRefs: new Map(),
@@ -145,7 +165,9 @@ export async function askCandidates(question: string, topic: string, viewerId: s
       const slug = view.entities[it.key]?.slug;
       if (slug) engineRefs.set(slug, { id: it.ref.id, position, reason: it.reason?.code ?? null, source: it.source });
     });
-    return { citations, requestId: view.result.requestId, unresolved: parsed.unresolved, engineRefs, sponsored };
+    const hasGoal = parsed.constraints.some((c) => c.kind === "usecase");
+    const coveredSlugs = [...new Set([...keyword.map((k) => k.slug), ...(hasGoal ? engineSlugs : [])])];
+    return { citations, coveredSlugs, requestId: view.result.requestId, unresolved: parsed.unresolved, engineRefs, sponsored };
   } catch (err) {
     console.error("[ai] engine candidates failed, keyword search only", err);
     return keywordOnly();

@@ -119,8 +119,14 @@ export function parseConstraints(question: string, index: CatalogueIndex): Parse
      read as coding it filled a salon booking site's answer with Cursor and
      Claude Code (founder test 2026-11-04). */
   const goalText = q.replace(/\b(can'?t|cannot|don'?t|do not|no|without|never)\s+(know how to\s+|really\s+)?cod(e|ing)\b|\bno[- ]code\b|\bnon[- ]technical\b/g, " ");
+  /* A photo that should move is a VIDEO job, and the photo is only the input.
+     "Make my grandma's old photo move" read as image alone, which rejected
+     every image to video tool as off_goal and filled the answer with image
+     generators (truth pass 2026-11-10). */
+  const motion = /\b(photos?|pictures?|images?|stills?|selfies?)\b[^.?!]{0,40}\b(move|moving|alive|to life|animat(e|ed|ion)|into (a )?video|to video)\b|\b(animat(e|ed)|bring)\b[^.?!]{0,40}\b(photos?|pictures?|images?|stills?|selfies?)\b|\bimage[- ]to[- ]video\b/.exec(goalText);
   for (const [goal, re] of GOAL_PATTERNS) {
-    const m = re.exec(goalText);
+    if (goal === "image" && motion) continue;
+    const m = goal === "video" && motion ? motion : re.exec(goalText);
     if (m) constraints.push({ kind: "usecase", value: goal, hard: false, phrase: m[0] });
   }
 
