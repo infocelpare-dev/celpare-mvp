@@ -29,6 +29,7 @@ import {
   type BillingPeriod,
   type RequestStatus,
 } from "@/lib/billing/catalog";
+import { coinLabel } from "@/lib/billing/coins";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +78,13 @@ type QueueRow = {
   status: RequestStatus;
   activated_at: string | null;
   created_at: string;
+  /* One invoice per request; PostgREST may return it as an object or a list. */
+  invoices: { pay_currency: string | null } | { pay_currency: string | null }[] | null;
+};
+
+const chosenCoin = (r: QueueRow) => {
+  const inv = Array.isArray(r.invoices) ? r.invoices[0] : r.invoices;
+  return inv?.pay_currency ? coinLabel(inv.pay_currency) : "Not chosen";
 };
 
 export default async function AdminBillingPage({
@@ -96,7 +104,7 @@ export default async function AdminBillingPage({
       : null,
     session.db
       .from("billing_requests")
-      .select("id, kind, plan, period, amount_cents, currency, billing_name, billing_email, country, status, activated_at, created_at")
+      .select("id, kind, plan, period, amount_cents, currency, billing_name, billing_email, country, status, activated_at, created_at, invoices(pay_currency)")
       .in("status", tab.statuses)
       .order("created_at", { ascending: tab.key !== "rejected" })
       .limit(100)
@@ -208,6 +216,7 @@ export default async function AdminBillingPage({
                       <Th>Plan</Th>
                       <Th numeric>Amount</Th>
                       <Th>Customer</Th>
+                      <Th>Coin chosen</Th>
                       <Th>Country</Th>
                       <Th>Status</Th>
                     </tr>
@@ -233,6 +242,7 @@ export default async function AdminBillingPage({
                               {r.billing_name}
                               <span className="block text-[12px] text-muted">{r.billing_email}</span>
                             </Td>
+                            <Td className="text-[13px]">{chosenCoin(r)}</Td>
                             <Td>{r.country}</Td>
                             <Td>
                               <StatusBadge tone={BILLING_STATUS_TONE[label]}>{label}</StatusBadge>
@@ -329,7 +339,7 @@ export default async function AdminBillingPage({
                           <Td>{b ? planLabel(b.kind, b.plan) : "−"}</Td>
                           <Td numeric>{formatMoney(p.amount_cents, p.currency)}</Td>
                           <Td className="font-mono text-[13px]">
-                            {c ? `${c.actually_paid ?? "?"} ${c.pay_currency.toUpperCase()}` : "−"}
+                            {c ? `${c.actually_paid ?? "?"} ${coinLabel(c.pay_currency)}` : "−"}
                           </Td>
                           <Td className="font-mono text-[13px]">
                             {c?.outcome_amount != null ? `${c.outcome_amount} ${String(c.outcome_currency ?? "").toUpperCase()}` : "−"}

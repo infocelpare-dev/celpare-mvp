@@ -5,17 +5,21 @@ import { useActionState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { startCheckout, type BillingFormState } from "@/app/actions/billing";
+import type { PayCoin } from "@/lib/billing/coins";
 import type { Country } from "@/lib/billing/countries";
 
 /*
-  The checkout (phase CRYPTO, D256). Submitting creates the request and opens
-  the NOWPayments page, where the person pays in crypto (D261). Nothing is charged on
+  The checkout (phase CRYPTO, D256). The person picks the coin here (D263);
+  submitting creates the request and opens the NOWPayments page already set
+  to that coin (D261). Nothing is charged on
   celpare.com, and the plan turns on only when the signed webhook confirms it.
 
   Accessibility (ui-ux-pro-max): every field has a visible label; a failed
   submit puts a summary at the top, moves focus to it and links each problem
   to its field, and the inline messages stay; the button says what is
-  happening while it works.
+  happening while it works. The coin choice is native radio buttons in a
+  fieldset with a legend, so it is one keyboard stop with arrow keys and is
+  announced as a group; each option is a 56px tall target with 8px gaps.
 */
 
 const IDLE: BillingFormState = { status: "idle", message: "" };
@@ -31,6 +35,7 @@ const FIELD_LABEL: Record<string, string> = {
   toolId: "Tool",
   plan: "Plan",
   period: "Billing period",
+  payCurrency: "Pay with",
 };
 
 const textarea =
@@ -44,6 +49,7 @@ export function BillingRequestForm({
   defaultName,
   defaultEmail,
   countries,
+  coins,
 }: {
   kind: string;
   plan: string;
@@ -52,6 +58,7 @@ export function BillingRequestForm({
   defaultName: string;
   defaultEmail: string;
   countries: Country[];
+  coins: PayCoin[];
 }) {
   const [state, action, pending] = useActionState(startCheckout, IDLE);
   const summary = useRef<HTMLDivElement>(null);
@@ -198,6 +205,34 @@ export function BillingRequestForm({
         {err("taxId")}
       </div>
 
+      <fieldset id="payCurrency" aria-describedby={describedBy("payCurrency", true)}>
+        <legend className="mb-1.5 block text-[14px] font-medium">Pay with</legend>
+        <p id="payCurrency-hint" className="mb-3 text-[13px] text-muted">
+          Choose the coin you have. The payment page opens on it and shows the exact amount and address.
+        </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {coins.map((c) => (
+            <label
+              key={c.id}
+              className="flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-border px-3 py-2 transition-colors duration-200 hover:bg-surface has-[:checked]:border-foreground has-[:checked]:bg-surface has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
+            >
+              <input
+                type="radio"
+                name="payCurrency"
+                value={c.id}
+                required
+                className="size-4 shrink-0 accent-[var(--color-foreground)]"
+              />
+              <span className="min-w-0">
+                <span className="block text-[15px] font-medium leading-tight">{c.symbol}</span>
+                <span className="block text-[12px] leading-tight text-muted">{c.network}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        {err("payCurrency")}
+      </fieldset>
+
       <div className="rounded-xl border border-border p-4">
         <label htmlFor="accept" className="flex cursor-pointer gap-3 text-[14px] leading-relaxed">
           <input
@@ -210,7 +245,7 @@ export function BillingRequestForm({
             className="mt-1 size-4 shrink-0 accent-[var(--color-foreground)]"
           />
           <span>
-            I understand that I pay in crypto (BTC, ETH, BNB, XRP or USDT) on a NOWPayments page, that my plan starts once the payment is
+            I understand that I pay in the coin I chose on a NOWPayments page, that my plan starts once the payment is
             confirmed on the blockchain, that it does not renew automatically, and that I can ask for a full refund
             within 24 hours of the payment being confirmed and not after, paid back in USDT to an address I give. See
             the{" "}
@@ -227,7 +262,7 @@ export function BillingRequestForm({
         {pending ? "Opening the payment page..." : "Pay with crypto"}
       </Button>
       <p className="text-center text-[13px] text-muted">
-        You pay on NOWPayments in BTC, ETH, BNB, XRP or USDT. Celpare never asks for card details, wallet keys or payment screenshots.
+        You pay on NOWPayments. Celpare never asks for card details, wallet keys or payment screenshots.
       </p>
     </form>
   );

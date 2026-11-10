@@ -24,6 +24,7 @@ import {
   type RequestStatus,
   type SubscriptionStatus,
 } from "@/lib/billing/catalog";
+import { coinLabel } from "@/lib/billing/coins";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +87,7 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
       .maybeSingle<Row>(),
     session.db
       .from("invoices")
-      .select("number, provider, provider_invoice_ref, payment_url, status, sent_at, due_at, paid_at, payment_ref")
+      .select("number, provider, provider_invoice_ref, payment_url, pay_currency, status, sent_at, due_at, paid_at, payment_ref")
       .eq("request_id", id)
       .maybeSingle(),
     session.db
@@ -204,6 +205,9 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
                   <Field label={crypto ? "NOWPayments invoice" : "Payoneer invoice"} mono>
                     {inv.data.provider_invoice_ref}
                   </Field>
+                  {crypto ? (
+                    <Field label="Coin chosen">{inv.data.pay_currency ? coinLabel(inv.data.pay_currency) : "Chosen on the NOWPayments page"}</Field>
+                  ) : null}
                   <Field label="Status">{inv.data.status}</Field>
                   <Field label="Sent">
                     <When iso={inv.data.sent_at} time />
@@ -243,7 +247,7 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
                       </Field>
                       <Field label="Status">{p.status}</Field>
                       <Field label="Paid" mono>
-                        {p.actually_paid ?? 0} of {p.pay_amount ?? "?"} {String(p.pay_currency ?? "").toUpperCase()}
+                        {p.actually_paid ?? 0} of {p.pay_amount ?? "?"} {coinLabel(p.pay_currency)}
                       </Field>
                       {p.outcome_amount != null ? (
                         <Field label="You receive" mono>

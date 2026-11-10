@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 /*
-  NOWPayments, the crypto checkout (phase CRYPTO, D256 to D260).
+  NOWPayments, the crypto checkout (phase CRYPTO, D256 to D263).
 
   Server only. The API key and the IPN secret never leave this module: they are
   read from the environment on each call and never logged.
@@ -96,8 +96,11 @@ export function invoiceBody(input: {
   amountCents: number;
   description: string;
   origin: string;
+  /* The coin the customer chose on Celpare (D263); the page opens on it. */
+  payCurrency?: string;
 }) {
   return {
+    ...(input.payCurrency ? { pay_currency: input.payCurrency } : {}),
     price_amount: Number((input.amountCents / 100).toFixed(2)),
     price_currency: "usd",
     order_id: input.requestId,
@@ -115,6 +118,26 @@ export async function createInvoice(input: Parameters<typeof invoiceBody>[0]): P
   const inv = await call<NowInvoice>("/invoice", { method: "POST", body: JSON.stringify(invoiceBody(input)) });
   if (!inv?.id || !isNowpaymentsUrl(inv.invoice_url)) throw new Error("NOWPayments returned no usable invoice");
   return { id: String(inv.id), invoice_url: inv.invoice_url };
+}
+
+/* The coins switched on in the NOWPayments dashboard ("Coins settings"),
+   read at most every 10 minutes. Null when it cannot be read: the caller then
+   offers every coin Celpare accepts. */
+let coinsCache: { at: number; coins: string[] } | null = null;
+export async function enabledCoins(): Promise<string[] | null> {
+  if (!process.env.NOWPAYMENTS_API_KEY) return null;
+  if (coinsCache && Date.now() - coinsCache.at < 10 * 60_000) return coinsCache.coins;
+  try {
+    const r = await call<{ selectedCurrencies?: unknown; currencies?: unknown }>("/merchant/coins");
+    const list = Array.isArray(r.selectedCurrencies) ? r.selectedCurrencies : Array.isArray(r.currencies) ? r.currencies : null;
+    if (!list) return null;
+    const coins = list.filter((c): c is string => typeof c === "string").map((c) => c.toLowerCase());
+    coinsCache = { at: Date.now(), coins };
+    return coins;
+  } catch (e) {
+    console.error("[billing] NOWPayments coin list failed", e instanceof Error ? e.message : e);
+    return null;
+  }
 }
 
 export async function getPayment(paymentId: string | number): Promise<NowPayment> {

@@ -17,7 +17,9 @@ import {
   type BillingKind,
   type BillingPeriod,
 } from "@/lib/billing/catalog";
+import { offeredCoins } from "@/lib/billing/coins";
 import { countries } from "@/lib/billing/countries";
+import { enabledCoins } from "@/lib/billing/nowpayments";
 import { isBillingOpen } from "@/lib/platform/settings";
 import { DEVELOPER_PLANS, INDIVIDUAL_PLANS, yearlyCents } from "@/lib/pricing/plans";
 import { SPONSORSHIP_PRICE_CENTS } from "@/lib/sponsored/config";
@@ -120,7 +122,7 @@ export default async function BillingRequestPage({
         ) : (
           <>
             <p className="mt-3 text-[15px] leading-relaxed text-muted">
-              Add your details for the receipt, then pay in BTC, ETH, BNB, XRP or USDT on the NOWPayments page. Your plan switches on by
+              Add your details for the receipt, choose the coin you have (BTC, ETH, BNB, XRP or USDT), then pay on the NOWPayments page. Your plan switches on by
               itself as soon as the payment confirms on the blockchain, usually within minutes.
             </p>
 
@@ -151,6 +153,7 @@ export default async function BillingRequestPage({
                 defaultName={profile?.full_name ?? ""}
                 defaultEmail={user.email ?? ""}
                 countries={countries()}
+                coins={offeredCoins(await enabledCoins())}
               />
             </div>
 

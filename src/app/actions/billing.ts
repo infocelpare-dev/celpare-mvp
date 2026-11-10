@@ -18,6 +18,7 @@ import {
   type BillingKind,
   type BillingPeriod,
 } from "@/lib/billing/catalog";
+import { coinLabel, isPayCoin } from "@/lib/billing/coins";
 import { createInvoice, isNowpaymentsUrl, nowpaymentsConfigured } from "@/lib/billing/nowpayments";
 import { activationEmailInfo, requestSummary } from "@/lib/billing/notify";
 import { emailBillingCustomer, emailBillingPaymentLink } from "@/lib/email/dispatch";
@@ -68,6 +69,7 @@ const checkoutSchema = z
     company: optionalText(120),
     address: optionalText(500),
     taxId: optionalText(64),
+    payCurrency: z.string().trim().refine(isPayCoin, "Choose the coin you will pay with."),
     accept: z.literal("on", { message: "Confirm you have read how payment and refunds work." }),
   })
   .superRefine((v, ctx) => {
@@ -149,18 +151,29 @@ export async function startCheckout(_prev: BillingFormState, formData: FormData)
       amountCents: row.amount_cents,
       description: `Celpare ${planLabel(v.kind as BillingKind, v.plan)}, ${periodLabel(v.period as BillingPeriod)}`,
       origin: siteUrl(""),
+      payCurrency: v.payCurrency,
     });
     /* Only the server records the invoice: billing_attach_checkout is service role only. */
     const { error: attachError } = await createAdminClient().rpc("billing_attach_checkout", {
       p_request: requestId,
       p_invoice_id: invoice.id,
       p_url: invoice.invoice_url,
+      p_pay_currency: v.payCurrency,
     });
     if (attachError) throw new Error(attachError.message);
     paymentUrl = invoice.invoice_url;
   } catch (e) {
     /* The unpaid request is replaced by the next attempt (billing_start_checkout). */
-    console.error("[billing] NOWPayments invoice failed", e instanceof Error ? e.message : e);
+    const why = e instanceof Error ? e.message : String(e);
+    console.error("[billing] NOWPayments invoice failed", why);
+    /* A coin switched off in the NOWPayments dashboard is refused with a 400. */
+    if (/ 400: /.test(why)) {
+      return {
+        status: "error",
+        message: `${coinLabel(v.payCurrency)} is not available right now. Choose another coin.`,
+        fields: { payCurrency: "Choose another coin." },
+      };
+    }
     return { status: "error", message: "The payment page could not be opened. Try again in a minute." };
   }
 
