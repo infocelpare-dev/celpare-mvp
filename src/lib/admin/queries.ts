@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { rolesFor } from "@/lib/auth/roles";
 import type {
   AdminCommentRow,
   AdminModelRow,
@@ -780,11 +781,17 @@ export async function profilesByIds(
   const unique = [...new Set(ids.filter((v): v is string => Boolean(v)))];
   if (unique.length === 0) return new Map();
 
-  const { data, error } = await db
-    .from("profiles")
-    .select("id, username, full_name, avatar_url, account_status, role")
-    .in("id", unique);
+  const [{ data, error }, roles] = await Promise.all([
+    db
+      .from("profiles")
+      .select("id, username, full_name, avatar_url, account_status")
+      .in("id", unique),
+    /* Roles through profile_roles(), staff only (SEC.7). */
+    rolesFor(db, unique),
+  ]);
   warn("profiles by ids", error);
 
-  return new Map(((data ?? []) as MiniProfile[]).map((p) => [p.id, p]));
+  return new Map(
+    ((data ?? []) as Omit<MiniProfile, "role">[]).map((p) => [p.id, { ...p, role: roles.get(p.id) ?? "user" }]),
+  );
 }

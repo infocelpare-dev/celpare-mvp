@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { isStaffRole, ROLE_LABEL, type Role } from "@/lib/admin/capabilities";
 import { createClient, getCurrentUser, isSupabaseConfigured } from "@/lib/supabase/server";
+import { myRole } from "@/lib/auth/roles";
 
 /*
   The way into the admin dashboard, in the sidebar.
@@ -29,13 +30,7 @@ export async function AdminLink() {
   if (!user) return null;
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const role = data?.role as string | undefined;
+  const role = await myRole(supabase, user.id);
   if (!isStaffRole(role)) return null;
 
   return (
