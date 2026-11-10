@@ -66,7 +66,7 @@ export const privacy: Doc = {
         {
           list: [
             "We do not use analytics or advertising trackers, and we do not build an advertising profile of you.",
-            "We do not collect your precise location, contacts, or payment card or bank details. Paid plans are paid in USDT through NOWPayments, which handles the payment under its own privacy policy. Celpare never sees your wallet keys. A blockchain transaction is public by nature: anyone can see the sending address, the amount and the time on the blockchain, though not that it was for Celpare.",
+            "We do not collect your precise location, contacts, or payment card or bank details. Paid plans are paid in crypto (BTC, ETH, BNB, XRP or USDT) through NOWPayments, which handles the payment under its own privacy policy. Celpare never sees your wallet keys. A blockchain transaction is public by nature: anyone can see the sending address, the amount and the time on the blockchain, though not that it was for Celpare.",
             "We do not ask for your date of birth.",
           ],
         },
@@ -235,7 +235,7 @@ export const privacy: Doc = {
     },
   ],
   changes: [
-    { version: "1.4", date: "2026-11-10", note: "Paid plans are paid in USDT through NOWPayments: what payment data we keep, and that blockchain transactions are public. Payoneer is no longer used." },
+    { version: "1.4", date: "2026-11-10", note: "Paid plans are paid in crypto through NOWPayments: what payment data we keep, and that blockchain transactions are public. Payoneer is no longer used." },
     { version: "1.3", date: "2026-11-07", note: "Paid plans: the billing details we collect, that Payoneer handles payments, and that billing records are kept as financial records." },
     { version: "1.2", date: "2026-11-04", note: "Privacy and data requests now go to reports@celpare.com." },
     { version: "1.1", date: "2026-10-31", note: "Added the questions after sign up: what we ask, why, and that every answer is optional and private." },

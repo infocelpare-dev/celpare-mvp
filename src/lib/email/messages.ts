@@ -280,11 +280,14 @@ export function demoEmail(videoUrl?: string | null): BuiltEmail {
 
 /* ---------------------------------------------------------------- billing */
 /*
-  Phase CRYPTO (D256 to D260), replacing the Payoneer emails of phase BILL.
+  Phase CRYPTO (D256 to D262), replacing the Payoneer emails of phase BILL.
   Customer emails go to the account's own address, never to the billing email
   typed into the form, so the form cannot be used to send Celpare mail to a
-  stranger. There is no "request received" email: the person goes straight to
-  the NOWPayments page, and hears from us when the plan is on.
+  stranger. There is no automatic "request received" email: the person goes
+  straight to the NOWPayments page, and hears from us when the plan is on. An
+  admin can send a payment reminder (D262) for a checkout left unpaid; it links
+  to the billing page on celpare.com, never straight to a payment page, so the
+  rule in PAY_SAFELY stays true.
 */
 
 export type BillingEmailInput = {
@@ -302,7 +305,7 @@ export function billingActivatedEmail(b: BillingEmailInput): BuiltEmail {
   const body = renderEmail({
     heading: `${b.plan} is active`,
     paragraphs: [
-      "Your USDT payment is confirmed and your plan is switched on. Thank you for supporting Celpare.",
+      "Your payment is confirmed and your plan is switched on. Thank you for supporting Celpare.",
       b.endsOn
         ? `It runs until ${b.endsOn}. Nothing renews automatically: renew from your billing page before then.`
         : "Nothing renews automatically: renew from your billing page before it ends.",
@@ -318,6 +321,25 @@ export function billingActivatedEmail(b: BillingEmailInput): BuiltEmail {
   return { kind: "billing", subject: `${subjectPart(b.plan)} is active`, ...body };
 }
 
+/* Sent by an admin from the request page (D262). */
+export function billingPaymentLinkEmail(b: BillingEmailInput): BuiltEmail {
+  const body = renderEmail({
+    heading: `Finish paying for ${b.plan}`,
+    paragraphs: [
+      `Your checkout for ${b.plan} is ready and waiting. Open your billing page on Celpare and choose Continue to payment to pay ${b.amount} in BTC, ETH, BNB, XRP or USDT.`,
+      "Your plan switches on by itself as soon as the payment is confirmed. If you no longer want it, ignore this email: nothing is charged.",
+    ],
+    details: [
+      { label: "Plan", value: `${b.plan}, ${b.period}` },
+      { label: "Price", value: b.amount },
+      ...(b.invoiceNumber ? [{ label: "Celpare reference", value: b.invoiceNumber }] : []),
+    ],
+    action: { label: "Open your billing page", href: siteUrl("/settings/billing") },
+    footnote: PAY_SAFELY,
+  });
+  return { kind: "billing", subject: `Finish paying for ${subjectPart(b.plan)}`, ...body };
+}
+
 export type BillingAlertEvent = "paid" | "partial" | "mismatch" | "refunded";
 
 export type BillingAlertInput = BillingEmailInput & {
@@ -331,7 +353,7 @@ export type BillingAlertInput = BillingEmailInput & {
 };
 
 const ALERT: Record<BillingAlertEvent, { heading: string; line: string; subject: string }> = {
-  paid: { heading: "Payment received", line: "A USDT payment finished and the plan was switched on automatically.", subject: "Paid" },
+  paid: { heading: "Payment received", line: "A crypto payment finished and the plan was switched on automatically.", subject: "Paid" },
   partial: { heading: "Partly paid", line: "The customer sent less than the price. Nothing was switched on. Settle it with them, then reject the request with the reason.", subject: "Partly paid" },
   mismatch: { heading: "Payment does not match", line: "A finished payment did not match the request (currency or amount). Nothing was switched on. Check it in NOWPayments.", subject: "Check payment" },
   refunded: { heading: "Payment refunded", line: "NOWPayments reports this payment as refunded. If the plan is still on, end it from the admin page.", subject: "Refunded" },

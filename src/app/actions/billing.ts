@@ -19,8 +19,8 @@ import {
   type BillingPeriod,
 } from "@/lib/billing/catalog";
 import { createInvoice, isNowpaymentsUrl, nowpaymentsConfigured } from "@/lib/billing/nowpayments";
-import { activationEmailInfo } from "@/lib/billing/notify";
-import { emailBillingCustomer } from "@/lib/email/dispatch";
+import { activationEmailInfo, requestSummary } from "@/lib/billing/notify";
+import { emailBillingCustomer, emailBillingPaymentLink } from "@/lib/email/dispatch";
 import { siteUrl } from "@/lib/email/layout";
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
@@ -222,6 +222,78 @@ export async function billingReject(_prev: AdminState, formData: FormData): Prom
     "Request closed.",
   );
   return state;
+}
+
+/*
+  Emails the customer a reminder to finish an unpaid checkout (D262), from
+  billing@celpare.com to the account's own sign in address. The email links to
+  /settings/billing, where Continue to payment opens the NOWPayments page; it
+  never carries the payment link itself. If the checkout has no NOWPayments
+  invoice yet (the first attempt failed), one is created here first.
+*/
+export async function billingSendPaymentLink(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const p = id.safeParse(formData.get("requestId"));
+  if (!p.success) return { status: "error", message: p.error.issues[0].message };
+  const gate = await adminActionSession("billing.manage");
+  if (!gate.ok) return { status: "error", message: gate.message };
+  if (!hasServiceRole() || !nowpaymentsConfigured()) {
+    return { status: "error", message: "Payments are not switched on on this server (NOWPayments keys missing)." };
+  }
+
+  const { data: r } = await gate.session.db
+    .from("billing_requests")
+    .select("id, user_id, kind, plan, period, amount_cents, status")
+    .eq("id", p.data)
+    .maybeSingle<{ id: string; user_id: string | null; kind: BillingKind; plan: string; period: BillingPeriod; amount_cents: number; status: string }>();
+  if (!r) return { status: "error", message: "That request no longer exists." };
+  if (r.status !== "awaiting_payment") {
+    return {
+      status: "error",
+      message: "Only an unpaid checkout can be sent. A closed one cannot be reopened: the customer starts again from the pricing page.",
+    };
+  }
+
+  const admin = createAdminClient();
+  const { data: inv } = await admin.from("invoices").select("payment_url").eq("request_id", r.id).maybeSingle<{ payment_url: string | null }>();
+  if (!inv) {
+    try {
+      const invoice = await createInvoice({
+        requestId: r.id,
+        amountCents: r.amount_cents,
+        description: `Celpare ${planLabel(r.kind, r.plan)}, ${periodLabel(r.period)}`,
+        origin: siteUrl(""),
+      });
+      const { error } = await admin.rpc("billing_attach_checkout", {
+        p_request: r.id,
+        p_invoice_id: invoice.id,
+        p_url: invoice.invoice_url,
+      });
+      if (error) throw new Error(error.message);
+    } catch (e) {
+      console.error("[billing] admin invoice failed", e instanceof Error ? e.message : e);
+      return { status: "error", message: "NOWPayments did not create the payment page. Try again in a minute." };
+    }
+  }
+
+  const summary = await requestSummary(r.id);
+  if (!summary) return { status: "error", message: "That request no longer exists." };
+  const sent = await emailBillingPaymentLink(r.user_id, summary.email);
+
+  await admin.rpc("admin_audit", {
+    p_action: "billing.payment_link_sent",
+    p_entity_type: "billing_request",
+    p_entity_id: r.id,
+    p_entity_label: summary.row.billing_email,
+    p_reason: null,
+    p_before: null,
+    p_after: { result: sent.result, by: gate.session.userId, by_username: gate.session.username },
+  });
+  revalidatePath(`/admin/billing/${r.id}`);
+
+  if (sent.result === "sent") return { status: "success", message: `Sent from billing@celpare.com to ${sent.to}.` };
+  if (sent.result === "no_address") return { status: "error", message: "This account has no email address, so nothing was sent." };
+  if (sent.result === "skipped") return { status: "error", message: "Email is not set up on this server (RESEND_API_KEY), so nothing was sent." };
+  return { status: "error", message: "The email did not send. Try again in a minute." };
 }
 
 /* The webhook activates on its own. This is the safety net for a paid request

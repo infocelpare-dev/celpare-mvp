@@ -13,7 +13,7 @@ import {
   When,
 } from "@/components/admin/ui";
 import { BILLING_STATUS_TONE } from "@/components/admin/billing-status";
-import { billingActivate, billingReject } from "@/app/actions/billing";
+import { billingActivate, billingReject, billingSendPaymentLink } from "@/app/actions/billing";
 import {
   displayStatus,
   formatMoney,
@@ -28,7 +28,7 @@ import {
 export const dynamic = "force-dynamic";
 
 /*
-  One billing request (phase CRYPTO, D256 to D260). Shows what was asked, who
+  One billing request (phase CRYPTO, D256 to D262). Shows what was asked, who
   asked, the NOWPayments invoice, every payment NOWPayments reported, and the
   history. Payment and activation happen through the signed webhook; the only
   steps left here are closing a checkout that will not complete, and activating
@@ -289,9 +289,24 @@ export default async function BillingRequestAdminPage({ params }: { params: Prom
           <Section title="Next step">
             <Panel className="space-y-4 p-4">
               {r.status === "awaiting_payment" ? (
-                <p className="text-[13px] text-muted">
-                  Waiting for the customer to pay on NOWPayments. The plan turns on by itself when the payment finishes.
-                </p>
+                <>
+                  <p className="text-[13px] text-muted">
+                    Waiting for the customer to pay on NOWPayments. The plan turns on by itself when the payment finishes.
+                  </p>
+                  {canManage ? (
+                    <ActionForm
+                      action={billingSendPaymentLink}
+                      fields={{ requestId: r.id }}
+                      label="Email payment link"
+                      tone="primary"
+                      confirm={{
+                        title: "Email this customer a payment link?",
+                        body: `From billing@celpare.com to the account's sign in email. It links to their Celpare billing page, where they pay ${amount} in BTC, ETH, BNB, XRP or USDT.`,
+                        confirmLabel: "Send email",
+                      }}
+                    />
+                  ) : null}
+                </>
               ) : null}
 
               {r.status === "partially_paid" ? (

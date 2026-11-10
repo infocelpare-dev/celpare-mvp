@@ -35,7 +35,7 @@ export const subprocessors: Doc = {
               ["Cloudflare", "Domain name service, Turnstile bot check, and hosting once Celpare is live", "Network address and browser signals for the bot check; request data for hosting", "Global network"],
               ["Google Cloud", "Turning voice search recordings into text, only when voice search is switched on and you press the microphone", "The recording, briefly. Not stored by Celpare. No name, email or account id", "EU (eu multi-region) for English, Netherlands (europe-west4) for Somali"],
               ["Google", "Sign in with Google, when you choose it", "Google confirms your identity and shares your name, email and picture with Celpare", "Global"],
-              ["NOWPayments", "Taking payment for paid plans and sponsorship in USDT", "A Celpare order id, the plan and its price; the payment page collects the payment itself. No name or email is sent", "Global"],
+              ["NOWPayments", "Taking payment for paid plans and sponsorship in crypto (BTC, ETH, BNB, XRP or USDT)", "A Celpare order id, the plan and its price; the payment page collects the payment itself. No name or email is sent", "Global"],
             ],
           },
         },

@@ -15,7 +15,7 @@ import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
      only that answer is used, so a replayed or crafted body cannot set the
      status, the amount or the coin.
   3. order_id is the Celpare request; billing_crypto_update (service role only)
-     checks the invoice id, the USD price and that it was paid in USDT, and is
+     checks the invoice id, the USD price and that it was paid in an accepted coin (D261), and is
      idempotent, so NOWPayments retrying the same event changes nothing.
 
   Answers 200 once handled or once it is clear a retry cannot help, 401 on a bad

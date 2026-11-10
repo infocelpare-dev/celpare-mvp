@@ -4,6 +4,7 @@ import { escapeHtml, renderEmail } from "../layout";
 import {
   billingActivatedEmail,
   billingAlertEmail,
+  billingPaymentLinkEmail,
   demoEmail,
   describeBrowser,
   maskIp,
@@ -127,15 +128,26 @@ describe("demo", () => {
 describe("billing (phase CRYPTO)", () => {
   const input = { plan: "Pro", period: "Monthly", amount: "$7.99", invoiceNumber: "CP-2026-0001", endsOn: "7 December 2026" };
 
-  it("says it was paid in USDT, never asks for wallet keys or card details, and names the end date", () => {
+  it("confirms the payment, never asks for wallet keys or card details, and names the end date", () => {
     const e = billingActivatedEmail(input);
     assert.equal(e.kind, "billing");
-    assert.match(e.text, /USDT/);
+    assert.match(e.text, /payment is confirmed/);
     assert.match(e.text, /never asks for card details, wallet keys, seed phrases/);
     assert.match(e.text, /7 December 2026/);
     assert.match(e.text, /CP-2026-0001/);
     assert.match(e.text, /renews automatically/);
     assert.doesNotMatch(e.text, /Payoneer/);
+  });
+
+  it("sends the payment reminder from billing@ to the billing page, never to a payment page (D262)", () => {
+    const e = billingPaymentLinkEmail(input);
+    assert.equal(e.kind, "billing");
+    assert.match(e.subject, /^Finish paying for Pro/);
+    assert.match(e.html, /\/settings\/billing/);
+    assert.doesNotMatch(e.html, /nowpayments\.io/);
+    assert.match(e.text, /BTC, ETH, BNB, XRP or USDT/);
+    assert.match(e.text, /\$7\.99/);
+    assert.doesNotMatch(billingPaymentLinkEmail({ ...input, plan: "Pro\r\nBcc: x@y.z" }).subject, /[\r\n]/);
   });
 
   it("keeps every subject on one line", () => {

@@ -253,7 +253,7 @@ export default async function BillingPage({
             </section>
 
             <p className="mt-10 text-[13px] leading-relaxed text-muted">
-              Celpare takes payment in USDT through NOWPayments and never asks for card details, wallet keys, seed
+              Celpare takes payment in BTC, ETH, BNB, XRP or USDT through NOWPayments and never asks for card details, wallet keys, seed
               phrases or payment screenshots.
               Questions:{" "}
               <Link href="mailto:billing@celpare.com" className="underline underline-offset-2">

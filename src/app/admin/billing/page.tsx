@@ -35,7 +35,7 @@ export const dynamic = "force-dynamic";
 /*
   Plans and billing.
 
-  Billing is USDT through NOWPayments (phase CRYPTO, D256 to D260): the
+  Billing is crypto through NOWPayments (phase CRYPTO, D256 to D262): the
   customer pays on a NOWPayments page and the signed webhook switches the plan
   on. The queue is mostly to watch, not to work: part payments and old Payoneer
   requests (D239) are the only ones that need a person. Nothing renews by
@@ -53,6 +53,16 @@ const QUEUE_TABS: { key: string; label: string; statuses: RequestStatus[] }[] = 
   { key: "expired", label: "Not paid", statuses: ["expired"] },
   { key: "rejected", label: "Closed", statuses: ["rejected"] },
 ];
+
+type PaidRow = {
+  request_id: string;
+  number: string;
+  amount_cents: number;
+  currency: string;
+  paid_at: string;
+  payment_ref: string;
+  billing_requests: { kind: BillingKind; plan: string; billing_name: string; billing_email: string; user_id: string | null } | null;
+};
 
 type QueueRow = {
   id: string;
@@ -101,12 +111,24 @@ export default async function AdminBillingPage({
       .returns<{ id: string; user_id: string | null; kind: BillingKind; plan: string; current_period_end: string; tools: { name: string } | null }[]>(),
     session.db
       .from("invoices")
-      .select("request_id, number, amount_cents, currency, paid_at, payment_ref")
+      .select("request_id, number, amount_cents, currency, paid_at, payment_ref, billing_requests(kind, plan, billing_name, billing_email, user_id)")
       .eq("status", "paid")
       .order("paid_at", { ascending: false })
       .limit(50)
-      .returns<{ request_id: string; number: string; amount_cents: number; currency: string; paid_at: string; payment_ref: string }[]>(),
+      .returns<PaidRow[]>(),
   ]);
+
+  /* What each payment was actually sent in, from the webhook record. */
+  const paidIds = (payments.data ?? []).map((p) => p.request_id);
+  const coins = paidIds.length
+    ? await session.db
+        .from("crypto_payments")
+        .select("request_id, pay_currency, actually_paid, outcome_amount, outcome_currency")
+        .in("request_id", paidIds)
+        .eq("status", "finished")
+        .returns<{ request_id: string; pay_currency: string; actually_paid: number | null; outcome_amount: number | null; outcome_currency: string | null }[]>()
+    : { data: [] as never[] };
+  const coinOf = new Map((coins.data ?? []).map((c) => [c.request_id, c]));
 
   /* Before the billing migration is applied the tables do not exist (42P01).
      Say that, rather than a generic failure. */
@@ -144,7 +166,7 @@ export default async function AdminBillingPage({
 
       <Section
         title="Billing queue"
-        lead="Checkouts by status, oldest first. Plans switch on by themselves when the USDT payment finishes; Needs attention is anything a person must settle."
+        lead="Checkouts by status, oldest first. Plans switch on by themselves when the payment finishes. Awaiting payment is who opened a checkout and has not paid yet: open one to email them a payment link. Needs attention is anything a person must settle."
       >
         {billingMissing ? (
           <Panel className="px-4 py-4 text-[13px] text-muted">
@@ -268,35 +290,59 @@ export default async function AdminBillingPage({
             )}
           </Section>
 
-          <Section title="Payment history" lead="Paid invoices, newest first. NOWPayments payment ids, or Payoneer transactions for the old ones.">
+          <Section title="Payment history" lead="Who paid, for what, and in which coin, newest first. Received is what reached your payout wallet after conversion.">
             {(payments.data ?? []).length === 0 ? (
               <EmptyState title="No payments yet" />
             ) : (
               <TableWrap>
-                <Table className="min-w-[560px]">
+                <Table className="min-w-[880px]">
                   <thead>
                     <tr>
                       <Th>Paid</Th>
+                      <Th>Customer</Th>
+                      <Th>Plan</Th>
+                      <Th numeric>Price</Th>
+                      <Th>Paid with</Th>
+                      <Th>Received</Th>
                       <Th>Reference</Th>
-                      <Th numeric>Amount</Th>
-                      <Th>Payment</Th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(payments.data ?? []).map((p) => (
-                      <Tr key={p.number}>
-                        <Td>
-                          <When iso={p.paid_at} time />
-                        </Td>
-                        <Td>
-                          <Link href={`/admin/billing/${p.request_id}`} className="font-mono text-[13px] hover:underline">
-                            {p.number}
-                          </Link>
-                        </Td>
-                        <Td numeric>{formatMoney(p.amount_cents, p.currency)}</Td>
-                        <Td className="font-mono text-[13px]">{p.payment_ref}</Td>
-                      </Tr>
-                    ))}
+                    {(payments.data ?? []).map((p) => {
+                      const b = p.billing_requests;
+                      const c = coinOf.get(p.request_id);
+                      return (
+                        <Tr key={p.number}>
+                          <Td>
+                            <When iso={p.paid_at} time />
+                          </Td>
+                          <Td>
+                            {b?.user_id ? (
+                              <Link href={`/admin/users/${b.user_id}`} className="font-medium hover:underline">
+                                {b.billing_name}
+                              </Link>
+                            ) : (
+                              b?.billing_name ?? "Deleted"
+                            )}
+                            {b ? <span className="block text-[12px] text-muted">{b.billing_email}</span> : null}
+                          </Td>
+                          <Td>{b ? planLabel(b.kind, b.plan) : "−"}</Td>
+                          <Td numeric>{formatMoney(p.amount_cents, p.currency)}</Td>
+                          <Td className="font-mono text-[13px]">
+                            {c ? `${c.actually_paid ?? "?"} ${c.pay_currency.toUpperCase()}` : "−"}
+                          </Td>
+                          <Td className="font-mono text-[13px]">
+                            {c?.outcome_amount != null ? `${c.outcome_amount} ${String(c.outcome_currency ?? "").toUpperCase()}` : "−"}
+                          </Td>
+                          <Td>
+                            <Link href={`/admin/billing/${p.request_id}`} className="font-mono text-[13px] hover:underline">
+                              {p.number}
+                            </Link>
+                            <span className="block font-mono text-[12px] text-muted">{p.payment_ref}</span>
+                          </Td>
+                        </Tr>
+                      );
+                    })}
                   </tbody>
                 </Table>
               </TableWrap>
@@ -446,16 +492,7 @@ export default async function AdminBillingPage({
         )}
       </Section>
 
-      <Section title="What connecting billing would need">
-        <Panel className="px-4 py-4 text-[13px] leading-relaxed text-muted">
-          A subscriptions table keyed to the provider&rsquo;s customer and subscription ids, a
-          webhook endpoint that is the only thing allowed to write it, and profiles.plan becoming
-          derived from that table rather than set by hand. The admin plan control would then stay
-          for support overrides and would have to say so on the account, so that a manually granted
-          Premium is never mistaken for a paid one. None of that is built, and none of it is
-          implied anywhere on this page.
-        </Panel>
-      </Section>
+
     </>
   );
 }

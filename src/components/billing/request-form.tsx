@@ -9,7 +9,7 @@ import type { Country } from "@/lib/billing/countries";
 
 /*
   The checkout (phase CRYPTO, D256). Submitting creates the request and opens
-  the NOWPayments page, where the person pays in USDT. Nothing is charged on
+  the NOWPayments page, where the person pays in crypto (D261). Nothing is charged on
   celpare.com, and the plan turns on only when the signed webhook confirms it.
 
   Accessibility (ui-ux-pro-max): every field has a visible label; a failed
@@ -210,7 +210,7 @@ export function BillingRequestForm({
             className="mt-1 size-4 shrink-0 accent-[var(--color-foreground)]"
           />
           <span>
-            I understand that I pay in USDT on a NOWPayments page, that my plan starts once the payment is
+            I understand that I pay in crypto (BTC, ETH, BNB, XRP or USDT) on a NOWPayments page, that my plan starts once the payment is
             confirmed on the blockchain, that it does not renew automatically, and that I can ask for a full refund
             within 24 hours of the payment being confirmed and not after, paid back in USDT to an address I give. See
             the{" "}
@@ -224,10 +224,10 @@ export function BillingRequestForm({
       </div>
 
       <Button type="submit" className="w-full" disabled={pending} aria-busy={pending}>
-        {pending ? "Opening the payment page..." : "Pay with USDT"}
+        {pending ? "Opening the payment page..." : "Pay with crypto"}
       </Button>
       <p className="text-center text-[13px] text-muted">
-        You pay on NOWPayments in USDT. Celpare never asks for card details, wallet keys or payment screenshots.
+        You pay on NOWPayments in BTC, ETH, BNB, XRP or USDT. Celpare never asks for card details, wallet keys or payment screenshots.
       </p>
     </form>
   );

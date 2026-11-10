@@ -14,7 +14,7 @@ export const BILLING_PERIODS = ["monthly", "yearly"] as const;
 export type BillingPeriod = (typeof BILLING_PERIODS)[number];
 
 /* Statuses on the request. pending, under_review and invoice_sent are the
-   Payoneer flow (D239), kept for history; the rest are the USDT checkout (D256). */
+   Payoneer flow (D239), kept for history; the rest are the crypto checkout (D256, D261). */
 export const REQUEST_STATUSES = [
   "pending",
   "under_review",
@@ -94,7 +94,7 @@ export function displayStatus(
 /* What the person should expect next, in one sentence. */
 export const NEXT_STEP: Record<DisplayStatus, string> = {
   Pending: "We received your request and will review it shortly.",
-  "Awaiting Payment": "Finish paying in USDT on the NOWPayments page. Your plan turns on as soon as the payment confirms.",
+  "Awaiting Payment": "Finish paying on the NOWPayments page. Your plan turns on as soon as the payment confirms.",
   "Partly Paid": "Less than the price arrived, so nothing was switched on. We will email you to settle it.",
   "Not Paid": "This checkout closed without a payment. Nothing was charged.",
   "Under Review": "We are checking your details before sending an invoice.",

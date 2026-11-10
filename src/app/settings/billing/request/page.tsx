@@ -120,7 +120,7 @@ export default async function BillingRequestPage({
         ) : (
           <>
             <p className="mt-3 text-[15px] leading-relaxed text-muted">
-              Add your details for the receipt, then pay in USDT on the NOWPayments page. Your plan switches on by
+              Add your details for the receipt, then pay in BTC, ETH, BNB, XRP or USDT on the NOWPayments page. Your plan switches on by
               itself as soon as the payment confirms on the blockchain, usually within minutes.
             </p>
 

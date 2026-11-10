@@ -3,8 +3,8 @@ import { OPERATOR } from "../operator";
 
 /*
   Sponsorship Terms, version 1.2 (phase CRYPTO, 2026-11-10). The offer is D204,
-  the ranking D205 (docs/context/18-sponsored-tools.md). Paid in USDT through
-  NOWPayments like the paid plans (D256): /pricing/sponsored says Pay with USDT
+  the ranking D205 (docs/context/18-sponsored-tools.md). Paid in crypto through
+  NOWPayments like the paid plans (D256, D261): /pricing/sponsored says Pay with crypto
   while features.billing_requests is on, Coming soon otherwise.
 */
 
@@ -26,7 +26,7 @@ export const sponsorship: Doc = {
       heading: "1. What a sponsorship is",
       blocks: [
         "A sponsorship is a flat monthly price, shown on the [sponsorship page](/pricing/sponsored), for an approved tool you own on Celpare. It makes the tool eligible to appear in a slot labelled Sponsored in Search results and in Ask Celpare answers. There is no bid, cost per click, cost per view, budget or tier.",
-        "A sponsorship is paid in USDT through NOWPayments, and runs for one month from the moment the payment is confirmed. It does not renew automatically: when it ends, the tool stops being eligible for the Sponsored slot until a new month is paid. The [Paid Plans Terms](/legal/paid-plans) apply to payment, part payments and refunds.",
+        "A sponsorship is paid in BTC, ETH, BNB, XRP or USDT through NOWPayments, and runs for one month from the moment the payment is confirmed. It does not renew automatically: when it ends, the tool stops being eligible for the Sponsored slot until a new month is paid. The [Paid Plans Terms](/legal/paid-plans) apply to payment, part payments and refunds.",
       ],
     },
     {
@@ -78,7 +78,7 @@ export const sponsorship: Doc = {
     },
   ],
   changes: [
-    { version: "1.2", date: "2026-11-10", note: "Sponsorship is paid in USDT through NOWPayments. Payoneer is no longer used." },
+    { version: "1.2", date: "2026-11-10", note: "Sponsorship is paid in crypto through NOWPayments. Payoneer is no longer used." },
     { version: "1.1", date: "2026-11-07", note: "Sponsorship is paid by invoice through Payoneer, runs one month from the confirmed payment and does not renew automatically." },
     { version: "1.0", date: "2026-10-07", note: "First version, before sponsorship opens." },
   ],

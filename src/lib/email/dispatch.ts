@@ -4,6 +4,7 @@ import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import {
   billingActivatedEmail,
   billingAlertEmail,
+  billingPaymentLinkEmail,
   type BillingAlertInput,
   type BillingEmailInput,
   demoEmail,
@@ -293,6 +294,23 @@ export function emailBillingCustomer(userId: string | null, _step: BillingStep, 
     if (!to) return;
     await sendEmail(to, billingActivatedEmail(input));
   });
+}
+
+/* Awaited by the admin action, so the admin learns whether it went (D262).
+   Goes to the account's own sign in address, like every customer billing mail. */
+export async function emailBillingPaymentLink(
+  userId: string | null,
+  input: BillingEmailInput,
+): Promise<{ result: "sent" | "skipped" | "failed" | "no_address"; to?: string }> {
+  if (!userId) return { result: "no_address" };
+  const to = await addressOf(userId);
+  if (!to) return { result: "no_address" };
+  try {
+    return { result: await sendEmail(to, billingPaymentLinkEmail(input)), to };
+  } catch (err) {
+    console.error("[email] billing payment link failed", err);
+    return { result: "failed", to };
+  }
 }
 
 export function emailBillingAlert(input: BillingAlertInput) {
