@@ -64,6 +64,9 @@ const PLAN_LABEL: Record<string, string> = {
 const MODES: {
   key: ModeKey;
   label: string;
+  /* What the sources chip says on a phone, where the full name pushed Deep
+     match onto a second row (founder 2026-11-10). */
+  short: string;
   icon: typeof Search;
   hint: string;
   /* Always on, cannot be switched off (founder, 2026-10-07). The server
@@ -73,6 +76,7 @@ const MODES: {
   {
     key: "toolSearch",
     label: "Catalogue search",
+    short: "Catalogue",
     icon: Search,
     hint: "Always on. Searches the Celpare catalogue for matching tools, models, SaaS and tech.",
     fixed: true,
@@ -80,12 +84,14 @@ const MODES: {
   {
     key: "webSearch",
     label: "Web search",
+    short: "Web",
     icon: Globe,
     hint: "Check the web when the answer depends on something recent",
   },
   {
     key: "deepResearch",
     label: "Deep match",
+    short: "Match",
     icon: Telescope,
     hint: "Compare catalogue tools and check the web, then give the best fit or a build plan. Slower.",
   },
@@ -166,6 +172,8 @@ export function Composer({
       : activeCount === 1
         ? active[0].label
         : `${activeCount} sources on`;
+  const summaryShort =
+    activeCount === 0 ? "Off" : activeCount === 1 ? active[0].short : `${activeCount} sources`;
 
   const lockedMessage = (mode: (typeof MODES)[number], grant: ModeGrant) => {
     const requires = grant.requires;
@@ -188,7 +196,11 @@ export function Composer({
       </p>
       <div
         className={cn(
-          "rounded-[20px] border bg-surface px-3 pb-2 pt-3 transition-colors duration-200",
+          /* relative: on phones the sources menu is pinned to this box, not
+             to its button, so it is as wide as the composer and never leaves
+             the screen (founder 2026-11-10: it ran off the right edge when
+             the chat history rail pushed the button inwards). */
+          "relative rounded-[20px] border bg-surface px-3 pb-2 pt-3 transition-colors duration-200",
           focused ? "border-foreground" : "border-border",
         )}
       >
@@ -230,7 +242,7 @@ export function Composer({
             given message.
           */}
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <div className="relative min-w-0" ref={menuRef}>
+          <div className="min-w-0 sm:relative" ref={menuRef}>
             <button
               type="button"
               onClick={() => setMenuOpen((v) => !v)}
@@ -244,7 +256,9 @@ export function Composer({
               )}
             >
               <SlidersHorizontal className="size-3.5 shrink-0" aria-hidden />
-              <span className="truncate">{summary}</span>
+              <span className="sr-only">{summary}</span>
+              <span aria-hidden className="truncate min-[420px]:hidden">{summaryShort}</span>
+              <span aria-hidden className="hidden truncate min-[420px]:inline">{summary}</span>
               <ChevronUp
                 className={cn(
                   "size-3.5 shrink-0 transition-transform duration-200",
@@ -260,7 +274,7 @@ export function Composer({
                 aria-label="What Celpare may use for this answer"
                 /* Above the button, because the composer sits at the bottom of
                    the screen and a menu dropping down would leave the page. */
-                className="absolute bottom-[calc(100%+8px)] left-0 z-20 w-[min(320px,calc(100vw-48px))] overflow-hidden rounded-2xl border border-border bg-background"
+                className="absolute inset-x-0 bottom-[calc(100%+8px)] z-20 max-h-[50dvh] overflow-y-auto rounded-2xl border border-border bg-background sm:inset-x-auto sm:left-0 sm:w-[320px]"
               >
                 {sources.map((mode) => {
                   const grant = grants[mode.key];
