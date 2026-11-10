@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminScopedClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { clientIp } from "@/lib/telemetry";
+import { myRole } from "@/lib/auth/roles";
 import {
   capabilitiesFor,
   isStaffRole,
@@ -69,13 +70,18 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   } = await db.auth.getUser();
   if (!user) return null;
 
-  const { data: profile, error } = await db
-    .from("profiles")
-    .select("id, username, full_name, avatar_url, role, account_status")
-    .eq("id", user.id)
-    .maybeSingle();
+  const [{ data: row, error }, role] = await Promise.all([
+    db
+      .from("profiles")
+      .select("id, username, full_name, avatar_url, account_status")
+      .eq("id", user.id)
+      .maybeSingle(),
+    /* Not a column read: profile_roles(), since anon could read the column (SEC.7). */
+    myRole(db, user.id),
+  ]);
 
-  if (error || !profile) return null;
+  if (error || !row) return null;
+  const profile = { ...row, role };
   // A suspended admin is not an admin. has_admin_capability() says the same
   // thing in SQL; saying it here too means the shell never renders for one.
   if (profile.account_status !== "active") return null;

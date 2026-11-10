@@ -16,6 +16,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { PLAN_LIMITS } from "@/lib/ai/config";
 import { isWebSearchConfigured } from "@/lib/ai/web-search";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { myRole } from "@/lib/auth/roles";
 import { isBillingOpen } from "@/lib/platform/settings";
 import { PrivacyForm } from "@/components/settings/privacy-form";
 import { NotificationForm } from "@/components/settings/notification-form";
@@ -91,18 +92,20 @@ export default async function SettingsPage() {
 
   /* plan and ask_settings are not readable from the table (D194); they come
      from my_profile_private(), which answers for the caller only. */
-  const [{ data: row }, { data: own }] = await Promise.all([
+  const [{ data: row }, { data: own }, role] = await Promise.all([
     supabase
       .from("profiles")
       .select(
-        "is_developer, username, full_name, avatar_url, role, created_at, account_status, is_private, show_replies, show_follows, show_saved_tools, show_saved_models",
+        "is_developer, username, full_name, avatar_url, created_at, account_status, is_private, show_replies, show_follows, show_saved_tools, show_saved_models",
       )
       .eq("id", user.id)
       .maybeSingle(),
     supabase.rpc("my_profile_private"),
+    /* role is not readable from the table (SEC.7); profile_roles answers for the caller. */
+    myRole(supabase, user.id),
   ]);
   const ownPrivate = own as { plan?: string | null; ask_settings?: unknown } | null;
-  const profile = row ? { ...row, plan: ownPrivate?.plan ?? null, ask_settings: ownPrivate?.ask_settings ?? null } : null;
+  const profile = row ? { ...row, role, plan: ownPrivate?.plan ?? null, ask_settings: ownPrivate?.ask_settings ?? null } : null;
 
   const plan = (profile?.plan ?? "free") as Plan;
   const limits = PLAN_LIMITS[plan];
