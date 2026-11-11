@@ -12,8 +12,8 @@ export const privacy: Doc = {
   title: "Privacy Policy",
   description:
     "What personal data Celpare collects, why, who processes it, how long it is kept, and how to see, download or delete it.",
-  version: "1.4",
-  effective: "2026-11-10",
+  version: "1.5",
+  effective: "2026-11-11",
   summary: [
     "We collect what you give us (your account, profile, posts, messages and questions) and what using Celpare produces (searches, views, devices). We do not sell it and we run no advertising trackers.",
     "Your posts, comments and public profile are visible to anyone. Your email, messages, Ask Celpare chats, searches and devices are not.",
@@ -60,12 +60,13 @@ export const privacy: Doc = {
             "Billing, only if you buy a paid plan: the name and email for your receipt, your country, and if you give them your company, billing address and tax number; the plan, price and dates; the NOWPayments invoice and payment ids, the coin, network and amount paid, and the blockchain transaction id; and each status change. We use these to confirm the payment, run your plan and handle refunds. Because they are financial records, we keep them after you delete your account for as long as the law requires accounting records to be kept, without linking them to a Celpare account.",
             "Devices and security: a random browser id stored in a cookie, the browser and operating system from your user agent, and for security events the IP address. We use these to tell you about a new login (that email shows the browser and a partly masked network address) and to protect accounts.",
             "Errors: if something breaks, an error report with technical details about the page and browser. It never includes the content of your posts, messages or questions.",
+            "Visits: which Celpare pages are opened, the site that linked you here, your country, and your browser and operating system. We also count sign ups, Ask Celpare questions (never their words), checkouts and payments with their plan and price. When you are signed out you are counted under an id that changes every day and is made on our server from your network address and browser, so the address itself is never sent; when signed in, under your account id. These events go to Statsig, our product analytics provider. Nothing is stored in your browser for this, and a browser that sends Global Privacy Control or Do Not Track is not counted.",
           ],
         },
         "**What we do not collect**",
         {
           list: [
-            "We do not use analytics or advertising trackers, and we do not build an advertising profile of you.",
+            "We do not use advertising trackers or analytics cookies, and we do not build an advertising profile of you.",
             "We do not collect your precise location, contacts, or payment card or bank details. Paid plans are paid in crypto (BTC, ETH, BNB, XRP or USDT) through NOWPayments, which handles the payment under its own privacy policy. Celpare never sees your wallet keys. A blockchain transaction is public by nature: anyone can see the sending address, the amount and the time on the blockchain, though not that it was for Celpare.",
             "We do not ask for your date of birth.",
           ],
@@ -89,6 +90,7 @@ export const privacy: Doc = {
               ["Limit usage per plan and stop abuse, spam and automated traffic", "Usage, hashed network address, captcha result", "Legitimate interest in keeping Celpare available and safe"],
               ["Alert you to a new login and protect accounts", "Devices, security events", "Legitimate interest in security"],
               ["Find and fix errors", "Error reports", "Legitimate interest in a working service"],
+              ["Count visits and see how Celpare is used, so we can improve it", "Visits and product events", "Our legitimate interest in understanding and improving Celpare. You can object (section 8), or send Global Privacy Control or Do Not Track"],
               ["Review developer submissions and verify tools", "Developer data", "Performance of contract"],
               ["Moderate reported content and enforce the [Acceptable Use Policy](/legal/acceptable-use)", "Content, reports", "Legitimate interest in a safe community"],
               ["Email you about your account, and notifications you have switched on", "Email, preferences", "Performance of contract. Notification emails can be switched off in Settings"],
@@ -131,6 +133,7 @@ export const privacy: Doc = {
               ["Serper", "Web search for Ask Celpare, when a question needs current information", "Outside the EU, location not published"],
               ["Upstash", "Rate limits, using hashed keys", "Ireland (EU)"],
               ["Sentry", "Error reports, without content", "Germany (EU)"],
+              ["Statsig (Amplitude)", "Counting visits and product events, without cookies", "United States"],
               ["Resend", "Sending emails", "Ireland (EU) sending region"],
               ["Forward Email", "Receiving email sent to celpare.com addresses", "United States"],
               ["Cloudflare", "Domain, bot check (Turnstile), and hosting once Celpare is live", "Global network"],
@@ -166,6 +169,7 @@ export const privacy: Doc = {
               ["Ask Celpare usage records (plan, features used, answer size)", "While your account exists, deleted with it"],
               ["Rate limit counters", "Hours to one day, under hashed keys"],
               ["Error reports", "As long as Sentry keeps them for our plan, at most 90 days"],
+              ["Visit and product event records", "As long as Statsig keeps them for our plan"],
               ["Email delivery logs", "As long as Resend keeps them for our plan"],
               ["Waitlist and demo request emails", "Until launch communications end, or you ask us to delete them"],
               ["Records of admin and moderation actions", "Kept, because they show how decisions about content and accounts were made"],
@@ -216,7 +220,7 @@ export const privacy: Doc = {
       id: "cookies",
       heading: "11. Cookies",
       blocks: [
-        "Celpare uses only first party cookies that are needed for it to work: signing in, the login code step, password reset, the anonymous question limit, new login alerts, and remembering which feed posts you have already seen. There are no advertising or analytics cookies, so there is no cookie banner. The full list is in the [Cookie Policy](/legal/cookies).",
+        "Celpare uses only first party cookies that are needed for it to work: signing in, the login code step, password reset, the anonymous question limit, new login alerts, and remembering which feed posts you have already seen. There are no advertising or analytics cookies, so there is no cookie banner. Visits are counted on our server without cookies or browser storage (section 2). The full list is in the [Cookie Policy](/legal/cookies).",
       ],
     },
     {
@@ -235,6 +239,7 @@ export const privacy: Doc = {
     },
   ],
   changes: [
+    { version: "1.5", date: "2026-11-11", note: "Visits and product events are counted without cookies and sent to Statsig: what is counted, the daily id for signed out visitors, and how to opt out." },
     { version: "1.4", date: "2026-11-10", note: "Paid plans are paid in crypto through NOWPayments: what payment data we keep, and that blockchain transactions are public. Payoneer is no longer used." },
     { version: "1.3", date: "2026-11-07", note: "Paid plans: the billing details we collect, that Payoneer handles payments, and that billing records are kept as financial records." },
     { version: "1.2", date: "2026-11-04", note: "Privacy and data requests now go to reports@celpare.com." },

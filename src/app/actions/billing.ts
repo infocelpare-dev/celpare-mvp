@@ -23,6 +23,7 @@ import { createInvoice, isNowpaymentsUrl, nowpaymentsConfigured } from "@/lib/bi
 import { activationEmailInfo, requestSummary } from "@/lib/billing/notify";
 import { emailBillingCustomer, emailBillingPaymentLink } from "@/lib/email/dispatch";
 import { siteUrl } from "@/lib/email/layout";
+import { track } from "@/lib/statsig/server";
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
@@ -179,6 +180,12 @@ export async function startCheckout(_prev: BillingFormState, formData: FormData)
 
   revalidatePath("/settings/billing");
   if (!isNowpaymentsUrl(paymentUrl)) return { status: "error", message: "The payment page could not be opened." };
+  /* Statsig (D264): the first step of the paid funnel; purchase comes from the webhook. */
+  await track("checkout_started", {
+    userId: user.id,
+    value: row.amount_cents / 100,
+    metadata: { kind: v.kind, plan: v.plan, period: v.period, coin: v.payCurrency },
+  });
   redirect(paymentUrl);
 }
 
