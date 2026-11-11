@@ -19,16 +19,16 @@ const yearlyLine = (id: string) => {
 */
 const COMMON = [
   {
-    q: "When can I buy a paid plan?",
-    a: "Paid plans are not on sale yet. Everything on the Free plan works today, and this page will let you upgrade as soon as payments open.",
+    q: "How do I pay?",
+    a: "Choose Pay with crypto on a plan, add your details for the receipt, pick BTC, ETH, BNB, XRP or USDT, and pay on the NOWPayments page. Your plan switches on by itself once the payment confirms, usually within minutes. Nothing renews automatically.",
   },
   {
     q: "Can I get a refund?",
-    a: "You have 24 hours after paying to cancel and get your money back. After 24 hours, payments are not refunded.",
+    a: "You have 24 hours after the payment confirms to cancel and get all of it back, paid in USDT to an address you give. After 24 hours, payments are not refunded.",
   },
   {
     q: "What currency are prices in?",
-    a: "All prices are in US dollars.",
+    a: "Prices are set in US dollars. You pay the same value in the coin you choose, plus your own network fee.",
   },
 ];
 

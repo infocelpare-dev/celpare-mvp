@@ -13,8 +13,8 @@ export const developerTerms: Doc = {
   slug: "developer-terms",
   title: "Developer Terms",
   description: "The rules for listing AI tools and models on Celpare as a developer: accuracy, review, verification, launches and removal.",
-  version: "1.0",
-  effective: "2026-10-07",
+  version: "1.1",
+  effective: "2026-11-11",
   summary: [
     "List only tools and models you build or officially represent, and describe them accurately.",
     "Celpare reviews every submission before it is public. You cannot approve your own.",
@@ -115,9 +115,12 @@ export const developerTerms: Doc = {
       id: "plans",
       heading: "10. Developer plans",
       blocks: [
-        "Developer plans and their limits are shown on the pricing page. Paid developer plans are not on sale yet; when they are, the [Paid Plans Terms](/legal/paid-plans) apply. Sponsorship is covered by the [Sponsorship Terms](/legal/sponsorship).",
+        "Developer plans and their limits are shown on the pricing page. Paid developer plans are paid in crypto through NOWPayments, and the [Paid Plans Terms](/legal/paid-plans) apply to them. Sponsorship is covered by the [Sponsorship Terms](/legal/sponsorship).",
       ],
     },
   ],
-  changes: [{ version: "1.0", date: "2026-10-07", note: "First version." }],
+  changes: [
+    { version: "1.1", date: "2026-11-11", note: "Paid developer plans are on sale, paid in crypto through NOWPayments." },
+    { version: "1.0", date: "2026-10-07", note: "First version." },
+  ],
 };
