@@ -1,4 +1,5 @@
 import type { Doc } from "../types";
+import { OPERATOR } from "../operator";
 
 /* Help: developers and sponsorship (phase LEGAL, 2026-10-07). D75, D200 to D205, phases 4S to 4AC. */
 
@@ -50,6 +51,60 @@ export const developers: Doc = {
       heading: "Analytics",
       blocks: [
         "Analytics is on the Pro and Elite developer plans. The board shows views of your listings over time, how people arrived, and the search terms that led them to your tool, for the last 24 hours, 7 days or 30 days. It never shows who viewed.",
+      ],
+    },
+  ],
+};
+
+/*
+  A tool Celpare added itself (admin_seed, D40, D266) has no developer. Its owner
+  writes to submission@ from an address at the tool's own domain, which is the
+  proof of ownership: anyone can open a free mailbox, nobody else can send from
+  the company's domain. There is no in app claim flow yet, so a handover is done
+  by hand by a Celpare admin.
+*/
+export const listedTool: Doc = {
+  slug: "your-tool-is-listed",
+  title: "Your tool is listed, but you did not add it",
+  description: "How the people behind a tool can correct, take over or remove a listing that Celpare added.",
+  version: "1.0",
+  effective: "2026-11-11",
+  sections: [
+    {
+      id: "why",
+      heading: "Why your tool is on Celpare",
+      blocks: [
+        "Celpare adds some widely used tools itself, from public information such as the tool's own website, so people can find and compare them. A tool page says when a listing was added by Celpare rather than submitted by the people who build it.",
+        "If it is your tool, you can ask us to correct the details, hand the listing over to you, or remove it.",
+      ],
+    },
+    {
+      id: "how",
+      heading: "How to send a request",
+      blocks: [
+        {
+          steps: [
+            `Email [${OPERATOR.submissions}](mailto:${OPERATOR.submissions}).`,
+            "Send it from an email address at your tool's own domain, the same domain as the website on the listing. If the listing links to example.com, write from an address such as name@example.com.",
+            "Include the link to the tool's page on Celpare, your name and your role, and what you want: a correction (say what is wrong and link a public page that shows the right information), a handover to your Celpare account (give the email of that account), or removal.",
+          ],
+        },
+        "We cannot act on a request sent from a free mailbox such as Gmail or Outlook, or from a different domain, because anyone can open one of those. The address on your company's domain is how we know the request comes from the people who run the tool.",
+      ],
+    },
+    {
+      id: "after",
+      heading: "What happens next",
+      blocks: [
+        {
+          list: [
+            `We reply from ${OPERATOR.submissions}. We may write back to the address you used to confirm the request.`,
+            "Corrections are made to the listing once we can see the right information on a public page.",
+            "For a handover, your Celpare account needs Developer Mode switched on and the [Developer Terms](/legal/developer-terms) accepted. The listing then moves to your developer workspace, where you can edit it, launch features and request the verified tick.",
+            "A removed listing disappears from Celpare, including Search, Explore, Compare and Ask Celpare.",
+          ],
+        },
+        "We never ask for a password, a payment or a verification code to change a listing. An email asking for any of those is not from Celpare.",
       ],
     },
   ],

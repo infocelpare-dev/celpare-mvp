@@ -633,9 +633,10 @@ export default async function ToolPage({
           <Section title="Developer">
             <p className="text-[14px] leading-relaxed text-muted">
               This listing was added by Celpare rather than submitted by the
-              people who build it. If that is you,{" "}
-              <Link href="/developer" className="underline underline-offset-2">
-                claim it in Developer Mode
+              people who build it. If that is you, email us from your
+              company&apos;s domain to correct it, take it over or remove it.{" "}
+              <Link href="/help/your-tool-is-listed" className="underline underline-offset-2">
+                How to send a request
               </Link>
               .
             </p>
