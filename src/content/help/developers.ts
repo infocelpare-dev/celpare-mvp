@@ -73,7 +73,7 @@ export const sponsoredTools: Doc = {
       id: "developers",
       heading: "If you want to sponsor",
       blocks: [
-        "Sponsorship is a flat monthly price per tool on the [sponsorship page](/pricing/sponsored), shown to developers. There you choose which of your tools to sponsor: a tool can be chosen once it is approved, has a secure (https) website and is not already sponsored, and any other tool shows what it still needs. Sponsor this tool on your tool page opens the page with that tool chosen. It is not on sale yet. The rules are in the [Sponsorship Terms](/legal/sponsorship).",
+        "Sponsorship is a flat monthly price per tool on the [sponsorship page](/pricing/sponsored), shown to developers. There you choose which of your tools to sponsor: a tool can be chosen once it is approved, has a secure (https) website and is not already sponsored, and any other tool shows what it still needs. Sponsor this tool on your tool page opens the page with that tool chosen. You pay for each month in crypto through NOWPayments, and it does not renew by itself. The rules are in the [Sponsorship Terms](/legal/sponsorship).",
       ],
     },
   ],
