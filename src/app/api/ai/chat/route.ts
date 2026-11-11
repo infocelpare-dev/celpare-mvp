@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ask } from "@/lib/ai/gateway";
 import { INPUT_MAX_CHARS } from "@/lib/ai/config";
 import { isEnabled } from "@/lib/platform/settings";
+import { track } from "@/lib/statsig/server";
 
 /* Reads cookies and streams, so it must never be prerendered or cached. */
 export const dynamic = "force-dynamic";
@@ -83,6 +84,16 @@ export async function POST(request: NextRequest) {
   });
 
   const setCookie = result.identity?.setCookie;
+
+  /* Statsig (D264): that a question was asked and how it ended, never its words. */
+  await track("ask_question", {
+    userId: result.identity?.userId ?? null,
+    metadata: {
+      outcome: result.ok ? "answered" : result.kind,
+      web: parsed.data.modes?.webSearch ?? null,
+      deep: parsed.data.modes?.deepResearch ?? null,
+    },
+  });
 
   if (!result.ok) {
     const status =

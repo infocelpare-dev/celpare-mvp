@@ -5,6 +5,7 @@ import { activationEmailInfo, requestSummary } from "@/lib/billing/notify";
 import type { BillingAlertEvent } from "@/lib/email/messages";
 import { emailBillingAlert, emailBillingCustomer } from "@/lib/email/dispatch";
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
+import { trackAccount } from "@/lib/statsig/server";
 
 /*
   The NOWPayments webhook (phase CRYPTO, D257). The only thing that turns a
@@ -96,6 +97,20 @@ export async function POST(request: NextRequest) {
         paymentId,
         paid,
       });
+      if (result === "activated" && s.row.user_id) {
+        /* Statsig (D264): revenue, in US dollars, once per activated request. */
+        await trackAccount("purchase", {
+          userId: s.row.user_id,
+          country: s.row.country,
+          value: s.row.amount_cents / 100,
+          metadata: {
+            kind: s.row.kind,
+            plan: s.row.plan,
+            period: s.row.period,
+            coin: payment.pay_currency ? String(payment.pay_currency) : null,
+          },
+        });
+      }
       if (result === "activated") {
         const { data: r } = await createAdminClient()
           .from("billing_requests")

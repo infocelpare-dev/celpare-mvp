@@ -68,6 +68,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/search", label: "Search", capability: "analytics.read" },
       { href: "/admin/recommendations", label: "Recommendations", capability: "analytics.read" },
       { href: "/admin/billing", label: "Plans and billing", capability: "billing.read" },
+      { href: "/admin/revenue", label: "Revenue", capability: "billing.read" },
     ],
   },
   {

@@ -6,6 +6,7 @@ import { clientIp } from "@/lib/telemetry";
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import { TERMS_VERSION } from "@/content/legal";
 import { PLANS_COOKIE } from "@/lib/pricing/due";
+import { track } from "@/lib/statsig/server";
 
 /*
   What happens once a login is complete (D192): the browser gets a long lived
@@ -53,7 +54,7 @@ export async function markPlansDue(): Promise<void> {
 }
 
 export async function afterLogin(
-  user: { id: string; email?: string; user_metadata?: Record<string, unknown> },
+  user: { id: string; email?: string; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> },
   opts: { welcome: boolean },
 ): Promise<void> {
   /* New accounts get /welcome instead; the plans are for returning logins. */
@@ -67,6 +68,12 @@ export async function afterLogin(
     (typeof meta.full_name === "string" && meta.full_name) ||
     (typeof meta.name === "string" && meta.name) ||
     null;
+
+  /* Statsig (D264): a new account is a sign up; a returning login is not an event. */
+  if (opts.welcome) {
+    const provider = typeof user.app_metadata?.provider === "string" ? user.app_metadata.provider : "email";
+    await track("sign_up", { userId: user.id, metadata: { method: provider } });
+  }
 
   after(async () => {
     await noteLogin({ userId: user.id, email: user.email, deviceId, userAgent, ip });

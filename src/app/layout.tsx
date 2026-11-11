@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SignInPromptHost } from "@/components/auth/sign-in-prompt";
+import { PageviewBeacon } from "@/components/analytics/pageview-beacon";
 import "./globals.css";
 
 /*
@@ -77,6 +78,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {children}
           {/* One sign in prompt for the whole app, opened by SignInButton. */}
           <SignInPromptHost />
+          {/* Cookieless page views, counted server side (D264). */}
+          <PageviewBeacon />
         </ThemeProvider>
       </body>
     </html>
