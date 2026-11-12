@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { aiProviderState } from "@/lib/admin/ai-health-state";
 import { models, providerName } from "@/lib/ai/providers";
 import { paidAllowed, paidModelRefusal } from "@/lib/ai/providers/free-only";
 import {
@@ -130,11 +131,10 @@ async function checkAiProvider(db: SupabaseClient): Promise<HealthCheck> {
     };
   }
 
-  const errorRate = failed / requests;
   return {
     key: "ai",
     label: "AI provider",
-    state: errorRate > 0.25 ? "down" : errorRate > 0.05 ? "degraded" : "healthy",
+    state: aiProviderState(requests, failed),
     detail: `${provider}: ${failed} of ${requests} requests failed in 24 hours`,
   };
 }
