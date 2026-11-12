@@ -7,6 +7,7 @@ import { Field } from "@/components/ui/field";
 import { startCheckout, type BillingFormState } from "@/app/actions/billing";
 import type { PayCoin } from "@/lib/billing/coins";
 import type { Country } from "@/lib/billing/countries";
+import { planLabel, type BillingKind } from "@/lib/billing/catalog";
 
 /*
   The checkout (phase CRYPTO, D256). The person picks the coin here (D263);
@@ -259,7 +260,7 @@ export function BillingRequestForm({
       </div>
 
       <Button type="submit" className="w-full" disabled={pending} aria-busy={pending}>
-        {pending ? "Opening the payment page..." : "Pay with crypto"}
+        {pending ? "Opening the payment page..." : `Get ${planLabel(kind as BillingKind, plan)}`}
       </Button>
       <p className="text-center text-[13px] text-muted">
         You pay on NOWPayments. Celpare never asks for card details, wallet keys or payment screenshots.

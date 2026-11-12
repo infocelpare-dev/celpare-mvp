@@ -33,7 +33,7 @@ export function PlanCard({
   icon: LucideIcon;
   billing: Billing;
   action: PlanAction;
-  /* Where "Pay with crypto" goes (phase CRYPTO), when action is "request". */
+  /* Where "Get <plan>" goes (phase CRYPTO), when action is "request". */
   requestHref?: string;
 }) {
   const paid = plan.monthlyCents > 0;
@@ -142,8 +142,7 @@ function PlanButton({
     case "request":
       return requestHref ? (
         <ButtonLink href={requestHref} className={full} aria-describedby="payments-note">
-          Pay with crypto
-          <span className="sr-only"> for {name}</span>
+          Get {name}
         </ButtonLink>
       ) : null;
     case "current":

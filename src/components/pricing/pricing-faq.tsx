@@ -20,7 +20,7 @@ const yearlyLine = (id: string) => {
 const COMMON = [
   {
     q: "How do I pay?",
-    a: "Choose Pay with crypto on a plan, add your details for the receipt, pick BTC, ETH, BNB, XRP or USDT, and pay on the NOWPayments page. Your plan switches on by itself once the payment confirms, usually within minutes. Nothing renews automatically.",
+    a: "Choose Get on the plan you want, for example Get Pro, add your details for the receipt, pick BTC, ETH, BNB, XRP or USDT, and pay on the NOWPayments page. Your plan switches on by itself once the payment confirms, usually within minutes. Nothing renews automatically.",
   },
   {
     q: "Can I get a refund?",
