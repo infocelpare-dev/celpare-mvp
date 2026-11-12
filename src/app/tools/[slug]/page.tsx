@@ -31,14 +31,17 @@ import {
 import {
   getDeveloperCard,
   getRatingBreakdown,
+  getToolPriceCheck,
   getToolProfile,
   getToolReviews,
+  type PriceCheck,
   getViewerState,
   getVerificationRequestState,
   getSponsorshipState,
   type ToolProfile,
 } from "@/lib/tools/queries";
 import { recordToolView } from "@/lib/telemetry";
+import { shortDate } from "@/lib/compare/present";
 import { Suspense } from "react";
 import { getAdminSession } from "@/lib/admin/guard";
 import { ProfileRecommendations } from "@/components/recommend/profile-recommendations";
@@ -160,11 +163,12 @@ export default async function ToolPage({
   const tool = await getToolProfile(slug);
   if (!tool) notFound();
 
-  const [viewer, reviews, breakdown, developer] = await Promise.all([
+  const [viewer, reviews, breakdown, developer, priceCheck] = await Promise.all([
     getViewerState(tool.id, tool.developer_id),
     getToolReviews(tool.id),
     getRatingBreakdown(tool.id),
     getDeveloperCard(tool.developer_id, tool.id),
+    getToolPriceCheck(tool.id),
   ]);
   /* Only the owner sees Request verification, so only the owner pays for it. */
   const verification =
@@ -522,12 +526,15 @@ export default async function ToolPage({
             <div className="bg-background p-4">
               <dt className="text-[13px] text-muted">In the catalogue since</dt>
               <dd className="mt-1 text-[15px]">
-                {new Date(tool.published_at ?? tool.submitted_at).toLocaleDateString("en-GB", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                  timeZone: "UTC",
-                })}
+                {/* shortDate, so it reads "13 Sep 2026" like Prices checked
+                    below rather than en-GB's "13 Sept 2026". */}
+                {shortDate(tool.published_at ?? tool.submitted_at)}
+              </dd>
+            </div>
+            <div className="bg-background p-4 sm:col-span-2">
+              <dt className="text-[13px] text-muted">Prices checked</dt>
+              <dd className="mt-1 text-[15px]">
+                <PriceCheckLine check={priceCheck} />
               </dd>
             </div>
           </dl>
@@ -684,5 +691,45 @@ function LinkChip({
         <ExternalLink className="size-3.5 shrink-0 text-muted" aria-hidden />
       </a>
     </li>
+  );
+}
+
+/*
+  When the prices were last checked against a source (2026-11-12).
+
+  Same wording rule as Compare's ProvenanceLine: "Verified" only with a
+  verified_at date, past STALE_AFTER_DAYS (worked out by getToolPriceCheck, as
+  render must stay pure) the date stays and "may be out of date" is added, and
+  the source link says it opens in a new tab. No date says
+  so plainly instead of borrowing the listing's own last change, which is not a
+  check.
+*/
+function PriceCheckLine({ check }: { check: PriceCheck }) {
+  if (check.state === "error") {
+    return <span className="text-muted">Could not load when prices were last checked.</span>;
+  }
+  if (check.state === "none") {
+    return (
+      <span className="text-muted">
+        Not yet checked against the provider&apos;s pricing page. Confirm on their site before you buy.
+      </span>
+    );
+  }
+  return (
+    <span>
+      Verified {shortDate(check.verifiedAt)}
+      {check.stale ? ", may be out of date" : ""}
+      {" against "}
+      <a
+        href={check.sourceUrl}
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        className="inline-flex items-center gap-1 underline underline-offset-2 transition-colors duration-200 ease-out hover:text-muted"
+      >
+        {check.sourceLabel ?? "the provider's pricing page"}
+        <ExternalLink className="size-3.5 shrink-0" aria-hidden />
+        <span className="sr-only">, opens in a new tab</span>
+      </a>
+    </span>
   );
 }

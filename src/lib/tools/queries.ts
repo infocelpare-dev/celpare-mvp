@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAnonClient, createClient, getCurrentUser, isSupabaseConfigured } from "@/lib/supabase/server";
+import { ageInDays, STALE_AFTER_DAYS } from "@/lib/compare/present";
 
 /*
   Everything the public tool profile reads.
@@ -146,6 +147,48 @@ export async function getToolReviews(toolId: string, limit = 20): Promise<ToolRe
   );
 
   return rows.map((r) => ({ ...r, author: byId.get(r.user_id) ?? null }));
+}
+
+/*
+  When this tool's prices were last checked against a source, for the profile's
+  "Prices checked" line (2026-11-12).
+
+  Only tool_plans.verified_at counts: a constraint makes every verified plan
+  carry its source_url, so a date always comes with the page it was checked
+  against. tools.updated_at is not used, because any edit to the listing moves
+  it and that is not a check. A failed read is "error", never "none": saying a
+  price was never checked when we simply could not ask would be invented.
+*/
+export type PriceCheck =
+  | { state: "verified"; verifiedAt: string; stale: boolean; sourceUrl: string; sourceLabel: string | null }
+  | { state: "none" }
+  | { state: "error" };
+
+export async function getToolPriceCheck(toolId: string): Promise<PriceCheck> {
+  if (!isSupabaseConfigured()) return { state: "error" };
+  const db = createAnonClient();
+  const { data, error } = await db
+    .from("tool_plans")
+    .select("verified_at, source_url, source_label")
+    .eq("tool_id", toolId)
+    .not("verified_at", "is", null)
+    .order("verified_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[tools] price check lookup failed", error.code, error.message);
+    return { state: "error" };
+  }
+  if (!data?.verified_at || !data.source_url) return { state: "none" };
+  const age = ageInDays(data.verified_at as string, Date.now());
+  return {
+    state: "verified",
+    verifiedAt: data.verified_at as string,
+    stale: age !== null && age > STALE_AFTER_DAYS,
+    sourceUrl: data.source_url as string,
+    sourceLabel: (data.source_label as string | null) ?? null,
+  };
 }
 
 /* The distribution, computed from the same rows the average came from. Five
