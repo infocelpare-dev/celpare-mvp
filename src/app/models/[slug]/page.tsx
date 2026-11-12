@@ -56,6 +56,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     /* The root layout's template adds "| Celpare". */
     title: `${m.name}${m.provider ? ` by ${m.provider}` : ""}`,
     description: m.description?.slice(0, 160) ?? `${m.name} on Celpare: pricing, context, capabilities and similar models.`,
+    alternates: { canonical: `/models/${m.slug}` },
   };
 }
 
