@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Turnstile } from "./turnstile";
 import { ButtonLink } from "@/components/ui/button";
@@ -24,8 +23,9 @@ import { cn } from "@/lib/utils";
   expiry, or any transient widget error, flipped it back to false and the three
   options vanished from under somebody still reading the page.
 
-  IT FAILS OPEN. This page is the gate and nothing else: Create an account, Log
-  in and Skip for now all live inside the revealed block. A content blocker or a
+  IT FAILS OPEN. This page is the gate and nothing else: Create an account and
+  Log in live inside the revealed block (Skip for now was removed on
+  2026-11-12, founder). A content blocker or a
   Cloudflare outage therefore locked a real person out of the entire site, to
   protect a check that is decoration by its own description. That is D80's line,
   that an operational switch fails open and authorization fails closed, and this
@@ -103,16 +103,6 @@ export function EntryGate() {
             Log in
           </ButtonLink>
         </div>
-
-        <p className="mt-6 border-t border-border pt-5 text-center text-[14px] text-muted">
-          <Link
-            href="/app"
-            tabIndex={verified ? 0 : -1}
-            className="underline underline-offset-4 transition-colors duration-200 ease-out hover:text-foreground"
-          >
-            Skip for now
-          </Link>
-        </p>
       </div>
     </div>
   );
