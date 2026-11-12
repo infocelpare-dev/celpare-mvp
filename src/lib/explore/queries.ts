@@ -12,7 +12,7 @@ import {
 } from "@/lib/search/rows";
 import type { RecentRow } from "@/lib/profile/queries";
 import type { SaveEntity } from "@/lib/collections/types";
-import { SECTION_TYPES } from "./intelligence/config";
+import { EXPLORE_V1, SECTION_TYPES } from "./intelligence/config";
 import { explainExploreReason } from "./intelligence/reasons";
 import { getExplore, type ExploreResult } from "./intelligence/server/engine";
 import type { ExploreScored, ExploreSectionId as RankedSectionId } from "./intelligence/types";
@@ -238,6 +238,26 @@ export async function loadEngineShelf(ctx: ExploreContext, id: "recommended-tool
 }
 
 export const loadPeople = (ctx: ExploreContext) => rankedSection(ctx, "people");
+
+/*
+  The newest tools in the catalogue, newest first, for the feed's "New in
+  Celpare" shelf (D268). Not a ranked section: New and recently added keeps its
+  quality floor, which a tool added yesterday cannot meet yet (no ratings, no
+  engagement), so that section can be empty while the catalogue grew by twenty
+  one tools. This answers the plainer question with the same window Explore
+  calls new (NEW_WINDOW_DAYS.tool) and the tools Explore already loaded.
+*/
+export async function loadNewestTools(ctx: ExploreContext, now: number = Date.now()): Promise<SectionState> {
+  const result = await exploreFor(ctx);
+  if (!result || result.pool.failed.has("tool")) return failed();
+  const windowMs = EXPLORE_V1.NEW_WINDOW_DAYS.tool * 86_400_000;
+  const items: ExploreItem[] = [...result.pool.tools.values()]
+    .map((tool) => ({ tool, at: Date.parse(tool.publishedAt ?? tool.createdAt) }))
+    .filter(({ at }) => Number.isFinite(at) && now - at <= windowMs)
+    .sort((a, b) => b.at - a.at || a.tool.name.localeCompare(b.tool.name))
+    .map(({ tool }) => ({ kind: "tool" as const, id: tool.id, tool, reason: null }));
+  return items.length === 0 ? empty() : ok(items);
+}
 export const loadDiscussions = (ctx: ExploreContext) => rankedSection(ctx, "discussions");
 export const loadVideos = (ctx: ExploreContext) => rankedSection(ctx, "videos");
 export const loadTopics = (ctx: ExploreContext) => rankedSection(ctx, "topics");
