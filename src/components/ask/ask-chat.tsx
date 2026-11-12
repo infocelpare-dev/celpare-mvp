@@ -12,8 +12,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { SparkIcon } from "@/components/ui/spark-icon";
-import { shortDate } from "@/lib/compare/present";
-import type { CommunityTeaser } from "@/lib/community/teaser";
 import { RichText } from "./rich-text";
 import { ResearchActivity, ResearchTrail, type ResearchSummary } from "./research-line";
 import { ModelCards, ToolCards, type ModelCardData, type ToolCitation } from "./tool-cards";
@@ -79,7 +77,6 @@ export function AskChat({
   initialConversationId = null,
   grants: initialGrants,
   defaultModes,
-  communityPosts = [],
 }: {
   signedIn: boolean;
   seed?: string;
@@ -89,8 +86,6 @@ export function AskChat({
      is allowed to use, it renders what it was told. */
   grants: Grants;
   defaultModes: Modes;
-  /* Recent posts under the empty chat (D267). Empty renders no strip. */
-  communityPosts?: CommunityTeaser[];
 }) {
   const [turns, setTurns] = useState<Turn[]>(initialTurns);
   const [conversationId, setConversationId] = useState<string | null>(initialConversationId);
@@ -388,7 +383,7 @@ export function AskChat({
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[720px] px-4 py-8 sm:px-6">
           {turns.length === 0 ? (
-            <EmptyState onPick={send} signedIn={signedIn} communityPosts={communityPosts} />
+            <EmptyState onPick={send} signedIn={signedIn} />
           ) : (
             <ol className="space-y-6">
               {turns.map((turn, i) => (
@@ -695,11 +690,9 @@ function Dot({ delay }: { delay: string }) {
 function EmptyState({
   onPick,
   signedIn,
-  communityPosts,
 }: {
   onPick: (q: string) => void;
   signedIn: boolean;
-  communityPosts: CommunityTeaser[];
 }) {
   return (
     <div className="py-8">
@@ -740,53 +733,15 @@ function EmptyState({
         </p>
       ) : null}
 
-      {communityPosts.length > 0 ? <CommunityStrip posts={communityPosts} /> : null}
+      {/* The feed is the second section since D267; this keeps the way to it
+          in view from the home, without showing posts (founder, 2026-11-12). */}
+      <Link
+        href="/community"
+        className="mt-6 inline-flex items-center gap-1 text-[13px] text-muted underline-offset-2 transition-colors duration-200 hover:text-foreground hover:underline"
+      >
+        See the community
+        <ArrowRight className="size-3.5" aria-hidden />
+      </Link>
     </div>
-  );
-}
-
-/*
-  "From the community" (D267). Ask is the home and the feed is second, so the
-  empty chat shows a few recent posts to keep the community in view. It goes
-  away with the rest of the empty state once a chat starts.
-
-  Each excerpt is clamped to two lines and the whole row opens the post, so the
-  full text is one tap away (truncation never hides the only copy). Plain
-  links: no counts, no actions, no impression events.
-*/
-function CommunityStrip({ posts }: { posts: CommunityTeaser[] }) {
-  return (
-    <section aria-labelledby="ask-community-heading" className="mt-10 border-t border-border pt-6">
-      <div className="flex items-baseline justify-between gap-4">
-        <h2 id="ask-community-heading" className="text-[15px] font-medium">
-          From the community
-        </h2>
-        <Link
-          href="/community"
-          className="inline-flex items-center gap-1 text-[13px] text-muted underline-offset-2 transition-colors duration-200 hover:text-foreground hover:underline"
-        >
-          See the community
-          <ArrowRight className="size-3.5" aria-hidden />
-        </Link>
-      </div>
-      <ul className="mt-3 grid gap-2">
-        {posts.map((p) => (
-          <li key={p.id}>
-            <Link
-              href={p.href}
-              className="block rounded-xl border border-border px-4 py-3 transition-colors duration-200 hover:bg-surface"
-            >
-              <span className="flex items-baseline justify-between gap-3 text-[13px] text-muted">
-                <span className="min-w-0 truncate font-medium text-foreground">{p.name}</span>
-                <time dateTime={p.createdAt} className="shrink-0">
-                  {shortDate(p.createdAt)}
-                </time>
-              </span>
-              <span className="mt-1 line-clamp-2 block text-[15px] leading-snug">{p.excerpt}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }
