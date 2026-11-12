@@ -4,7 +4,7 @@ import { OPERATOR } from "../operator";
 /*
   Sponsorship Terms, version 1.2 (phase CRYPTO, 2026-11-10). The offer is D204,
   the ranking D205 (docs/context/18-sponsored-tools.md). Paid in crypto through
-  NOWPayments like the paid plans (D256, D261): /pricing/sponsored says Pay with crypto
+  NOWPayments like the paid plans (D256, D261): /pricing/sponsored says Get Sponsored placement
   while features.billing_requests is on, Coming soon otherwise.
 */
 
