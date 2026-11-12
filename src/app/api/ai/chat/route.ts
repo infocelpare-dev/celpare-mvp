@@ -4,6 +4,7 @@ import { ask } from "@/lib/ai/gateway";
 import { INPUT_MAX_CHARS } from "@/lib/ai/config";
 import { isEnabled } from "@/lib/platform/settings";
 import { track } from "@/lib/statsig/server";
+import { withinBurst } from "@/lib/security/burst";
 
 /* Reads cookies and streams, so it must never be prerendered or cached. */
 export const dynamic = "force-dynamic";
@@ -72,6 +73,15 @@ export async function POST(request: NextRequest) {
         kind: "paused",
       },
       { status: 503 },
+    );
+  }
+
+  /* Per address, per minute (burst.ts). Before the gateway, so a flood is
+     refused without an identity lookup or a usage row per request. */
+  if (!(await withinBurst("ai_chat"))) {
+    return NextResponse.json(
+      { error: "That is a lot of questions at once. Wait a minute and try again.", kind: "rate_limited" },
+      { status: 429, headers: { "retry-after": "60" } },
     );
   }
 

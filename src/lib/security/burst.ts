@@ -29,7 +29,8 @@ export type BurstName =
   | "auth_email"
   | "waitlist"
   | "account_export"
-  | "google_signin";
+  | "google_signin"
+  | "ai_chat";
 
 const PER_MINUTE: Record<BurstName, number> = {
   /* A beacon carries up to 60 events; a busy tab sends a few a minute. */
@@ -58,6 +59,11 @@ const PER_MINUTE: Record<BurstName, number> = {
   /* Sign in with Google's own button (/auth/google). A person signs in once;
      a few retries after a closed popup stay well under. */
   google_signin: 10,
+  /* Ask Celpare (founder, 2026-11-12). An answer takes seconds to read, so a
+     person asks a few a minute at most. The daily allowance is still the real
+     limit; this stops one address firing a burst of long, costly requests
+     inside a single minute. Shared addresses (an office) get some room. */
+  ai_chat: 12,
 };
 
 const PER_HOUR: Partial<Record<BurstName, number>> = {

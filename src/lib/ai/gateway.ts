@@ -22,7 +22,8 @@ import { createClient } from "@/lib/supabase/server";
 import { smallTalkReply } from "./small-talk";
 import { getProvider, models, providerName } from "./providers";
 import { paidModelRefusal } from "./providers/free-only";
-import { checkIdentityLimits, countIdentityMessage, countIdentityTokens } from "./ratelimit";
+import { checkIdentityLimits, countIdentityMessage, countIdentityTokens, nextResetIso } from "./ratelimit";
+import { withinCeiling } from "@/lib/security/ceiling";
 import { loadToolCards, type ToolCard } from "./tool-search";
 import { getSponsoredCampaigns, serveSponsored, viewerKeyFrom } from "@/lib/sponsored/server";
 import { askSponsoredCandidates } from "@/lib/sponsored/search";
@@ -187,6 +188,20 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
       kind: "rate_limited",
       message: verdict.message,
       resetsAt: verdict.resetsAt,
+      identity,
+    };
+  }
+
+  /* 3b. The ceiling across everybody (ceiling-config.ts). Checked after the
+     person's own limit, so somebody already over theirs does not use up the
+     shared count. */
+  if (!(await withinCeiling("ai_message"))) {
+    await recordUsage({ ...baseUsage, latencyMs: Date.now() - started, status: "rate_limited" });
+    return {
+      ok: false,
+      kind: "rate_limited",
+      message: "Ask Celpare is very busy today and has paused new questions. It opens again at midnight UTC.",
+      resetsAt: nextResetIso(),
       identity,
     };
   }

@@ -1,6 +1,7 @@
 import "server-only";
 import { bump } from "@/lib/ai/ratelimit";
 import { clientIp, hashIp } from "@/lib/ai/identity";
+import { withinCeiling } from "@/lib/security/ceiling";
 import type { VoiceConfig } from "./config";
 import type { LimitVerdict } from "./handler";
 
@@ -26,6 +27,8 @@ export async function voiceLimit(userId: string, config: VoiceConfig): Promise<L
     if (m > config.perMinute) return { ok: false, scope: "minute" };
     if (d > config.perDay) return { ok: false, scope: "day" };
     if (a > config.perMinute * 3) return { ok: false, scope: "ip" };
+    /* Last, so a clip refused above does not use up the shared count. */
+    if (!(await withinCeiling("voice"))) return { ok: false, scope: "day" };
     return { ok: true };
   } catch (err) {
     console.error("[voice] limit check failed, refusing", err instanceof Error ? err.name : "error");
