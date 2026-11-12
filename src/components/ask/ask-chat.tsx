@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
+  ArrowRight,
   ArrowUpRight,
   Check,
   Copy,
   ExternalLink,
   RotateCcw,
 } from "lucide-react";
+import Link from "next/link";
 import { SparkIcon } from "@/components/ui/spark-icon";
 import { RichText } from "./rich-text";
 import { ResearchActivity, ResearchTrail, type ResearchSummary } from "./research-line";
@@ -730,6 +732,16 @@ function EmptyState({
           You can ask without an account. Chats are not saved unless you sign in.
         </p>
       ) : null}
+
+      {/* The feed is the second section since D267; this keeps the way to it
+          in view from the home, without showing posts (founder, 2026-11-12). */}
+      <Link
+        href="/community"
+        className="mt-6 inline-flex items-center gap-1 text-[13px] text-muted underline-offset-2 transition-colors duration-200 hover:text-foreground hover:underline"
+      >
+        See the community
+        <ArrowRight className="size-3.5" aria-hidden />
+      </Link>
     </div>
   );
 }

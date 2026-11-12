@@ -71,7 +71,7 @@ export function AdminShell({
       actions={
         <>
           <Link
-            href="/community"
+            href="/ask"
             className="hidden items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[13px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground sm:inline-flex"
           >
             <ArrowLeft className="size-3.5" aria-hidden />

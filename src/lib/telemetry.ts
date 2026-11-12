@@ -1,5 +1,7 @@
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import { clientIpFrom } from "@/lib/edge/origin";
+import { headers } from "next/headers";
+import { isBot } from "@/lib/statsig/core";
 
 /*
   Platform telemetry: searches, tool views, security events and job runs.
@@ -26,6 +28,22 @@ import { clientIpFrom } from "@/lib/edge/origin";
   If the service role key is absent these degrade to nothing, exactly the way
   usage recording does, and the product keeps working with a thinner trail.
 */
+
+/*
+  A crawler opening a tool or model page is not interest in it (2026-11-12).
+  These views feed Explore's trending, the feed's Trending tools shelf (D268)
+  and co-viewing, and before this check Googlebot and uptime probes made up
+  most of them: 524 tool views in a week, 11 of them signed in. Same rule as
+  the Statsig page views (isBot). Outside a request there are no headers;
+  that is a script, so it is not counted either.
+*/
+async function fromCrawler(): Promise<boolean> {
+  try {
+    return isBot((await headers()).get("user-agent"));
+  } catch {
+    return true;
+  }
+}
 
 function unavailable(what: string): boolean {
   if (hasServiceRole()) return false;
@@ -104,6 +122,7 @@ export async function recordToolView(input: {
   query?: string | null;
 }): Promise<void> {
   if (unavailable("tool view")) return;
+  if (await fromCrawler()) return;
 
   try {
     const { error } = await createAdminClient().from("tool_view_events").insert({
@@ -127,6 +146,7 @@ export async function recordModelView(input: {
   query?: string | null;
 }): Promise<void> {
   if (unavailable("model view")) return;
+  if (await fromCrawler()) return;
 
   try {
     const { error } = await createAdminClient().from("model_view_events").insert({

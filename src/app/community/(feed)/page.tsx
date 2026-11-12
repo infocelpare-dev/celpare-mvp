@@ -18,6 +18,8 @@ import { FeedHeader } from "@/components/community/feed-header";
 import { unreadThreadCount } from "@/lib/messages/queries";
 import { FeedEmpty } from "@/components/community/feed-empty";
 import { DiscoverRail } from "@/components/community/feed-rails";
+import { FEED_SHELF_SLOTS, FeedShelf, type FeedShelfKind } from "@/components/community/feed-shelves";
+import { Suspense } from "react";
 import { PostCard } from "@/components/community/post-card";
 import { CreatePostFab } from "@/components/community/create-post-fab";
 import { FeedEnd } from "@/components/community/feed-end";
@@ -203,6 +205,10 @@ export default async function CommunityPage({
     nothing at all when signed out, which is exactly what EMPTY_VIEWER_STATE
     already says.
   */
+  /* For you only: Following is the people you chose, and a shelf of strangers
+     in it would change what that tab means. */
+  const shelves = scope === "for-you" ? FEED_SHELF_SLOTS : [];
+
   const viewer = signedIn
     ? await getViewerState(
         await createClient(),
@@ -290,7 +296,19 @@ export default async function CommunityPage({
                       </FeedItem>
                       {ranked?.debug ? <FeedDebugItem entry={ranked.debug.items[post.id]} now={now} lifecycle={ranked.debug.lifecycle?.[post.id]} /> : null}
                     </li>
-                  ))}
+                  )).flatMap((li, index) => {
+                    /* D268: Explore shelves between posts on For you. Each
+                       streams in its own boundary, so posts never wait. */
+                    const slot = shelves.find((s) => s.after === index + 1);
+                    return slot ? [li, <ShelfItem key={`shelf-${slot.kind}`} kind={slot.kind} signedIn={signedIn} viewerId={viewerId} />] : [li];
+                  })}
+                  {/* Shelves whose slot is past the last post go at the end,
+                      so a short feed still shows them. */}
+                  {shelves
+                    .filter((s) => s.after > posts.length)
+                    .map((s) => (
+                      <ShelfItem key={`shelf-${s.kind}`} kind={s.kind} signedIn={signedIn} viewerId={viewerId} />
+                    ))}
                 </ol>
               </FeedTelemetry>
 
@@ -323,5 +341,17 @@ export default async function CommunityPage({
 
       <CreatePostFab signedIn={signedIn} />
     </AppShell>
+  );
+}
+
+/* One shelf as a list item of the feed. The fallback is nothing: a shelf that
+   is still loading, or that has nothing real to show, takes no space. */
+function ShelfItem({ kind, signedIn, viewerId }: { kind: FeedShelfKind; signedIn: boolean; viewerId: string | null }) {
+  return (
+    <li>
+      <Suspense fallback={null}>
+        <FeedShelf kind={kind} signedIn={signedIn} viewerId={viewerId} />
+      </Suspense>
+    </li>
   );
 }

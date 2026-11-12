@@ -118,7 +118,7 @@ function Slotted({
    follows or likes.
    --------------------------------------------------------------------------- */
 
-async function viewerFor(
+export async function viewerFor(
   items: ExploreItem[],
   ctx: ExploreContext,
 ): Promise<ItemViewer> {

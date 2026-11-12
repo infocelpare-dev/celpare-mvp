@@ -3,15 +3,15 @@
   were on, as a guest. Never the landing page, which is what redirect("/") did.
 
   A page that only exists for an account (your own profile, settings, messages
-  and the rest below) has nothing to show a guest, so those go to the community
-  feed instead. Everything else (a post, a tool, a public profile, Explore,
+  and the rest below) has nothing to show a guest, so those go to Ask Celpare,
+  the home since D267, instead. Everything else (a post, a tool, a public profile, Explore,
   Compare) reads the same signed out, so you stay on it.
 
   The page comes from the Referer header, so it is untrusted input: only a path
-  on our own origin is accepted, anything else falls back to the feed.
+  on our own origin is accepted, anything else falls back to Ask.
 */
 
-const FALLBACK = "/community";
+const FALLBACK = "/ask";
 
 /* Prefixes that mean "this page is your account". Matched on whole segments,
    so /profile matches /profile and /profile/edit but not /profiles-of-x. */

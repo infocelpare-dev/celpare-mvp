@@ -26,7 +26,7 @@ export default async function WelcomePage() {
   if (!user) redirect("/login");
 
   const state = await getOnboarding(db);
-  if (!state || state.onboardedAt) redirect("/community");
+  if (!state || state.onboardedAt) redirect("/ask");
 
   const options = await loadOptions(db);
   const a = (state.answers ?? {}) as Record<string, unknown>;

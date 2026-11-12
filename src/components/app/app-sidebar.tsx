@@ -31,11 +31,11 @@ const LINKS: {
   label: string;
   icon: (props: { className?: string }) => React.ReactNode;
 }[] = [
-  { href: "/community", label: "Feed", icon: Newspaper },
   /* Ask Celpare carries the Celpare spark, not a generic sparkle. It is the
      product's own mark and the one section that is Celpare rather than a
-     category. */
+     category. First since D267: it is the home, the feed is second. */
   { href: "/ask", label: "Ask Celpare", icon: SparkIcon },
+  { href: "/community", label: "Feed", icon: Newspaper },
   { href: "/explore", label: "Explore", icon: Compass },
   { href: "/compare", label: "Compare", icon: Scale },
   { href: "/profile", label: "Profile", icon: User },
