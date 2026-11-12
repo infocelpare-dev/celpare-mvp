@@ -112,7 +112,7 @@ export default async function SearchPage({
       signedIn={signedIn}
     >
       <div className="mx-auto w-full max-w-[760px] px-4 py-4 sm:px-5">
-        <BackLink href="/community" label="Back to Celpare" />
+        <BackLink href="/ask" label="Back to Celpare" />
 
         <h1 className="sr-only">Search Celpare</h1>
 

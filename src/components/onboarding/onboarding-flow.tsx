@@ -87,7 +87,7 @@ export function OnboardingFlow({
     start(async () => {
       const r = await finishOnboarding();
       if (!r.ok) return setError(r.message);
-      router.replace("/community");
+      router.replace("/ask");
     });
   }
 

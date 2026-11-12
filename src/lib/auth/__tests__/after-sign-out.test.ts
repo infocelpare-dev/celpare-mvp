@@ -13,15 +13,15 @@ describe("where Log out leaves you", () => {
     assert.equal(afterSignOutPath(`${O}/tools/claude/`, O), "/tools/claude");
   });
 
-  it("goes to the feed from a page that is the account", () => {
+  it("goes to Ask from a page that is the account", () => {
     for (const p of ["/profile", "/profile/edit", "/settings", "/settings/billing", "/messages/x", "/notifications", "/admin", "/plans", "/community/new"]) {
-      assert.equal(afterSignOutPath(`${O}${p}`, O), "/community", p);
+      assert.equal(afterSignOutPath(`${O}${p}`, O), "/ask", p);
     }
   });
 
   it("never lands on the landing page or a sign in form", () => {
     for (const p of ["/", "/login", "/signup", "/verify"]) {
-      assert.equal(afterSignOutPath(`${O}${p}`, O), "/community", p);
+      assert.equal(afterSignOutPath(`${O}${p}`, O), "/ask", p);
     }
   });
 
@@ -30,9 +30,9 @@ describe("where Log out leaves you", () => {
   });
 
   it("refuses another origin or junk", () => {
-    assert.equal(afterSignOutPath("https://evil.example/community", O), "/community");
-    assert.equal(afterSignOutPath("https://celpare.com.evil.example/x", O), "/community");
-    assert.equal(afterSignOutPath("not a url", O), "/community");
-    assert.equal(afterSignOutPath(null, O), "/community");
+    assert.equal(afterSignOutPath("https://evil.example/community", O), "/ask");
+    assert.equal(afterSignOutPath("https://celpare.com.evil.example/x", O), "/ask");
+    assert.equal(afterSignOutPath("not a url", O), "/ask");
+    assert.equal(afterSignOutPath(null, O), "/ask");
   });
 });
