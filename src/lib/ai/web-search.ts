@@ -1,4 +1,5 @@
 import { WEB_SEARCH_LIMIT } from "./config";
+import { withinCeiling } from "@/lib/security/ceiling";
 import type { WebResult } from "./types";
 
 /*
@@ -33,6 +34,10 @@ export async function webSearch(
   if (!key || !query.trim()) return [];
 
   const limit = opts.limit ?? WEB_SEARCH_LIMIT;
+
+  /* Every Serper call is paid. Past the daily ceiling across everybody the
+     answer is built from the catalogue alone, the same as a failed search. */
+  if (!(await withinCeiling("web_search"))) return [];
 
   try {
     const res = await fetch("https://google.serper.dev/search", {
