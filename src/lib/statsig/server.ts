@@ -53,9 +53,13 @@ export async function sendEvents(events: StatsigEvent[]): Promise<void> {
 
 /*
   Who and where, from the request. Behind Cloudflare (the trusted mark set in
-  proxy.ts) cf-ipcountry is the visitor's country; Vercel's own header would be
-  the Cloudflare edge's. The address is used for the daily id and then dropped.
+  proxy.ts) cf-ipcountry is the visitor's country; the host's own header would
+  be the Cloudflare edge's. The address is used for the daily id and then dropped.
 */
+function deployEnv(): string | undefined {
+  return process.env.VERCEL_ENV || process.env.CELPARE_DEPLOY_CONTEXT || undefined;
+}
+
 export function visitorFrom(h: Headers, now = new Date()) {
   const trusted = h.get(TRUSTED_HEADER) === "1";
   const userAgent = h.get("user-agent");
@@ -79,7 +83,7 @@ export function buildEvent(
       visitor: v.visitor,
       country: v.country,
       userAgent: v.userAgent,
-      tier: tierFor(process.env.VERCEL_ENV),
+      tier: tierFor(deployEnv()),
     }),
     time: now.getTime(),
     ...(opts.value !== undefined ? { value: opts.value } : {}),
@@ -123,7 +127,7 @@ export async function trackAccount(
         userId: opts.userId,
         visitor: opts.userId,
         country: cleanCountry(opts.country),
-        tier: tierFor(process.env.VERCEL_ENV),
+        tier: tierFor(deployEnv()),
       }),
       time: Date.now(),
       ...(opts.value !== undefined ? { value: opts.value } : {}),

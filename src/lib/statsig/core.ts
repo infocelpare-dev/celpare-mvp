@@ -112,9 +112,10 @@ export function cleanCountry(raw: string | null | undefined): string | undefined
   return c && /^[A-Z]{2}$/.test(c) && c !== "XX" ? c : undefined;
 }
 
-export function tierFor(vercelEnv: string | undefined): StatsigUser["statsigEnvironment"]["tier"] {
-  if (vercelEnv === "production") return "production";
-  if (vercelEnv === "preview") return "staging";
+/* Accepts Vercel's VERCEL_ENV or Netlify's CONTEXT. */
+export function tierFor(deployEnv: string | undefined): StatsigUser["statsigEnvironment"]["tier"] {
+  if (deployEnv === "production") return "production";
+  if (deployEnv === "preview" || deployEnv === "deploy-preview" || deployEnv === "branch-deploy") return "staging";
   return "development";
 }
 

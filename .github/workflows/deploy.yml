@@ -44,7 +44,11 @@ permissions:
 jobs:
   production:
     name: Deploy to production
+    # Production moved to Netlify on 2026-11-13 after Vercel disabled the Hobby
+    # team. Netlify builds main itself until this workflow is rewritten for it,
+    # so the Vercel path only runs if HOST is set back to vercel.
     if: >-
+      vars.HOST == 'vercel' &&
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
