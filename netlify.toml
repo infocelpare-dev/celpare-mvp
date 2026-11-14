@@ -1,0 +1,17 @@
+# Celpare on Netlify (2026-11-13). Cloudflare proxies in front and adds the
+# x-celpare-edge header that src/proxy.ts checks (D254).
+#
+# Netlify builds on its own servers, which have no .env files, so no local
+# secret can reach the bundle (OPS.2). Server secrets live in the Netlify UI,
+# scoped to Functions; only NEXT_PUBLIC_* values are needed at build time.
+# The Next.js adapter (OpenNext for Netlify) is applied automatically.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "24"
+  NEXT_TELEMETRY_DISABLED = "1"
+  # Sentry source map upload needs SENTRY_AUTH_TOKEN; without it the build
+  # still succeeds, as in CI.

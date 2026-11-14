@@ -46,7 +46,12 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   env: {
     NEXT_PUBLIC_APP_VERSION: appVersion,
-    NEXT_PUBLIC_COMMIT_SHA: process.env.NEXT_PUBLIC_COMMIT_SHA ?? "local",
+    /* CI passes the SHA; Netlify's own build exposes it as COMMIT_REF. */
+    NEXT_PUBLIC_COMMIT_SHA: process.env.NEXT_PUBLIC_COMMIT_SHA ?? process.env.COMMIT_REF ?? "local",
+    /* Netlify's deploy context (production, deploy-preview, branch-deploy) is a
+       build time variable; written into the code so the origin check and
+       analytics know a production deploy at runtime. Not a secret. */
+    CELPARE_DEPLOY_CONTEXT: process.env.CONTEXT ?? process.env.VERCEL_ENV ?? "",
   },
   /* Dev only: lets a phone load the dev server through a Cloudflare quick tunnel.
      Ignored by production builds. */

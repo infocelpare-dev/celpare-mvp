@@ -28,6 +28,15 @@ describe("edgeVerdict", () => {
     assert.equal(edgeVerdict(null, { EDGE_SECRET: "   ", VERCEL_ENV: "production" }), "reject");
   });
 
+  it("fails closed on Netlify production with no secret configured", () => {
+    assert.equal(edgeVerdict(VALUE, { CONTEXT: "production" }), "reject");
+    assert.equal(edgeVerdict(VALUE, { CELPARE_DEPLOY_CONTEXT: "production" }), "reject");
+  });
+
+  it("is off on a Netlify preview with no secret", () => {
+    assert.equal(edgeVerdict(null, { CONTEXT: "deploy-preview" }), "off");
+  });
+
   it("is off locally and on the Cloudflare Worker, where no secret exists", () => {
     assert.equal(edgeVerdict(null, {}), "off");
     assert.equal(edgeVerdict(null, { VERCEL_ENV: "preview" }), "off");

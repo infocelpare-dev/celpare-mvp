@@ -175,12 +175,12 @@ export default async function AdminHealthPage() {
           <Stat label="Node" value={process.version} />
           <Stat
             label="Region"
-            value={process.env.VERCEL_REGION ?? "local"}
+            value={process.env.VERCEL_REGION ?? process.env.AWS_REGION ?? "local"}
             hint="Where this render ran"
           />
           <Stat
             label="Build"
-            value={(process.env.VERCEL_GIT_COMMIT_SHA ?? "local").slice(0, 7)}
+            value={(process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.NEXT_PUBLIC_COMMIT_SHA ?? "local").slice(0, 7)}
             hint="Commit this deployment was built from"
           />
         </StatGrid>
