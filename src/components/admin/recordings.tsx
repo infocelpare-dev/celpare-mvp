@@ -15,7 +15,7 @@ import { getSentryReplaysForUser, sentryConfigured } from "@/lib/admin/sentry";
   and every session that hit an error, and those are listed.
 */
 
-const STATSIG_REPLAYS = "https://console.statsig.com/4odCGWCV4s4J8bVvy5rmlM/session_replays";
+const STATSIG_REPLAYS = "https://console.statsig.com/4odCGWCV4s4J8bVvy5rmlM/session_replay";
 
 function seconds(ms: number): string {
   const s = Math.round(ms / 1000);
