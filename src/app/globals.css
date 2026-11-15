@@ -352,3 +352,9 @@ html {
     }
   }
 }
+
+/* The host injects a "Powered by" badge frame on its free plan. Hidden here.
+   Remove this rule if the plan changes or the host objects. */
+#nl-badge-frame {
+  display: none !important;
+}
