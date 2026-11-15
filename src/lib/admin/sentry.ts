@@ -324,25 +324,19 @@ export type ReplayRow = {
   deadClicks: number;
   rageClicks: number;
   url: string | null;
+  /* The Celpare account id, when the person was signed in (D269). */
+  userId: string | null;
   permalink: string;
 };
 
-export async function getSentryReplays(days = 14): Promise<ReplayRow[]> {
-  const res = await call<{ data?: Record<string, unknown>[] }>(
-    `/organizations/${ORG}/replays/?${fields(
-      "id",
-      "started_at",
-      "duration",
-      "count_errors",
-      "count_dead_clicks",
-      "count_rage_clicks",
-      "urls",
-    )}&sort=-started_at${scope(days)}`,
-  );
+const ACCOUNT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  return (res?.data ?? []).map((r) => {
+function replayRows(data: Record<string, unknown>[]): ReplayRow[] {
+  return data.map((r) => {
     const urls = Array.isArray(r.urls) ? (r.urls as string[]) : [];
     const id = String(r.id ?? "");
+    const user = (r.user ?? null) as { id?: unknown } | null;
+    const userId = typeof user?.id === "string" && ACCOUNT_ID.test(user.id) ? user.id : null;
     return {
       id,
       startedAt: String(r.started_at ?? ""),
@@ -352,9 +346,42 @@ export async function getSentryReplays(days = 14): Promise<ReplayRow[]> {
       deadClicks: Number(r.count_dead_clicks ?? 0),
       rageClicks: Number(r.count_rage_clicks ?? 0),
       url: urls[0] ?? null,
+      userId,
       permalink: `${SENTRY_URL}/explore/replays/${id}/`,
     };
   });
+}
+
+const REPLAY_FIELDS = fields(
+  "id",
+  "started_at",
+  "duration",
+  "count_errors",
+  "count_dead_clicks",
+  "count_rage_clicks",
+  "urls",
+  "user",
+);
+
+export async function getSentryReplays(days = 14): Promise<ReplayRow[]> {
+  const res = await call<{ data?: Record<string, unknown>[] }>(
+    `/organizations/${ORG}/replays/?${REPLAY_FIELDS}&sort=-started_at${scope(days)}`,
+  );
+  return replayRows(res?.data ?? []);
+}
+
+/*
+  One account's replays. null means the read failed or Sentry is not
+  configured, which the page must say rather than show "none" (D99).
+  The id is checked before it goes into the query string.
+*/
+export async function getSentryReplaysForUser(userId: string, days = 30): Promise<ReplayRow[] | null> {
+  if (!ACCOUNT_ID.test(userId)) return null;
+  const res = await call<{ data?: Record<string, unknown>[] }>(
+    `/organizations/${ORG}/replays/?${REPLAY_FIELDS}&query=${encodeURIComponent(`user.id:${userId}`)}` +
+      `&sort=-started_at${scope(days)}`,
+  );
+  return res?.data ? replayRows(res.data) : null;
 }
 
 export type LogRow = { timestamp: string; message: string; severity: string };

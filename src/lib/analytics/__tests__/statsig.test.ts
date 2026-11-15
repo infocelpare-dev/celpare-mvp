@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { RRWEB_PRIVACY, consoleUnmasks } from "../../statsig/replay-privacy";
 import { describe, it } from "node:test";
 import {
   buildUser,
@@ -91,5 +92,32 @@ describe("user and metadata", () => {
     assert.equal(tierFor(undefined), "development");
     assert.deepEqual(cleanMetadata({ a: 1, b: null, c: "", d: true }), { a: "1", d: "true" });
     assert.equal(cleanMetadata({ b: null }), undefined);
+  });
+});
+
+describe("session recorder privacy (D269)", () => {
+  it("masks all text and inputs and leaves media out", () => {
+    assert.equal(RRWEB_PRIVACY.maskTextSelector, "*");
+    assert.equal(RRWEB_PRIVACY.maskAllInputs, true);
+    for (const tag of ["img", "video", "iframe", "canvas"]) assert.ok(RRWEB_PRIVACY.blockSelector.includes(tag));
+  });
+
+  it("keeps our rules when the console is untouched", () => {
+    assert.equal(consoleUnmasks(undefined), false);
+    assert.equal(consoleUnmasks(null), false);
+    assert.equal(consoleUnmasks({ privacy_mode: "min" }), false);
+  });
+
+  it("accepts the console's strictest mode", () => {
+    assert.equal(consoleUnmasks({ privacy_mode: "max" }), false);
+    assert.equal(consoleUnmasks({ privacy_mode: "max", blocked_elements: [".x"] }), false);
+  });
+
+  it("refuses any console setting that could show text", () => {
+    assert.equal(consoleUnmasks({ privacy_mode: "input" }), true);
+    assert.equal(consoleUnmasks({}), true);
+    assert.equal(consoleUnmasks({ privacy_mode: "max", unmasked_elements: ["p"] }), true);
+    assert.equal(consoleUnmasks({ privacy_mode: "min", unmasked_elements: ["p"] }), true);
+    assert.equal(consoleUnmasks({ privacy_mode: "min", masked_elements: [".a"] }), true);
   });
 });

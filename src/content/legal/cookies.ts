@@ -12,8 +12,8 @@ export const cookies: Doc = {
   slug: "cookies",
   title: "Cookie Policy",
   description: "Every cookie and browser storage item Celpare uses, what it is for and how long it lasts.",
-  version: "1.2",
-  effective: "2026-11-11",
+  version: "1.3",
+  effective: "2026-11-15",
   summary: [
     "Celpare uses only its own cookies, and only ones it needs to work.",
     "There are no advertising, analytics or third party tracking cookies, which is why there is no cookie banner.",
@@ -54,7 +54,7 @@ export const cookies: Doc = {
             ],
           },
         },
-        "Visits are counted on our server, not in your browser: nothing is stored for it. See the [Privacy Policy](/legal/privacy).",
+        "Visits are counted on our server, not in your browser: nothing is stored for it. Session recordings, which show how a page was used with all text hidden, also store nothing in your browser. See the [Privacy Policy](/legal/privacy).",
         "The bot check on sign up and some forms is Cloudflare Turnstile. It runs in a frame from challenges.cloudflare.com and may store its own data to tell people from bots; Cloudflare's [privacy policy](https://www.cloudflare.com/privacypolicy/) applies to it.",
       ],
     },
@@ -68,6 +68,7 @@ export const cookies: Doc = {
     },
   ],
   changes: [
+    { version: "1.3", date: "2026-11-15", note: "Says that session recordings store nothing in the browser." },
     { version: "1.2", date: "2026-11-11", note: "Says that visits are counted on our server with nothing stored in the browser." },
     { version: "1.1", date: "2026-11-04", note: "Added cp_plans, which shows the plans once after a login." },
     { version: "1.0", date: "2026-10-07", note: "First version." },

@@ -1,6 +1,7 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { withinBurst } from "@/lib/security/burst";
+import { sameOrigin } from "@/lib/security/same-origin";
 import { cleanPath, isBot, referrerHost } from "@/lib/statsig/core";
 import { buildEvent, sendEvents, statsigOn } from "@/lib/statsig/server";
 
@@ -24,21 +25,9 @@ export const runtime = "nodejs";
 
 const done = () => new NextResponse(null, { status: 204 });
 
-function sameOrigin(request: NextRequest): boolean {
-  const site = request.headers.get("sec-fetch-site");
-  if (site) return site === "same-origin";
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  try {
-    return new URL(origin).host === request.headers.get("host");
-  } catch {
-    return false;
-  }
-}
-
 export async function POST(request: NextRequest) {
   if (!statsigOn()) return done();
-  if (!sameOrigin(request) || isBot(request.headers.get("user-agent"))) return done();
+  if (!sameOrigin(request.headers) || isBot(request.headers.get("user-agent"))) return done();
   if (!(await withinBurst("beacon"))) return done();
 
   let body: unknown;

@@ -64,6 +64,9 @@ if (dsn) {
         maskAllText: true,
         maskAllInputs: true,
         blockAllMedia: true,
+        /* Nothing kept in sessionStorage, which the Cookie Policy does not
+           list (D269). A full page reload starts a new replay. */
+        stickySession: false,
       }),
       Sentry.browserProfilingIntegration(),
     ],
