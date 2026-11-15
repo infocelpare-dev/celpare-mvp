@@ -290,7 +290,7 @@ async function ReplaysPanel() {
       {replays.length === 0 ? (
         <EmptyState
           title="No replays in this window"
-          body="Replay records a tenth of sessions in production and every session in development. Nothing has been recorded yet."
+          body="Sentry keeps a tenth of sessions in production and every session that hit an error. Nothing has been recorded yet. Statsig records every session."
         />
       ) : (
         <ul className="space-y-2">
@@ -323,6 +323,13 @@ async function ReplaysPanel() {
                     <Count n={replay.rageClicks} /> rage clicks
                   </span>
                 ) : null}
+                {replay.userId ? (
+                  <Link href={`/admin/users/${replay.userId}`} className="underline underline-offset-2 hover:text-foreground">
+                    Account
+                  </Link>
+                ) : (
+                  <span>Signed out</span>
+                )}
                 <span className="ml-auto">
                   <ExternalLink href={replay.permalink}>Watch</ExternalLink>
                 </span>

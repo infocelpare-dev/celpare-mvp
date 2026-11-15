@@ -5,6 +5,7 @@ import { getUserDetail } from "@/lib/admin/queries";
 import { ALL_ROLES, RANK, ROLE_DESCRIPTION, ROLE_LABEL, type Role } from "@/lib/admin/capabilities";
 import { setUserPlan, setUserRole, setUserStatus, warnUser } from "@/app/actions/admin";
 import { ActionForm, ActionSelectForm } from "@/components/admin/action-form";
+import { Recordings } from "@/components/admin/recordings";
 import { RankedBars, TimeSeries } from "@/components/ui/charts";
 import {
   EmptyState,
@@ -192,6 +193,9 @@ export default async function AdminUserDetailPage({
               ) : null}
             </Section>
           ) : null}
+
+          {/* Masked session recordings, super admin only (D269). */}
+          {session.role === "super_admin" ? <Recordings userId={account.id} /> : null}
 
           <Section title="Moderation">
             <StatGrid>

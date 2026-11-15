@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SignInPromptHost } from "@/components/auth/sign-in-prompt";
 import { PageviewBeacon } from "@/components/analytics/pageview-beacon";
+import { SessionRecorder } from "@/components/analytics/session-recorder";
 import "./globals.css";
 
 /*
@@ -80,6 +81,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <SignInPromptHost />
           {/* Cookieless page views, counted server side (D264). */}
           <PageviewBeacon />
+          {/* Masked session recordings, nothing stored in the browser (D269). */}
+          <SessionRecorder />
         </ThemeProvider>
       </body>
     </html>
