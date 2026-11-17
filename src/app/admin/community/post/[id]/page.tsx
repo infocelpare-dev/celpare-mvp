@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/admin/guard";
 import { getPostThread } from "@/lib/admin/queries";
-import { setContentStatus, warnUser } from "@/app/actions/admin";
+import { setContentStatus, setPostPick, warnUser } from "@/app/actions/admin";
 import { ActionForm } from "@/components/admin/action-form";
 import {
   Count,
@@ -103,6 +103,15 @@ export default async function AdminPostDetailPage({
   if (!thread) notFound();
 
   const { post, comments, reports } = thread;
+
+  /* D270. A failed read shows "could not be read", never "not picked". */
+  const { data: pickRow, error: pickError } = await session.db
+    .from("post_picks")
+    .select("picked_at")
+    .eq("post_id", id)
+    .maybeSingle();
+  const pickedAt = (pickRow as { picked_at: string } | null)?.picked_at ?? null;
+
   const openReports = reports.filter((r) => r.status === "open" || r.status === "investigating");
 
   return (
@@ -289,6 +298,47 @@ export default async function AdminPostDetailPage({
                 ))}
               </ul>
             )}
+          </Section>
+
+          <Section title="Picked by Celpare">
+            <Panel className="px-4 py-4 text-[13px] leading-relaxed text-muted">
+              {pickError ? (
+                <p>Whether this post is picked could not be read just now.</p>
+              ) : pickedAt ? (
+                <>
+                  <p>
+                    Picked <When iso={pickedAt} />. It carries the label, and the newest pick is pinned to the top
+                    of For you for 7 days. Counts are never changed.
+                  </p>
+                  <div className="mt-3">
+                    <ActionForm
+                      action={setPostPick}
+                      fields={{ postId: post.id, picked: "false" }}
+                      label="Unpick"
+                      size="xs"
+                    />
+                  </div>
+                </>
+              ) : post.status !== "visible" ? (
+                <p>Only a visible post can be picked.</p>
+              ) : (
+                <>
+                  <p>
+                    Adds a &ldquo;Picked by Celpare&rdquo; label and pins it to the top of For you for 7 days. Likes
+                    and views are never changed.
+                  </p>
+                  <div className="mt-3">
+                    <ActionForm
+                      action={setPostPick}
+                      fields={{ postId: post.id, picked: "true" }}
+                      label="Pick this post"
+                      tone="primary"
+                      size="xs"
+                    />
+                  </div>
+                </>
+              )}
+            </Panel>
           </Section>
 
           <Section title="At a glance">

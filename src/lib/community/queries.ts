@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient, createAnonClient } from "@/lib/supabase/server";
 import { RANKING, interleaveAuthors, scoreOf, type Sort } from "./ranking";
 import type { PostKind } from "./kinds";
+import { PICKS, choosePinnedPick } from "./picks";
 
 /*
   Every community read lives here, the way every profile read lives in
@@ -492,4 +493,86 @@ export async function getAttachableModels(
     return [];
   }
   return (data as { id: string; name: string }[]) ?? [];
+}
+
+/* ----------------------------------------------------- Picked by Celpare */
+
+/*
+  Which of these posts carry the "Picked by Celpare" label (D270). A failed
+  read shows no labels, which is safe here: a missing label hides nothing and
+  claims nothing.
+*/
+export async function getPickedIds(db: SupabaseClient, postIds: string[]): Promise<Set<string>> {
+  if (postIds.length === 0) return new Set();
+  const { data, error } = await db.from("post_picks").select("post_id").in("post_id", postIds);
+  if (error) {
+    console.error("[community] picks failed", error.code, error.message);
+    return new Set();
+  }
+  return new Set(((data ?? []) as { post_id: string }[]).map((r) => r.post_id));
+}
+
+/*
+  The pick to pin at the top of For you for this viewer, or null. The rule is
+  choosePinnedPick in ./picks; this only gathers its inputs. Any failed read
+  means no pin rather than a guess, and the feed is exactly what it would
+  have been.
+*/
+export async function getPinnedPick(
+  db: SupabaseClient,
+  viewerId: string | null,
+  now: number,
+): Promise<FeedPost | null> {
+  const since = new Date(now - PICKS.PIN_DAYS * 24 * 60 * 60_000).toISOString();
+  const { data: picks, error } = await db
+    .from("post_picks")
+    .select("post_id, picked_at")
+    .gte("picked_at", since)
+    .order("picked_at", { ascending: false })
+    .limit(10);
+  if (error) {
+    console.error("[community] pinned pick failed", error.code, error.message);
+    return null;
+  }
+  const rows = (picks ?? []) as { post_id: string; picked_at: string }[];
+  if (rows.length === 0) return null;
+
+  const { data: posts, error: postsError } = await db
+    .from("posts")
+    .select("id, author_id")
+    .in("id", rows.map((r) => r.post_id))
+    .eq("status", "visible")
+    .is("deleted_at", null);
+  if (postsError) {
+    console.error("[community] pinned pick posts failed", postsError.code, postsError.message);
+    return null;
+  }
+  const authorOf = new Map(((posts ?? []) as { id: string; author_id: string }[]).map((p) => [p.id, p.author_id]));
+
+  const notInterested = new Set<string>();
+  const mutedAuthors = new Set<string>();
+  if (viewerId) {
+    const { data: feedback, error: feedbackError } = await db
+      .from("feed_feedback")
+      .select("target_type, target_id, kind")
+      .eq("user_id", viewerId)
+      .in("target_id", [...rows.map((r) => r.post_id), ...authorOf.values()]);
+    if (feedbackError) {
+      /* Without the viewer's own choices the pin could override them. */
+      console.error("[community] pinned pick feedback failed", feedbackError.code, feedbackError.message);
+      return null;
+    }
+    for (const f of (feedback ?? []) as { target_type: string; target_id: string; kind: string }[]) {
+      if (f.target_type === "post" && f.kind === "not_interested") notInterested.add(f.target_id);
+      if (f.target_type === "author" && f.kind === "mute") mutedAuthors.add(f.target_id);
+    }
+  }
+
+  const chosen = choosePinnedPick(
+    rows
+      .filter((r) => authorOf.has(r.post_id))
+      .map((r) => ({ postId: r.post_id, authorId: authorOf.get(r.post_id)!, pickedAt: r.picked_at })),
+    { now, viewerId, notInterested, mutedAuthors },
+  );
+  return chosen ? getPost(db, chosen) : null;
 }

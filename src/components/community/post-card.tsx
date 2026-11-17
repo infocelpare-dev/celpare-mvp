@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Link2, MessageCircle, Repeat2 } from "lucide-react";
+import { Award, Link2, MessageCircle, Repeat2 } from "lucide-react";
 import { IdentityAvatar } from "./identity-avatar";
 import { IdentityMarks } from "@/components/community/identity-marks";
 import { postIdentity } from "@/lib/community/identity";
@@ -40,6 +40,7 @@ export function PostCard({
   signedIn,
   feedback = false,
   socialProof = null,
+  picked = false,
 }: {
   post: FeedPost;
   viewer: ViewerState;
@@ -48,6 +49,8 @@ export function PostCard({
      sits inside a FeedItem that can collapse it. */
   feedback?: boolean;
   socialProof?: SocialProof | null;
+  /* Picked by Celpare (D270): an editor's pick, said as one. */
+  picked?: boolean;
 }) {
   const href = `/community/${post.id}`;
 
@@ -69,7 +72,16 @@ export function PostCard({
     <article className="border-b border-border px-4 py-4 sm:px-5 sm:py-5">
       {/* The context line sits above the byline with its icon in the avatar
           column, the way X and LinkedIn mark a post from outside your follows. */}
-      {socialProof ? (
+      {/* One context line at most. A pick says why it is here more plainly
+          than social proof, so it wins when both apply. */}
+      {picked ? (
+        <p className="mb-2 flex items-center gap-3 text-[13px] leading-5 text-muted">
+          <span className="flex w-10 shrink-0 justify-end" aria-hidden>
+            <Award className="size-3.5 text-foreground" />
+          </span>
+          <span className="whitespace-nowrap">Picked by Celpare</span>
+        </p>
+      ) : socialProof ? (
         <p className="mb-2 flex items-center gap-3 text-[13px] leading-5 text-muted">
           <span className="flex w-10 shrink-0 justify-end" aria-hidden>
             {socialProof.reason === "reposted_by_following" ? (
