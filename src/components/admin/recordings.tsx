@@ -36,7 +36,10 @@ function Out({ href, children }: { href: string; children: React.ReactNode }) {
 }
 
 export async function Recordings({ userId }: { userId: string }) {
-  const replays = sentryConfigured() ? await getSentryReplaysForUser(userId) : null;
+  /* Not connected and a failed read are told apart: one is a missing setting,
+     the other is Sentry being unreachable, and they need different fixes. */
+  const connected = sentryConfigured();
+  const replays = connected ? await getSentryReplaysForUser(userId) : null;
 
   return (
     <Section
@@ -54,7 +57,12 @@ export async function Recordings({ userId }: { userId: string }) {
       </Panel>
 
       <div className="mt-3">
-        {replays === null ? (
+        {!connected ? (
+          <Panel className="px-4 py-4 text-[13px] text-muted">
+            Sentry replays are not shown: SENTRY_API_TOKEN is not set on this deployment. Statsig above
+            still has every session. See Errors and performance for how to connect it.
+          </Panel>
+        ) : replays === null ? (
           <Panel className="px-4 py-4 text-[13px] text-muted">
             Sentry replays could not be read just now. This is not the same as there being none.
           </Panel>
