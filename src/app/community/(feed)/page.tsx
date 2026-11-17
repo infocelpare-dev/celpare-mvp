@@ -7,6 +7,8 @@ import { isSort } from "@/lib/community/ranking";
 import {
   countVisiblePosts,
   getFeed,
+  getPickedIds,
+  getPinnedPick,
   getPost,
   getTopics,
   getViewerState,
@@ -24,6 +26,7 @@ import { PostCard } from "@/components/community/post-card";
 import { CreatePostFab } from "@/components/community/create-post-fab";
 import { FeedEnd } from "@/components/community/feed-end";
 import { RANKING } from "@/lib/community/ranking";
+import { pinFirst } from "@/lib/community/picks";
 import type { FeedPost } from "@/lib/community/queries";
 import { FeedItem, FeedTelemetry } from "@/components/community/feed-intelligence";
 import {
@@ -150,6 +153,16 @@ export default async function CommunityPage({
   }
 
   /*
+    Picked by Celpare (D270): on the ranked For you feed the newest pick goes
+    first for a few days, unless this viewer wrote it, said not interested or
+    muted its author. Latest and Following are never touched: Latest means
+    newest first and Following means the people you chose.
+  */
+  if (sort === "top" && scope === "for-you") {
+    posts = pinFirst(posts, await getPinnedPick(db, viewerId, now));
+  }
+
+  /*
     ?posted=<id>: the post the viewer has just published (a feature launch,
     D202) goes first, so "See it in the feed" lands on the feed with it on top.
     Only their own, only within the hour, only on the first page; anything else
@@ -208,6 +221,8 @@ export default async function CommunityPage({
   /* For you only: Following is the people you chose, and a shelf of strangers
      in it would change what that tab means. */
   const shelves = scope === "for-you" ? FEED_SHELF_SLOTS : [];
+
+  const picked = await getPickedIds(db, posts.map((p) => p.id));
 
   const viewer = signedIn
     ? await getViewerState(
@@ -292,6 +307,7 @@ export default async function CommunityPage({
                           signedIn={signedIn}
                           feedback={Boolean(ranked)}
                           socialProof={ranked?.socialProof[post.id] ?? null}
+                          picked={picked.has(post.id)}
                         />
                       </FeedItem>
                       {ranked?.debug ? <FeedDebugItem entry={ranked.debug.items[post.id]} now={now} lifecycle={ranked.debug.lifecycle?.[post.id]} /> : null}

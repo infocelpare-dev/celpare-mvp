@@ -279,6 +279,33 @@ export async function setContentStatus(
   );
 }
 
+/* Picked by Celpare (D270). The RPC checks content.moderate, refuses a post
+   that is not visible, and audits. */
+const pickSchema = z.object({
+  postId: uuid,
+  picked: z.enum(["true", "false"]),
+  reason: optionalReason,
+});
+
+export async function setPostPick(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const parsed = pickSchema.safeParse({
+    postId: formData.get("postId"),
+    picked: formData.get("picked"),
+    reason: formData.get("reason") ?? undefined,
+  });
+  if (!parsed.success) {
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the form." };
+  }
+  const picked = parsed.data.picked === "true";
+  return run(
+    "content.moderate",
+    "admin_set_post_pick",
+    { p_post_id: parsed.data.postId, p_picked: picked, p_reason: parsed.data.reason ?? null },
+    [`/admin/community/post/${parsed.data.postId}`, "/community"],
+    picked ? "Picked. It is pinned to the top of For you for 7 days." : "No longer picked.",
+  );
+}
+
 /* --------------------------------------------------------------- reports */
 
 const resolveSchema = z.object({
