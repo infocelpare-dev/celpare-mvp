@@ -47,6 +47,7 @@ export function Logo({
 }) {
   return (
     <Link
+      prefetch={false}
       href="/"
       className={cn(
         "inline-flex items-center gap-2.5 text-foreground",

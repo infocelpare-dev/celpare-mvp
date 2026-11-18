@@ -183,6 +183,7 @@ function BarIcon({
 }) {
   return (
     <Link
+      prefetch={false}
       href={href}
       title={label}
       className="inline-flex size-10 items-center justify-center rounded-lg text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"

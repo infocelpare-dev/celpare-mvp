@@ -126,9 +126,14 @@ export function AppSidebar({
                 );
               }
 
+              /* prefetch off (usage audit, 2026-11-18): these pages render per
+                 request, so every visible nav link was a server call on every
+                 page load, about twenty per view. The same is done for the
+                 header icons and the listing cards. A click still navigates. */
               return (
                 <li key={link.href}>
                   <Link
+                    prefetch={false}
                     href={link.href}
                     onClick={onClose}
                     aria-current={active ? "page" : undefined}
@@ -159,6 +164,7 @@ export function AppSidebar({
         {signedIn ? (
           <div className="shrink-0 border-t border-border p-2">
             <Link
+              prefetch={false}
               href="/settings"
               onClick={onClose}
               aria-current={pathname === "/settings" ? "page" : undefined}

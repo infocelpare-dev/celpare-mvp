@@ -94,7 +94,7 @@ export function PostCard({
         </p>
       ) : null}
       <div className="flex gap-3">
-        <Link href={who.href ?? href} className="shrink-0">
+        <Link prefetch={false} href={who.href ?? href} className="shrink-0">
           <IdentityAvatar identity={who} />
         </Link>
 
@@ -105,6 +105,7 @@ export function PostCard({
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[14px]">
             {who.href ? (
               <Link
+                prefetch={false}
                 href={who.href}
                 className="font-medium text-foreground hover:underline hover:underline-offset-4"
               >
@@ -128,6 +129,7 @@ export function PostCard({
               would stop a value that is supposed to move.
             */}
             <Link
+              prefetch={false}
               href={href}
               suppressHydrationWarning
               className="text-[13px] text-muted hover:text-foreground"
@@ -162,6 +164,7 @@ export function PostCard({
             making it the link nests nothing interactive.
           */}
           <Link
+            prefetch={false}
             href={href}
             className="mt-1.5 block whitespace-pre-wrap break-words text-[15px] leading-relaxed text-foreground"
           >

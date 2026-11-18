@@ -44,6 +44,7 @@ export function ExploreTabs({ active }: { active: ExploreTab }) {
 
         return (
           <Link
+            prefetch={false}
             key={tab}
             href={href}
             role="tab"

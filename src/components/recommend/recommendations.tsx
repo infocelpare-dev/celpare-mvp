@@ -135,7 +135,7 @@ function RecCard({ entity: e, item, compareLink }: { entity: CardEntity; item: R
   const fit = item.fit;
   return (
     <div className="flex h-full flex-col rounded-xl border border-border transition-colors duration-200 ease-out hover:bg-surface">
-      <Link href={e.href} className="flex min-h-11 flex-1 items-start gap-3 p-4">
+      <Link prefetch={false} href={e.href} className="flex min-h-11 flex-1 items-start gap-3 p-4">
         {/* A model shows its maker's logo (D199), drawn here only: logoUrl on the entity is a ranking input. */}
         {(e.logoUrl ?? (e.type === "model" ? providerLogo(e.provider) : null)) ? (
           /* eslint-disable-next-line @next/next/no-img-element */
@@ -169,6 +169,7 @@ function RecCard({ entity: e, item, compareLink }: { entity: CardEntity; item: R
       {compareLink ? (
         <div className="flex border-t border-border px-4 py-1.5">
           <Link
+            prefetch={false}
             href={compareLink.href}
             data-rec-compare=""
             className="inline-flex min-h-9 items-center text-[13px] text-muted underline-offset-2 transition-colors duration-200 ease-out hover:text-foreground hover:underline"

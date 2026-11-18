@@ -43,6 +43,7 @@ export function RecentList({ rows }: { rows: RecentRow[] }) {
       {rows.map((r) => (
         <li key={`${r.kind}-${r.href}`}>
           <Link
+            prefetch={false}
             href={r.href}
             className="flex items-center gap-3 px-4 py-3 transition-colors duration-200 ease-out hover:bg-surface"
           >

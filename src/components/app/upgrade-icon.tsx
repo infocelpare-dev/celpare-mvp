@@ -38,6 +38,7 @@ export function UpgradeIcon() {
 
   return (
     <Link
+      prefetch={false}
       href="/pricing"
       title="Upgrade your plan"
       className="relative inline-flex size-10 items-center justify-center rounded-lg text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"

@@ -53,10 +53,22 @@ export function NotificationBell() {
   }, [pathname]);
 
   useEffect(() => {
-    const refresh = () =>
+    /*
+      Coming back to the tab fires both focus and visibilitychange, which was
+      two identical reads (usage audit, 2026-11-18). A read within the last
+      ten seconds already answers the question, so the second is skipped.
+      Hidden tabs already send nothing: readUnread returns early.
+    */
+    let lastRead = 0;
+    const refresh = () => {
+      if (document.visibilityState === "hidden") return;
+      const now = Date.now();
+      if (now - lastRead < 10_000) return;
+      lastRead = now;
       void readUnread().then((c) => {
         if (c !== undefined) setCount(c);
       });
+    };
     const onFocus = () => refresh();
     const onRead = () => setCount(0);
     const timer = window.setInterval(() => void refresh(), 60_000);
@@ -76,6 +88,7 @@ export function NotificationBell() {
 
   return (
     <Link
+      prefetch={false}
       href="/notifications"
       title={label}
       className="relative inline-flex size-10 items-center justify-center rounded-lg text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
