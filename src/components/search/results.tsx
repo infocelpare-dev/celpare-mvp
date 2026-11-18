@@ -103,7 +103,7 @@ export function ToolResult({
 
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
-          <Link href={`/tools/${t.slug}`} className={`${PRIMARY} text-[16px]`}>
+          <Link prefetch={false} href={`/tools/${t.slug}`} className={`${PRIMARY} text-[16px]`}>
             {t.name}
           </Link>
           {t.verified ? (
@@ -210,6 +210,7 @@ export function ModelResult({
           {/* The model's own page (4BK). It used to run a search for the name,
               when there was no page to link to. */}
           <Link
+            prefetch={false}
             href={`/models/${m.slug}`}
             className={`${PRIMARY} text-[16px]`}
           >
@@ -332,7 +333,7 @@ export function PersonResult({
 
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
-          <Link href={`/u/${p.username}`} className={`${PRIMARY} text-[16px]`}>
+          <Link prefetch={false} href={`/u/${p.username}`} className={`${PRIMARY} text-[16px]`}>
             {name}
           </Link>
           {p.developerVerified ? (

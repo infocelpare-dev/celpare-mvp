@@ -161,6 +161,35 @@ export async function recordModelView(input: {
   }
 }
 
+/*
+  A signed out profile view (usage audit, 2026-11-18). Signed out visitors get
+  the cached render of /tools/<slug> and /models/<slug>, which cannot record a
+  view the way the live page does, so the page view beacon reports it and
+  /api/telemetry/pageview calls this. Approved rows only, the same rows the
+  public profile renders. The live page still records signed in views.
+*/
+const PROFILE_PATH = /^\/(tools|models)\/([a-z0-9-]{1,80})$/;
+
+export async function recordSignedOutProfileView(path: string): Promise<void> {
+  const match = PROFILE_PATH.exec(path);
+  if (!match || unavailable("profile view")) return;
+  const [, kind, slug] = match;
+  try {
+    const { data } = await createAdminClient()
+      .from(kind === "tools" ? "tools" : "models")
+      .select("id")
+      .eq("slug", slug)
+      .eq("status", "approved")
+      .maybeSingle();
+    const id = (data as { id: string } | null)?.id;
+    if (!id) return;
+    if (kind === "tools") await recordToolView({ toolId: id, userId: null, source: "direct" });
+    else await recordModelView({ modelId: id, userId: null, source: "direct" });
+  } catch (err) {
+    console.error("[telemetry] profile view lookup threw", err);
+  }
+}
+
 export type SecurityEventKind =
   | "login_failed"
   | "login_blocked"

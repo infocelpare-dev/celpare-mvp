@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAnonClient, createClient, getCurrentUser, isSupabaseConfigured } from "@/lib/supabase/server";
 import { ageInDays, STALE_AFTER_DAYS } from "@/lib/compare/present";
@@ -78,7 +79,11 @@ export type ToolProfile = {
 const TOOL_COLUMNS =
   "id, slug, name, tagline, description, website_url, docs_url, logo_url, pricing, pricing_model, tags, features, platforms, rating, rating_count, like_count, verified, status, source, developer_id, submitted_at, published_at";
 
-export async function getToolProfile(slug: string): Promise<ToolProfile | null> {
+/* cache(): the profile's generateMetadata and the page itself both ask for the
+   same slug in one request; this makes it one database read instead of two. */
+export const getToolProfile = cache(loadToolProfile);
+
+async function loadToolProfile(slug: string): Promise<ToolProfile | null> {
   if (!isSupabaseConfigured()) return null;
 
   const db = createAnonClient();

@@ -116,9 +116,11 @@ jobs:
         run: npm run scan:history
 
       # Production dependencies, high and critical only. Moderate findings are
-      # Dependabot's job and do not block a release.
+      # Dependabot's job and do not block a release. An advisory with no fixed
+      # version yet can be accepted in .audit-allow.json, with a reason and an
+      # expiry date; scripts/check-audit.mjs fails again once it expires.
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+        run: node scripts/check-audit.mjs
 
       # Applied migrations never change, new ones never destroy data without a
       # written decision. See scripts/check-migrations.mjs.

@@ -50,6 +50,7 @@ export function AppShellSkeleton({ children }: { children: React.ReactNode }) {
                 real links rather than grey boxes: the bar is usable while the
                 page underneath is still coming. */}
             <Link
+              prefetch={false}
               href="/search"
               title="Search Celpare"
               className="inline-flex size-10 items-center justify-center rounded-lg text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
@@ -58,6 +59,7 @@ export function AppShellSkeleton({ children }: { children: React.ReactNode }) {
               <span className="sr-only">Search Celpare</span>
             </Link>
             <Link
+              prefetch={false}
               href="/ask"
               title="Ask Celpare"
               className="inline-flex size-10 items-center justify-center rounded-lg text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"

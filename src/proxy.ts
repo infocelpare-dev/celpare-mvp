@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth/second-factor";
 import { cleanRef, REF_COOKIE, REF_MAX_AGE } from "@/lib/onboarding/options";
 import { EDGE_HEADER, TRUSTED_HEADER, edgeVerdict } from "@/lib/edge/origin";
+import { isExploreTab } from "@/lib/explore/types";
 
 /*
   Refreshes the auth session on every request and writes the rotated cookies
@@ -21,6 +22,17 @@ import { EDGE_HEADER, TRUSTED_HEADER, edgeVerdict } from "@/lib/edge/origin";
   marketing pages still render.
 */
 export async function proxy(request: NextRequest) {
+  /* www.celpare.com is routed to the Worker only to send it to the apex, with
+     path and query kept (wrangler.jsonc). Permanent, so search engines merge
+     the two. */
+  if (request.nextUrl.hostname === "www.celpare.com") {
+    const apex = request.nextUrl.clone();
+    apex.hostname = "celpare.com";
+    apex.protocol = "https:";
+    apex.port = "";
+    return NextResponse.redirect(apex, 301);
+  }
+
   /*
     Origin authentication first (D254). On Vercel production a request that did
     not come through Cloudflare is refused before any work is done. Whatever a
@@ -38,6 +50,32 @@ export async function proxy(request: NextRequest) {
   request.headers.delete(EDGE_HEADER);
   request.headers.delete(TRUSTED_HEADER);
   request.headers.set(TRUSTED_HEADER, "1");
+
+  /*
+    A visitor with no session cookie has no session to refresh, so the Supabase
+    client is not even built (usage audit, 2026-11-18). Their tool and model
+    profiles are served from the cached signed out render instead of a fresh
+    one: same page, same address bar, see app/anon/tools/[slug]/page.tsx.
+  */
+  if (!request.cookies.getAll().some((c) => SESSION_COOKIE.test(c.name))) {
+    if (PROFILE.test(request.nextUrl.pathname)) {
+      const cached = request.nextUrl.clone();
+      cached.pathname = `/anon${request.nextUrl.pathname}`;
+      return rememberRef(request, NextResponse.rewrite(cached, { request }));
+    }
+    if (PLAIN_CACHED.has(request.nextUrl.pathname) && onlyNextParams(request.nextUrl)) {
+      const cached = request.nextUrl.clone();
+      cached.pathname = `/anon${request.nextUrl.pathname}`;
+      return rememberRef(request, NextResponse.rewrite(cached, { request }));
+    }
+    const tab = exploreTab(request.nextUrl);
+    if (tab) {
+      const cached = request.nextUrl.clone();
+      cached.pathname = `/anon/explore/${tab}`;
+      return rememberRef(request, NextResponse.rewrite(cached, { request }));
+    }
+    return rememberRef(request, NextResponse.next({ request }));
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -99,6 +137,43 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  return rememberRef(request, response);
+}
+
+/* A Supabase session cookie: sb-<project>-auth-token, or one of its chunks
+   (.0, .1) when the session is too large for one cookie. */
+const SESSION_COOKIE = /^sb-.+-auth-token(?:\.\d+)?$/;
+
+/* A tool or model profile: exactly one segment after /tools or /models. */
+const PROFILE = /^\/(?:tools|models)\/[^/]+$/;
+
+/* Pages whose plain, no query address has a prebuilt signed out copy under
+   /anon (Workers free plan, 2026-11-18). /community is not here on purpose:
+   a prebuilt feed would hide new posts until the next deploy. */
+const PLAIN_CACHED = new Set(["/search", "/compare", "/pricing", "/ask"]);
+
+/* True when the only query parameter is Next's own _rsc marker, or none. */
+function onlyNextParams(url: URL): boolean {
+  for (const key of url.searchParams.keys()) if (key !== "_rsc") return false;
+  return true;
+}
+
+/*
+  The tab of a plain Explore address that has a cached signed out copy:
+  /explore, or /explore?tab=<a real tab>. Any other parameter (?debug, ?why,
+  a campaign tag) goes to the live page, which handles it as before. _rsc is
+  Next's own marker on in app navigations and does not change the page.
+*/
+function exploreTab(url: URL): string | null {
+  if (url.pathname !== "/explore") return null;
+  for (const key of url.searchParams.keys()) {
+    if (key !== "tab" && key !== "_rsc") return null;
+  }
+  const tab = url.searchParams.get("tab") ?? "all";
+  return isExploreTab(tab) ? tab : null;
+}
+
+function rememberRef(request: NextRequest, response: NextResponse): NextResponse {
   /*
     The campaign tag (phase ONB, D227). A link posted with `?ref=tiktok-gems`
     or `?utm_source=` is remembered first party for 30 days, first touch only,
@@ -137,6 +212,10 @@ export const config = {
 
        /api/health is excluded for the same reason: deploy checks call it with
        no session, and it must answer even if the auth service is slow. */
-    "/((?!monitoring|api/health|_next/static|_next/image|favicon.ico|brand/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    /* Also left out since the 2026-11-18 usage audit: files that never need a
+       session or the origin check, each of which was an edge invocation of
+       its own. robots.txt, sitemap.xml and llms.txt fall under txt and xml;
+       public/video under mp4; fonts under woff2. */
+    "/((?!monitoring|api/health|_next/static|_next/image|favicon.ico|brand/|video/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|mp4|webm|mp3|wav|woff|woff2|ttf|txt|xml|webmanifest|map)$).*)",
   ],
 };

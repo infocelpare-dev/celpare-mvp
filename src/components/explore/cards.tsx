@@ -122,7 +122,7 @@ export function ToolCard({
 
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-1.5">
-            <Link href={`/tools/${tool.slug}`} className={`${PRIMARY} text-[15px]`}>
+            <Link prefetch={false} href={`/tools/${tool.slug}`} className={`${PRIMARY} text-[15px]`}>
               {tool.name}
             </Link>
             {tool.verified ? (
@@ -240,6 +240,7 @@ export function ModelCard({
 
         <span className="min-w-0 flex-1">
           <Link
+            prefetch={false}
             href={`/models/${model.slug}`}
             className={`${PRIMARY} block truncate text-[15px]`}
           >
@@ -357,6 +358,7 @@ export function PersonCard({
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-1.5">
             <Link
+              prefetch={false}
               href={`/u/${person.username}`}
               className={`${PRIMARY} text-[15px]`}
             >
@@ -432,6 +434,7 @@ export function TopicCard({ topic, as: Root = "li" }: { topic: ExploreTopic; as?
   return (
     <Root className="relative">
       <Link
+        prefetch={false}
         href={topic.href}
         className="flex h-full flex-col rounded-2xl border border-border p-3.5 transition-colors duration-200 ease-out hover:bg-surface sm:p-4"
       >
@@ -504,7 +507,7 @@ export function PostShelfCard({ post, as: Root = "li" }: { post: FeedPost; as?: 
         ) : null}
       </div>
 
-      <Link href={`/community/${post.id}`} className={`${PRIMARY} mt-2.5 text-[13px]`}>
+      <Link prefetch={false} href={`/community/${post.id}`} className={`${PRIMARY} mt-2.5 text-[13px]`}>
         <span className="line-clamp-4 font-normal leading-relaxed text-foreground">
           {post.body}
         </span>
@@ -627,7 +630,7 @@ export function VideoCard({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col p-3.5">
-        <Link href={`/community/video/${post.id}`} className={`${PRIMARY} text-[14px]`}>
+        <Link prefetch={false} href={`/community/video/${post.id}`} className={`${PRIMARY} text-[14px]`}>
           {caption ? (
             <span className="line-clamp-2">{caption}</span>
           ) : (

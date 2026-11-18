@@ -1,0 +1,8 @@
+[
+  {
+    "id": "GHSA-fc5q-39xc-vjpf",
+    "package": "picomatch",
+    "expires": "2026-12-18",
+    "reason": "ReDoS in glob matching. Every published picomatch (up to 4.0.7) is affected, so there is no fixed version yet. It is reached only through @sentry/nextjs's build plugin (@rollup/plugin-commonjs), matching our own file patterns while the site is built; no visitor input reaches it at runtime. Remove this entry when a fixed picomatch is released."
+  }
+]

@@ -35,6 +35,7 @@ export async function AdminLink() {
 
   return (
     <Link
+      prefetch={false}
       href="/admin"
       className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
     >

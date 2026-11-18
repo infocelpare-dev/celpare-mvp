@@ -49,37 +49,19 @@ if (dsn) {
       Production only now. Errors and tracing are untouched, so a local crash
       still reaches Sentry exactly as it did.
     */
-    integrations: isDev ? [] : [
-      /*
-        Session Replay, with every default privacy control left ON.
-
-        Celpare pages carry email addresses, private conversations with Ask
-        Celpare, and the admin dashboard, which renders other people's account
-        data. maskAllText and maskAllInputs are the difference between a replay
-        that shows how somebody got stuck and a replay that is a copy of their
-        personal data sitting in a third party. Unmask specific elements
-        deliberately later if a particular flow needs it; never unmask globally.
-      */
-      Sentry.replayIntegration({
-        maskAllText: true,
-        maskAllInputs: true,
-        blockAllMedia: true,
-        /* Nothing kept in sessionStorage, which the Cookie Policy does not
-           list (D269). A full page reload starts a new replay. */
-        stickySession: false,
-      }),
-      Sentry.browserProfilingIntegration(),
-    ],
-
     /*
-      A tenth of production sessions, and always every session that hit an
-      error. Zero in development, where the integration is not loaded at all.
-
-      The error rate is the one that matters: a replay is worth having precisely
-      when something went wrong.
+      Sentry Session Replay is OFF (founder, 2026-11-18, usage audit). Every
+      replay chunk was posted through our own origin (/monitoring), so a
+      recorded session was a stream of function calls on the host's free tier.
+      Session recordings for the founder come from Statsig (D269,
+      components/analytics/session-recorder.tsx), which sends straight to
+      Statsig and not through our host. To bring Sentry replays back, re-add
+      Sentry.replayIntegration (maskAllText, maskAllInputs, blockAllMedia,
+      stickySession false) and the replays sample rates.
     */
-    replaysSessionSampleRate: isDev ? 0 : 0.1,
-    replaysOnErrorSampleRate: 1.0,
+    integrations: isDev ? [] : [Sentry.browserProfilingIntegration()],
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 0,
 
     /*
       Do not send the browser's idea of who the user is. Sentry would otherwise

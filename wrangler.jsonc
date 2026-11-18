@@ -6,8 +6,10 @@
     public internet rather than looping back into this Worker.
   - workers_dev false: production is served only on celpare.com, behind the
     zone's WAF and rate limits. A *.workers.dev address would bypass both.
-  - preview_urls true: each uploaded version gets its own preview URL for PR
-    checks. These go behind Cloudflare Access before any are made.
+  - preview_urls false (2026-11-18): a version's preview URL on workers.dev
+    serves the production app with production secrets but outside the zone's
+    WAF and rate limits, and no Cloudflare Access was ever put in front of
+    them. Turn on again only behind Access.
   - compatibility_date matches the workerd that wrangler 4.156.0 ships, so
     local and deployed behaviour agree. Move it forward on purpose, not by habit.
 
@@ -21,14 +23,17 @@
   "compatibility_date": "2026-10-23",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "workers_dev": false,
-  "preview_urls": true,
+  "preview_urls": false,
   /* Production hostname. A zone route, not a custom domain: the apex already
      has a proxied placeholder A record (192.0.2.1) in the celpare.com zone,
      which a route sits on top of and a custom domain would have to replace.
      Mail records are untouched either way. Live only after the first approved
      deploy; until then the placeholder keeps answering. */
   "routes": [
-    { "pattern": "celpare.com/*", "zone_name": "celpare.com" }
+    { "pattern": "celpare.com/*", "zone_name": "celpare.com" },
+    /* www only redirects to the apex (src/proxy.ts); before 2026-11-18 Netlify
+       did that, and it stopped answering when Netlify paused the site. */
+    { "pattern": "www.celpare.com/*", "zone_name": "celpare.com" }
   ],
   /* Off, against wrangler's default. With keep_names, esbuild wraps functions
      in __name(...) calls. next-themes ships its no flash theme script as a

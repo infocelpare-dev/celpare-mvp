@@ -97,6 +97,7 @@ export function FeedTabs({
             return (
               <li key={tab.key} className="flex items-center">
                 <Link
+                  prefetch={false}
                   href={tab.href}
                   aria-current={selected ? "page" : undefined}
                   /* Switching feeds should not throw the reader back to the
@@ -193,6 +194,7 @@ export function FeedTabs({
               return (
                 <li key={topic.id}>
                   <Link
+                    prefetch={false}
                     href={`/community/topic/${topic.slug}`}
                     aria-current={current ? "page" : undefined}
                     onClick={() => setOpen(false)}
