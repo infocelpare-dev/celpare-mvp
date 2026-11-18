@@ -9,6 +9,15 @@
 [build]
   command = "npm run build"
   publish = ".next"
+  # Usage audit, 2026-11-18: every build and deploy counts against the plan.
+  # Exit 0 cancels the build, anything else builds. Skipped:
+  #   - Dependabot branches. Their pull requests are still built and tested
+  #     by GitHub CI (ci.yml); a Netlify preview of a version bump adds nothing.
+  #   - Commits that change nothing the site is built from: docs, design,
+  #     Supabase migrations, workflows, Markdown.
+  # A redeploy of the same commit (CACHED_COMMIT_REF = COMMIT_REF) always
+  # builds, and so does a first build, where the diff fails and exits non zero.
+  ignore = """case "$HEAD" in dependabot/*) exit 0 ;; esac; [ "$CACHED_COMMIT_REF" = "$COMMIT_REF" ] && exit 1; git diff --quiet "$CACHED_COMMIT_REF" "$COMMIT_REF" -- . ':(exclude)docs' ':(exclude)design' ':(exclude)supabase' ':(exclude).github' ':(exclude)*.md'"""
 
 [build.environment]
   NODE_VERSION = "24"
