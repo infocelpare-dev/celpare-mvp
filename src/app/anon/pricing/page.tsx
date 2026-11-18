@@ -1,0 +1,19 @@
+import LivePricingPage, { metadata as liveMetadata } from "@/app/pricing/page";
+
+/*
+  The signed out /pricing with no query parameters, built at build time
+  (Cloudflare Workers free plan, 2026-11-18: rendered on demand it needs more
+  than the 10 ms of CPU a request may use). src/proxy.ts rewrites a visitor
+  with no session cookie here only when the address has no query string, so
+  every query still reaches the live page. Same component, rendered with no
+  cookies and no parameters, which is what that visitor always got.
+*/
+
+export const dynamic = "force-static";
+export const revalidate = 3600;
+
+export const metadata = liveMetadata;
+
+export default function CachedPricingPage() {
+  return LivePricingPage({ params: Promise.resolve({}), searchParams: Promise.resolve({}) } as Parameters<typeof LivePricingPage>[0]);
+}
