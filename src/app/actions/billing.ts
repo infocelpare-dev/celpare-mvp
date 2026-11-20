@@ -11,6 +11,7 @@ import {
   BILLING_KINDS,
   BILLING_PERIODS,
   isCountryCode,
+  isOnSale,
   isPaidPlan,
   periodLabel,
   periodsFor,
@@ -26,6 +27,7 @@ import { siteUrl } from "@/lib/email/layout";
 import { track } from "@/lib/statsig/server";
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { arePaidPlansOn } from "@/lib/platform/settings";
 
 /*
   Billing actions (phase CRYPTO, D256 to D260; Payoneer, D239, is gone).
@@ -112,6 +114,10 @@ export async function startCheckout(_prev: BillingFormState, formData: FormData)
     return { status: "error", message: "Check the highlighted fields.", fields };
   }
   const v = parsed.data;
+  /* Paid plans paused (D271): only a sponsorship. The database refuses too. */
+  if (!isOnSale(v.kind, await arePaidPlansOn())) {
+    return { status: "error", message: "Paid plans are paused right now. Everything on Celpare is free in the meantime." };
+  }
 
   const supabase = await createClient();
   const {

@@ -12,8 +12,8 @@ export const cookies: Doc = {
   slug: "cookies",
   title: "Cookie Policy",
   description: "Every cookie and browser storage item Celpare uses, what it is for and how long it lasts.",
-  version: "1.3",
-  effective: "2026-11-15",
+  version: "1.4",
+  effective: "2026-11-20",
   summary: [
     "Celpare uses only its own cookies, and only ones it needs to work.",
     "There are no advertising, analytics or third party tracking cookies, which is why there is no cookie banner.",
@@ -28,11 +28,12 @@ export const cookies: Doc = {
           table: {
             head: ["Name", "What it does", "How long"],
             rows: [
-              ["sb-...-auth-token", "Keeps you signed in (set by our sign in provider, Supabase)", "Until you log out, renewed while you use Celpare"],
+              ["sb-...-auth-token", "Keeps you signed in (set by our sign in provider, Supabase)", "Until you log out, or 3 days without visiting Celpare"],
               ["cp_login_pending", "Remembers that your password was right while you enter the emailed login code", "15 minutes"],
               ["cp_2fa", "Remembers that this browser passed the login code step", "30 days"],
               ["cp_recovery", "Allows a password reset only in the browser that opened the reset link", "30 minutes"],
               ["cp_plans", "Remembers that you just logged in, so the plans are shown once after a login and not again until the next one", "Until you continue, log out or close the browser"],
+              ["cp_active", "When this browser last used Celpare while signed in, so a session left unused for 3 days is logged out", "400 days, read only while you are signed in"],
               ["cp_device", "A random id for this browser, so we can email you when your account is used from a new one", "400 days"],
               ["celpare_anon", "A random, signed id used when you are signed out: it applies the daily question limit to Ask Celpare, and limits how often the same sponsored tool is shown to you. It is not linked to any account", "180 days"],
               ["cp_seen", "The last posts you saw in the feed, so they are not shown again straight away", "2 days"],
@@ -68,6 +69,7 @@ export const cookies: Doc = {
     },
   ],
   changes: [
+    { version: "1.4", date: "2026-11-20", note: "Added cp_active, which logs out a session left unused for 3 days." },
     { version: "1.3", date: "2026-11-15", note: "Says that session recordings store nothing in the browser." },
     { version: "1.2", date: "2026-11-11", note: "Says that visits are counted on our server with nothing stored in the browser." },
     { version: "1.1", date: "2026-11-04", note: "Added cp_plans, which shows the plans once after a login." },

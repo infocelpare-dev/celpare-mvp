@@ -19,6 +19,7 @@ import { AccountNotices } from "@/components/app/account-notices";
 import { AdminLink } from "@/components/app/admin-link";
 import { ToolActions } from "@/components/tools/tool-actions";
 import { VerificationRequest } from "@/components/tools/verification-request";
+import { arePaidPlansOn } from "@/lib/platform/settings";
 import { SponsorLink } from "@/components/tools/sponsor-link";
 import { LaunchFeatureButton } from "@/components/tools/launch-feature";
 import { CompareLink } from "@/components/compare/compare-link";
@@ -191,6 +192,8 @@ export async function ToolProfilePage({
     viewer.isOwner && viewer.userId && !tool.verified
       ? await getVerificationRequestState(tool.id, viewer.userId)
       : null;
+  /* Which way the locked message points: the Elite plan or a sponsorship (D271). */
+  const plansOn = verification ? await arePaidPlansOn() : false;
   /* Owner only too (D204). Formatted here, with the zone pinned, so the
      server and the browser print the same date. */
   const sponsorship = viewer.isOwner ? await getSponsorshipState(tool.id) : undefined;
@@ -360,6 +363,7 @@ export async function ToolProfilePage({
               toolName={tool.name}
               verified={tool.verified}
               state={verification}
+              plansOn={plansOn}
             />
           ) : null}
 

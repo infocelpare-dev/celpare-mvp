@@ -984,7 +984,7 @@ export async function requestToolVerification(
   if (error) {
     console.error("[developer] verification request failed", error.code, error.message);
     if (error.message.includes("elite_required")) {
-      return { status: "error", field: "elite", message: "Get the Elite plan first." };
+      return { status: "error", field: "elite", message: "Sponsor one of your tools first." };
     }
     if (error.message.includes("already_requested")) {
       return { status: "error", message: "You have already asked. An admin will look at it." };

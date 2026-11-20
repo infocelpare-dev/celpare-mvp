@@ -24,7 +24,7 @@ const columns = [
     title: "For builders",
     links: [
       { label: "Submit a tool", href: "/signup" },
-      { label: "Developer plans", href: "/signup" },
+      { label: "Sponsor a tool", href: "/pricing" },
       { label: "Verified badge", href: "/signup" },
     ],
   },

@@ -9,6 +9,7 @@ import {
   secondFactorEnabled,
   sessionClaims,
 } from "@/lib/auth/second-factor";
+import { IDLE_COOKIE, IDLE_COOKIE_MAX_AGE, idleValue, idleVerdict } from "@/lib/auth/idle";
 import { cleanRef, REF_COOKIE, REF_MAX_AGE } from "@/lib/onboarding/options";
 import { EDGE_HEADER, TRUSTED_HEADER, edgeVerdict } from "@/lib/edge/origin";
 import { isExploreTab } from "@/lib/explore/types";
@@ -117,11 +118,12 @@ export async function proxy(request: NextRequest) {
     API, or one from before the code step existed. getSession is safe to read
     here because getUser just validated the same token. Google is exempt.
   */
+  let signedOut = false;
+  const claims = user
+    ? sessionClaims((await supabase.auth.getSession()).data.session?.access_token)
+    : null;
+
   if (user && secondFactorEnabled()) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const claims = sessionClaims(session?.access_token);
     /* A reset link's session may reach the new password form, nothing else (D193). */
     const onResetForm =
       claims !== null &&
@@ -139,10 +141,55 @@ export async function proxy(request: NextRequest) {
     ) {
       await supabase.auth.signOut({ scope: "local" });
       response.cookies.delete(SECOND_FACTOR_COOKIE);
+      signedOut = true;
+    }
+  }
+
+  /*
+    Logged out after 3 days away (D272, lib/auth/idle.ts). scope "local" ends
+    this browser's session on the auth server too, so its refresh token is
+    worthless afterwards, and setAll above clears the session cookies on the
+    response and on the request, so the page below renders signed out. A page
+    visit is sent to /login with the reason; API and in app (RSC) requests
+    simply continue signed out.
+  */
+  if (claims && !signedOut) {
+    const now = Date.now();
+    const verdict = idleVerdict(request.cookies.get(IDLE_COOKIE)?.value, claims.sessionId, now);
+    if (verdict === "expired") {
+      await supabase.auth.signOut({ scope: "local" });
+      response.cookies.delete(SECOND_FACTOR_COOKIE);
+      response.cookies.delete(IDLE_COOKIE);
+      if (isPageVisit(request)) {
+        const redirect = NextResponse.redirect(new URL("/login?notice=idle", request.url));
+        for (const c of response.cookies.getAll()) redirect.cookies.set(c);
+        redirect.headers.set("cache-control", "no-store");
+        return redirect;
+      }
+    } else if (verdict === "touch") {
+      response.cookies.set(IDLE_COOKIE, idleValue(claims.sessionId, now), {
+        maxAge: IDLE_COOKIE_MAX_AGE,
+        httpOnly: true,
+        sameSite: "lax",
+        secure: request.nextUrl.protocol === "https:",
+        path: "/",
+      });
     }
   }
 
   return rememberRef(request, response);
+}
+
+/* A full page load of something other than the sign in pages: worth sending
+   to /login with the reason. Not an API call, a form post or an in app (RSC)
+   navigation, which would get a redirect they cannot show. */
+function isPageVisit(request: NextRequest): boolean {
+  if (request.method !== "GET") return false;
+  if (request.headers.has("rsc") || request.nextUrl.searchParams.has("_rsc")) return false;
+  const path = request.nextUrl.pathname;
+  if (path.startsWith("/api/") || path.startsWith("/auth/")) return false;
+  if (["/login", "/signup", "/get-started", "/verify"].includes(path)) return false;
+  return (request.headers.get("accept") ?? "").includes("text/html");
 }
 
 /* A Supabase session cookie: sb-<project>-auth-token, or one of its chunks

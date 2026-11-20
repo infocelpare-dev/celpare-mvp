@@ -90,24 +90,24 @@ export const yourData: Doc = {
 
 export const plans: Doc = {
   slug: "plans",
-  title: "Plans",
-  description: "What the Free plan includes, and the paid plans that are coming.",
-  version: "1.0",
-  effective: "2026-10-07",
+  title: "Is Celpare free?",
+  description: "Celpare is free while paid plans are paused. The one paid thing now is sponsoring a tool.",
+  version: "2.0",
+  effective: "2026-11-20",
   sections: [
     {
       id: "today",
       heading: "Today",
       blocks: [
-        "Everyone is on the Free plan. Your plan and your daily Ask Celpare allowance are shown at the top of [Settings](/settings). The allowance resets at midnight.",
+        "Paid plans are paused right now, so everyone is on Free. Your daily Ask Celpare allowance is shown at the top of [Settings](/settings) and resets at midnight.",
         "Signed out, you can ask a few questions a day without an account. Nothing you ask while signed out is saved.",
       ],
     },
     {
       id: "paid",
-      heading: "Paid plans",
+      heading: "Sponsorship",
       blocks: [
-        "The [pricing page](/pricing) shows Pro and Premium for individuals, and Pro and Elite for developers. They show Coming soon and cannot be bought yet. When they open, the [Paid Plans Terms](/legal/paid-plans) apply, including a full refund within 14 days of your first payment.",
+        "If you make an AI tool, you can sponsor it. The [pricing page](/pricing) explains what a sponsorship includes: labelled placement in Search and Ask Celpare, developer analytics and the blue tick request. The [Sponsorship Terms](/legal/sponsorship) apply.",
       ],
     },
   ],

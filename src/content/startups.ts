@@ -6,6 +6,8 @@
 
   Developer plans, the verified badge and sponsored placement are shown here
   to everyone, at the founder's request (D238, a page level exception to D196).
+  While paid plans are paused (D271) buildStages and startupFaq leave out what
+  only a plan gives.
 */
 
 export type StageCard = {
@@ -16,7 +18,7 @@ export type StageCard = {
   note?: string;
 };
 
-export const BUILD_STAGES: StageCard[] = [
+const BUILD_STAGES_ALL: StageCard[] = [
   {
     stage: "Idea",
     title: "Know what to use before you start",
@@ -44,6 +46,19 @@ export const BUILD_STAGES: StageCard[] = [
   },
 ];
 
+/* The Build stage while paid plans are paused (D271): Deep match is Premium,
+   so the stage describes the outline every answer gives instead. */
+const BUILD_STAGE_FREE: StageCard = {
+  stage: "Build",
+  title: "Get a roadmap, one tool per step",
+  body: "Tell Ask Celpare what you want to build and it outlines the work in three phases, plan and design, build, launch, with one tool for each. Written in plain words, for founders who do not code.",
+  link: { label: "Try it in Ask", href: "/ask" },
+};
+
+export function buildStages(plansOn: boolean): StageCard[] {
+  return plansOn ? BUILD_STAGES_ALL : BUILD_STAGES_ALL.map((s) => (s.stage === "Build" ? BUILD_STAGE_FREE : s));
+}
+
 export const LAUNCH_STEPS: { title: string; body: string }[] = [
   {
     title: "List your tool",
@@ -51,7 +66,7 @@ export const LAUNCH_STEPS: { title: string; body: string }[] = [
   },
   {
     title: "Prove it is yours",
-    body: "Verify that you own the tool, so you manage its page and post as it. Elite developers can request the blue tick.",
+    body: "Verify that you own the tool, so you manage its page and post as it. Elite developers, and any developer with a sponsored tool, can request the blue tick.",
   },
   {
     title: "Launch to the community",
@@ -63,7 +78,7 @@ export const LAUNCH_STEPS: { title: string; body: string }[] = [
   },
   {
     title: "See what is working",
-    body: "Developer analytics show views over a day, a week and a month, how people arrived at your tool and what they searched for, so you know what to improve.",
+    body: "Developer analytics, which also come with a sponsorship, show views over a day, a week and a month, how people arrived at your tool and what they searched for, so you know what to improve.",
   },
 ];
 
@@ -82,7 +97,7 @@ export const TRUST_POINTS: { title: string; body: string }[] = [
   },
 ];
 
-export const STARTUP_FAQ: { q: string; a: string }[] = [
+const STARTUP_FAQ_ALL: { q: string; a: string }[] = [
   {
     q: "Is listing my AI tool free?",
     a: "Yes. The free developer plan lists up to 2 tools. Pro and Elite add more tools, analytics, better placement and, on Elite, the blue tick. Paid plans are coming soon.",
@@ -104,3 +119,14 @@ export const STARTUP_FAQ: { q: string; a: string }[] = [
     a: "It compares the catalogue tools for your goal, checks the web for current prices and facts, reads the best pages and returns a recommendation or a build roadmap with numbered sources. It is part of Premium.",
   },
 ];
+
+/* While paid plans are paused (D271) there are no developer plans to name and
+   no Deep match, so those two answers change or go. */
+export function startupFaq(plansOn: boolean): { q: string; a: string }[] {
+  if (plansOn) return STARTUP_FAQ_ALL;
+  return STARTUP_FAQ_ALL.filter((f) => !f.q.startsWith("What does Deep match")).map((f) =>
+    f.q === "Is listing my AI tool free?"
+      ? { q: f.q, a: "Yes. Listing your tools is free, and so is the rest of Celpare. Paid plans are paused; the one paid thing now is sponsoring a tool, which adds labelled placement in Search and Ask, developer analytics and the blue tick request." }
+      : f,
+  );
+}

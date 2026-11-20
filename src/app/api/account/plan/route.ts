@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, getCurrentUser, isSupabaseConfigured } from "@/lib/supabase/server";
 import { withinBurst } from "@/lib/security/burst";
+import { arePaidPlansOn } from "@/lib/platform/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -8,10 +9,12 @@ export const dynamic = "force-dynamic";
   The caller's own plan, for the Upgrade icon in the top bar (PRICE.3). The
   plan is readable only by its owner, through my_profile_private() (D194).
   Signed out, or on any failure, the answer is null and the icon stays hidden:
-  a failed read must not show Upgrade to someone who already pays.
+  a failed read must not show Upgrade to someone who already pays. While paid
+  plans are paused (D271) the answer is null too: there is nothing to upgrade to.
 */
 export async function GET() {
   if (!isSupabaseConfigured()) return NextResponse.json({ plan: null });
+  if (!(await arePaidPlansOn())) return NextResponse.json({ plan: null }, { headers: { "Cache-Control": "private, no-store" } });
   if (!(await withinBurst("plan"))) return NextResponse.json({ plan: null }, { status: 429 });
   if (!(await getCurrentUser())) return NextResponse.json({ plan: null }, { status: 401 });
 

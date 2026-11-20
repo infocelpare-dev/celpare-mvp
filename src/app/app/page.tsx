@@ -4,6 +4,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getOnboarding } from "@/lib/onboarding/server";
 import { getViewerPlans } from "@/lib/pricing/viewer";
 import { isFreeForPlans, PLANS_COOKIE } from "@/lib/pricing/due";
+import { arePaidPlansOn } from "@/lib/platform/settings";
 
 /*
   Every entry path lands here: sign up, log in, the OAuth callback, and skip.
@@ -22,7 +23,8 @@ import { isFreeForPlans, PLANS_COOKIE } from "@/lib/pricing/due";
 
   Then the plans (phase PLANS, D228): a returning login carries the cp_plans
   cookie from afterLogin, and a free account goes to /plans once. Paying
-  accounts, and any failed read, go straight home.
+  accounts, and any failed read, go straight home. Not while paid plans are
+  paused (D271): there is nothing to show.
 */
 export default async function AppPage() {
   if (isSupabaseConfigured()) {
@@ -33,7 +35,7 @@ export default async function AppPage() {
       if (state && !state.onboardedAt) redirect("/welcome");
 
       const due = (await cookies()).get(PLANS_COOKIE)?.value === "1";
-      if (due && isFreeForPlans(await getViewerPlans(db, user.id))) redirect("/plans");
+      if (due && (await arePaidPlansOn()) && isFreeForPlans(await getViewerPlans(db, user.id))) redirect("/plans");
     }
   }
   redirect("/ask");

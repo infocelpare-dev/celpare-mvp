@@ -12,13 +12,14 @@ export const sponsorship: Doc = {
   slug: "sponsorship",
   title: "Sponsorship Terms",
   description: "How sponsored tools work on Celpare: what a sponsorship buys, how sponsored tools are chosen and labelled, and the rules for sponsors.",
-  version: "1.2",
-  effective: "2026-11-10",
+  version: "1.3",
+  effective: "2026-11-20",
   summary: [
     "A sponsorship buys eligibility for a labelled Sponsored slot, never a position. There is no bidding.",
     "Among sponsors that match what someone searched or asked, Celpare orders them by relevance and quality, the same way for every sponsor.",
     "Sponsored tools are always labelled, and paying never changes a tool's place in organic results.",
     "A sponsorship runs for one month from the confirmed payment and does not renew automatically.",
+    "While you have an active sponsorship you also get developer analytics and can request the verified tick for your tools.",
   ],
   sections: [
     {
@@ -26,6 +27,7 @@ export const sponsorship: Doc = {
       heading: "1. What a sponsorship is",
       blocks: [
         "A sponsorship is a flat monthly price, shown on the [sponsorship page](/pricing/sponsored), for an approved tool you own on Celpare. It makes the tool eligible to appear in a slot labelled Sponsored in Search results and in Ask Celpare answers. There is no bid, cost per click, cost per view, budget or tier.",
+        "While any of your tools has an active sponsorship, your developer account also gets developer analytics and can request the blue verified tick for your tools, as described in the [Developer Terms](/legal/developer-terms). Both stop when no sponsorship is active.",
         "A sponsorship is paid in BTC, ETH, BNB, XRP or USDT through NOWPayments, and runs for one month from the moment the payment is confirmed. It does not renew automatically: when it ends, the tool stops being eligible for the Sponsored slot until a new month is paid. The [Paid Plans Terms](/legal/paid-plans) apply to payment, part payments and refunds.",
       ],
     },
@@ -78,6 +80,7 @@ export const sponsorship: Doc = {
     },
   ],
   changes: [
+    { version: "1.3", date: "2026-11-20", note: "An active sponsorship also gives developer analytics and the verified tick request." },
     { version: "1.2", date: "2026-11-10", note: "Sponsorship is paid in crypto through NOWPayments. Payoneer is no longer used." },
     { version: "1.1", date: "2026-11-07", note: "Sponsorship is paid by invoice through Payoneer, runs one month from the confirmed payment and does not renew automatically." },
     { version: "1.0", date: "2026-10-07", note: "First version, before sponsorship opens." },

@@ -10,6 +10,7 @@ import { Container } from "@/components/ui/container";
 import { BillingRequestForm } from "@/components/billing/request-form";
 import {
   formatMoney,
+  isOnSale,
   isPaidPlan,
   periodLabel,
   periodsFor,
@@ -20,7 +21,7 @@ import {
 import { offeredCoins } from "@/lib/billing/coins";
 import { countries } from "@/lib/billing/countries";
 import { enabledCoins } from "@/lib/billing/nowpayments";
-import { isBillingOpen } from "@/lib/platform/settings";
+import { arePaidPlansOn, isBillingOpen } from "@/lib/platform/settings";
 import { DEVELOPER_PLANS, INDIVIDUAL_PLANS, yearlyCents } from "@/lib/pricing/plans";
 import { SPONSORSHIP_PRICE_CENTS } from "@/lib/sponsored/config";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
@@ -63,7 +64,10 @@ export default async function BillingRequestPage({
   const kind = q.kind ?? "";
   const plan = q.plan ?? "";
   const period = (q.period === "yearly" ? "yearly" : "monthly") as BillingPeriod;
-  const valid = isPaidPlan(kind, plan) && periodsFor(kind as BillingKind).includes(period);
+  const valid =
+    isPaidPlan(kind, plan) &&
+    periodsFor(kind as BillingKind).includes(period) &&
+    isOnSale(kind as BillingKind, await arePaidPlansOn());
   const open = await isBillingOpen();
 
   let toolName: string | null = null;

@@ -49,7 +49,7 @@ import { cn } from "@/lib/utils";
 
 export type ModeKey = "toolSearch" | "webSearch" | "deepResearch";
 
-export type ModeGrant = { allowed: boolean; requires: string | null };
+export type ModeGrant = { allowed: boolean; requires: string | null; offered?: boolean };
 
 export type Modes = Record<ModeKey, boolean>;
 export type Grants = Record<ModeKey, ModeGrant>;
@@ -160,7 +160,8 @@ export function Composer({
   /* What the sources button says. Naming the single active mode is more useful
      than a count, and a count is more useful than a list once there are two.
      Deep research has its own switch, so it is not a source here. */
-  const sources = MODES.filter((m) => m.key !== "deepResearch");
+  /* A mode no plan can unlock today is hidden, not locked (D271: plans paused). */
+  const sources = MODES.filter((m) => m.key !== "deepResearch" && grants[m.key].offered !== false);
   const deep = MODES.find((m) => m.key === "deepResearch")!;
   const deepGrant = grants.deepResearch;
   const deepOn = deepGrant.allowed && modes.deepResearch;
@@ -334,7 +335,9 @@ export function Composer({
           </div>
 
           {/* Deep research, its own switch (D234). Locked plans see a lock and
-              are told what it takes, in words, as the menu does. */}
+              are told what it takes, in words, as the menu does. Hidden when
+              no plan anyone can be on today includes it (D271). */}
+          {deepGrant.offered === false ? null : (
           <button
             type="button"
             aria-pressed={deepGrant.allowed ? deepOn : undefined}
@@ -367,6 +370,7 @@ export function Composer({
             <span aria-hidden className="min-[420px]:hidden">Match</span>
             <span aria-hidden className="hidden min-[420px]:inline">Deep match</span>
           </button>
+          )}
           </div>
 
           {busy ? (

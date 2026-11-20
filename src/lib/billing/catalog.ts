@@ -59,6 +59,14 @@ export function isPaidPlan(kind: string, plan: string): kind is BillingKind {
   return (BILLING_KINDS as readonly string[]).includes(kind) && plan in PAID_PLANS[kind as BillingKind];
 }
 
+/* Whether a kind can be bought right now. Sponsorship always can; the
+   individual and developer plans only while the paid plans switch is on
+   (D271: paused, not removed). The database checks the same thing through
+   billing_prices.active, which the switch sets. */
+export function isOnSale(kind: BillingKind, plansOn: boolean): boolean {
+  return kind === "sponsorship" || plansOn;
+}
+
 export function planLabel(kind: BillingKind, plan: string): string {
   return PAID_PLANS[kind]?.[plan] ?? plan;
 }

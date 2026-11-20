@@ -181,6 +181,9 @@ export type ModeGrant = {
   allowed: boolean;
   /* The lowest plan that unlocks it, for the copy on the lock. */
   requires: Plan | null;
+  /* False when no plan anyone can be on today unlocks it (paid plans paused,
+     D271), so the composer hides it instead of showing a lock. */
+  offered: boolean;
 };
 
 export type ModeGrants = Record<AskMode, ModeGrant>;

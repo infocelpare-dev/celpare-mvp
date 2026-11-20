@@ -13,8 +13,8 @@ export const developerTerms: Doc = {
   slug: "developer-terms",
   title: "Developer Terms",
   description: "The rules for listing AI tools and models on Celpare as a developer: accuracy, review, verification, launches and removal.",
-  version: "1.1",
-  effective: "2026-11-11",
+  version: "1.2",
+  effective: "2026-11-20",
   summary: [
     "List only tools and models you build or officially represent, and describe them accurately.",
     "Celpare reviews every submission before it is public. You cannot approve your own.",
@@ -77,7 +77,7 @@ export const developerTerms: Doc = {
       heading: "5. Ownership and the verified tick",
       blocks: [
         "Celpare may check that you own or represent a tool, for example through its domain, before treating you as its owner.",
-        "The blue verified tick is requested by the developer and granted only when a Celpare admin accepts the request. Requesting it is part of the Elite developer plan. The tick means Celpare confirmed the listing is managed by the tool's owner. It is not an endorsement or a ranking.",
+        "The blue verified tick is requested by the developer and granted only when a Celpare admin accepts the request. Requesting it is part of the Elite developer plan, and is also available while one of your tools has an active sponsorship. The tick means Celpare confirmed the listing is managed by the tool's owner. It is not an endorsement or a ranking.",
       ],
     },
     {
@@ -91,7 +91,7 @@ export const developerTerms: Doc = {
       id: "data",
       heading: "7. Analytics and data",
       blocks: [
-        "Developer analytics are part of the Pro and Elite developer plans. They show aggregate numbers about your listings, such as views over time and how people arrived, and the search terms people used before opening your listing. They never identify the individual people who viewed it, and you may not try to identify them.",
+        "Developer analytics are part of the Pro and Elite developer plans, and are also available while one of your tools has an active sponsorship. They show aggregate numbers about your listings, such as views over time and how people arrived, and the search terms people used before opening your listing. They never identify the individual people who viewed it, and you may not try to identify them.",
         `Your listing's contact email is used by Celpare to reach you about the listing and is not shown publicly. Submission emails come from ${OPERATOR.submissions}.`,
       ],
     },
@@ -115,11 +115,12 @@ export const developerTerms: Doc = {
       id: "plans",
       heading: "10. Developer plans",
       blocks: [
-        "Developer plans and their limits are shown on the pricing page. Paid developer plans are paid in crypto through NOWPayments, and the [Paid Plans Terms](/legal/paid-plans) apply to them. Sponsorship is covered by the [Sponsorship Terms](/legal/sponsorship).",
+        "Developer plans and their limits are shown on the pricing page while they are on sale; they can be paused, and listing stays free. Paid developer plans are paid in crypto through NOWPayments, and the [Paid Plans Terms](/legal/paid-plans) apply to them. Sponsorship is covered by the [Sponsorship Terms](/legal/sponsorship).",
       ],
     },
   ],
   changes: [
+    { version: "1.2", date: "2026-11-20", note: "An active sponsorship also gives developer analytics and the verified tick request. Developer plans can be paused." },
     { version: "1.1", date: "2026-11-11", note: "Paid developer plans are on sale, paid in crypto through NOWPayments." },
     { version: "1.0", date: "2026-10-07", note: "First version." },
   ],

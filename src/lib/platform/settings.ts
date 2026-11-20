@@ -77,6 +77,19 @@ export async function isBillingOpen(): Promise<boolean> {
   return settings["features.billing_requests"] === true;
 }
 
+/*
+  Whether the paid plans (Pro, Premium, developer Pro and Elite) are on (D271,
+  2026-11-20: paused, not removed). Off, Celpare shows as free and only a
+  sponsorship can be bought. Fails CLOSED like billing: a value that is
+  missing or unreadable keeps the plans hidden. The database follows the same
+  switch (a trigger turns the plan prices off), so this decides what renders
+  and the database decides what can be bought.
+*/
+export async function arePaidPlansOn(): Promise<boolean> {
+  const settings = await getPublicSettings();
+  return settings["features.paid_plans"] === true;
+}
+
 export type Announcement = { active: boolean; message: string };
 
 export async function getAnnouncement(): Promise<Announcement | null> {
