@@ -58,19 +58,9 @@ export function visitorId(secret: string, day: string, ip: string | null, userAg
   return `v_${mac.slice(0, 24)}`;
 }
 
-/*
-  Crawlers, previews and headless browsers. Most crawlers never run the page's
-  JavaScript, so they never send the beacon at all; this catches the ones that
-  do, plus link unfurlers that fetch with a script engine. An empty browser
-  string is a script, not a person.
-*/
-const BOT =
-  /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|embedly|quora link preview|whatsapp|telegram|discord|skype|headless|phantom|puppeteer|playwright|selenium|lighthouse|pagespeed|gtmetrix|pingdom|uptime|statuscake|curl|wget|python-requests|httpclient|axios|node-fetch|go-http-client|okhttp|java\//i;
-
-export function isBot(userAgent: string | null | undefined): boolean {
-  if (!userAgent || userAgent.trim().length < 10) return true;
-  return BOT.test(userAgent);
-}
+/* Crawlers, previews and headless browsers: one rule for the whole app, kept in
+   lib/edge/bots.ts so the proxy can use it too. */
+export { isBot } from "../edge/bots";
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 

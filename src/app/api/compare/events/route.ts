@@ -3,6 +3,8 @@ import { z } from "zod";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { recordCompareEvents } from "@/lib/compare/analytics";
 import { withinBurst } from "@/lib/security/burst";
+import { sameOrigin } from "@/lib/security/same-origin";
+import { isBot } from "@/lib/edge/bots";
 import { COMPARE_EVENTS, GOALS, MAX_ITEMS } from "@/lib/compare/types";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +47,11 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   if (!isSupabaseConfigured()) return new NextResponse(null, { status: 204 });
+  /* Our own pages and real browsers only, like the page view beacon. 204 so a
+     refused beacon has nothing to retry. */
+  if (!sameOrigin(request.headers) || isBot(request.headers.get("user-agent"))) {
+    return new NextResponse(null, { status: 204 });
+  }
   /* Written with the service role, so without this one script could fill the table. */
   if (!(await withinBurst("beacon"))) return new NextResponse(null, { status: 429 });
 

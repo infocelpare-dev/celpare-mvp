@@ -12,6 +12,7 @@ import {
 import { cleanRef, REF_COOKIE, REF_MAX_AGE } from "@/lib/onboarding/options";
 import { EDGE_HEADER, TRUSTED_HEADER, edgeVerdict } from "@/lib/edge/origin";
 import { isExploreTab } from "@/lib/explore/types";
+import { botQueryRedirect } from "@/lib/edge/bots";
 
 /*
   Refreshes the auth session on every request and writes the rotated cookies
@@ -58,6 +59,10 @@ export async function proxy(request: NextRequest) {
     one: same page, same address bar, see app/anon/tools/[slug]/page.tsx.
   */
   if (!request.cookies.getAll().some((c) => SESSION_COOKIE.test(c.name))) {
+    /* A crawler asking for a compare or search combination gets the plain,
+       prebuilt page instead of a render on demand (lib/edge/bots.ts). */
+    const plain = botQueryRedirect(request.nextUrl, request.headers.get("user-agent"));
+    if (plain) return NextResponse.redirect(plain, 301);
     if (PROFILE.test(request.nextUrl.pathname)) {
       const cached = request.nextUrl.clone();
       cached.pathname = `/anon${request.nextUrl.pathname}`;

@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { createClient, getCurrentUser, isSupabaseConfigured } from "@/lib/supabase/server";
 import { compareHref, parseGoal, parseRefs, parseView, refKey, viewType } from "@/lib/compare/params";
 import { recordCompareEvents } from "@/lib/compare/analytics";
+import { fromCrawler } from "@/lib/telemetry";
 import { MIN_ITEMS, type CompareItem } from "@/lib/compare/types";
 import { getAdminSession } from "@/lib/admin/guard";
 import { formatScenario, formatWeights, parseScenario, parseWeights } from "@/lib/compare/intelligence/request";
@@ -195,7 +196,10 @@ export default async function ComparePage({
   const isAdmin = debugRequested && signedIn ? (await getAdminSession()) !== null : false;
   const debug = run && debugAllowed({ requested: debugRequested, signedIn, isAdmin }) ? buildDebug(run) : null;
 
-  if (ready) {
+  /* A crawler walking compare addresses is not a comparison anybody made: it
+     wrote 1.1 million rows in 10 days (2026-11-20). Only checked when there is
+     something to record, so the prebuilt empty page never reads headers. */
+  if (ready && !(await fromCrawler())) {
     /* Not awaited: telemetry never holds up a render. */
     void recordCompareEvents({
       userId,
