@@ -1,4 +1,5 @@
 import { FEATURES, PLAN_LIMITS } from "./config";
+import { arePaidPlansOn } from "@/lib/platform/settings";
 import { isWebSearchConfigured } from "./web-search";
 import type { AiFeature, ModeGrants, Plan } from "./types";
 
@@ -13,16 +14,24 @@ import type { AiFeature, ModeGrants, Plan } from "./types";
 
 export const PLAN_ORDER: Plan[] = ["anon", "free", "pro", "premium"];
 
-/* The lowest plan whose limits turn a capability on. Derived rather than
-   written down twice, so moving web search to another plan moves the lock with
-   it. */
-export function lowestPlanWith(
-  key: "toolSearch" | "webSearch" | "researchMode",
-): Plan | null {
-  return PLAN_ORDER.find((p) => PLAN_LIMITS[p][key]) ?? null;
+/* The plans someone can be on right now. While paid plans are paused (D271,
+   the features.paid_plans switch) only anon and free can be reached, and a
+   mode only Pro or Premium has is not offered at all: hidden, not locked. */
+function reachable(plansOn: boolean): Plan[] {
+  return plansOn ? PLAN_ORDER : ["anon", "free"];
 }
 
-export function grantsFor(plan: Plan, feature: AiFeature = "ask"): ModeGrants {
+/* The lowest plan whose limits turn a capability on. Derived rather than
+   written down twice, so moving web search to another plan moves the lock with
+   it. Null when no reachable plan has it. */
+export function lowestPlanWith(
+  key: "toolSearch" | "webSearch" | "researchMode",
+  plansOn = true,
+): Plan | null {
+  return reachable(plansOn).find((p) => PLAN_LIMITS[p][key]) ?? null;
+}
+
+export function grantsFor(plan: Plan, feature: AiFeature = "ask", plansOn = false): ModeGrants {
   const limits = PLAN_LIMITS[plan];
   const config = FEATURES[feature];
 
@@ -37,15 +46,18 @@ export function grantsFor(plan: Plan, feature: AiFeature = "ask"): ModeGrants {
   return {
     toolSearch: {
       allowed: config.canToolSearch && limits.toolSearch,
-      requires: lowestPlanWith("toolSearch"),
+      requires: lowestPlanWith("toolSearch", plansOn),
+      offered: lowestPlanWith("toolSearch", plansOn) !== null,
     },
     webSearch: {
       allowed: config.canWebSearch && limits.webSearch && webConfigured,
-      requires: lowestPlanWith("webSearch"),
+      requires: lowestPlanWith("webSearch", plansOn),
+      offered: lowestPlanWith("webSearch", plansOn) !== null,
     },
     deepResearch: {
       allowed: limits.researchMode && config.canWebSearch && webConfigured,
-      requires: lowestPlanWith("researchMode"),
+      requires: lowestPlanWith("researchMode", plansOn),
+      offered: lowestPlanWith("researchMode", plansOn) !== null,
     },
   };
 }
@@ -65,7 +77,7 @@ export async function composerConfig(): Promise<{
 }> {
   const { identify } = await import("./identity");
   const identity = await identify();
-  const grants = grantsFor(identity.plan);
+  const grants = grantsFor(identity.plan, "ask", await arePaidPlansOn());
 
   return {
     plan: identity.plan,

@@ -41,7 +41,8 @@ type RequestRow = {
   tools: { name: string; slug: string; status: string; verified: boolean } | null;
 };
 
-const PLAN_LABEL: Record<string, string> = { free: "Free", pro: "Pro", elite: "Elite" };
+/* elite is the Elite plan or an active sponsorship, which sets it while it runs (D271). */
+const PLAN_LABEL: Record<string, string> = { free: "Free", pro: "Pro", elite: "Elite or sponsored" };
 
 export default async function AdminVerificationsPage({
   searchParams,
@@ -136,7 +137,7 @@ export default async function AdminVerificationsPage({
                         }
                       >
                         {plan ? `${PLAN_LABEL[plan] ?? plan} plan` : "No developer plan"}
-                        {elite ? "" : ", not Elite"}
+                        {elite ? "" : ", not Elite or sponsored"}
                       </span>
                     </div>
 

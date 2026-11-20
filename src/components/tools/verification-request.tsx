@@ -12,9 +12,10 @@ import type { VerificationRequestState } from "@/lib/tools/queries";
   Request verification, beside Launch a new feature on the owner's tool page
   (D201, founder instruction 2026-10-05).
 
-  Only Elite can ask. Anyone else who presses it is told to get Elite first and
-  sent to the developer plans; the button is not disabled, because a disabled
-  button cannot say why. The plan read here only chooses the message: the real
+  Only Elite can ask: the Elite plan, or an active sponsorship, which sets the
+  plan to elite while it runs (D271). Anyone else who presses it is told what
+  to get first, the plans while they are on and a sponsorship while they are
+  paused; the button is not disabled, because a disabled button cannot say why. The plan read here only chooses the message: the real
   check is request_tool_verification, and an admin checks the plan again when
   accepting.
 
@@ -33,12 +34,15 @@ export function VerificationRequest({
   toolName,
   verified,
   state,
+  plansOn = false,
 }: {
   toolId: string;
   slug: string;
   toolName: string;
   verified: boolean;
   state: VerificationRequestState;
+  /* The paid plans switch (D271). */
+  plansOn?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
@@ -98,15 +102,16 @@ export function VerificationRequest({
           {needsElite ? (
             <>
               <h2 id="verify-request-title" className="pe-10 pt-2 text-[20px] font-medium tracking-[-0.02em]">
-                Get Elite plan first
+                {plansOn ? "Get Elite or sponsor a tool first" : "Sponsor a tool first"}
               </h2>
               <p className="mt-3 text-[15px] leading-relaxed text-muted">
-                The blue tick is part of the Elite developer plan. Move to Elite, then send your
-                request and an admin will review it.
+                {plansOn
+                  ? "The blue tick comes with the Elite developer plan or a sponsorship. Get either, then send your request and an admin will review it."
+                  : "The blue tick comes with a sponsorship. Sponsor one of your tools, then send your request and an admin will review it."}
               </p>
               <div className="mt-6 space-y-3">
-                <ButtonLink href="/pricing?for=developers" className="w-full" onClick={close}>
-                  See the Elite plan
+                <ButtonLink href={plansOn ? "/pricing?for=developers" : "/pricing/sponsored"} className="w-full" onClick={close}>
+                  {plansOn ? "See the Elite plan" : "Choose a tool to sponsor"}
                 </ButtonLink>
                 <Button variant="outline" className="w-full" onClick={close}>
                   Not now

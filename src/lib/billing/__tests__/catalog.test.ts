@@ -4,6 +4,7 @@ import {
   displayStatus,
   formatMoney,
   isCountryCode,
+  isOnSale,
   isPaidPlan,
   NEXT_STEP,
   periodsFor,
@@ -40,6 +41,14 @@ describe("plans", () => {
     assert.equal(isPaidPlan("sponsorship", "sponsored"), true);
     assert.equal(isPaidPlan("individual", "free"), false);
     assert.equal(isPaidPlan("enterprise", "pro"), false);
+  });
+
+  it("sells plans only while the switch is on, sponsorship always (D271)", () => {
+    assert.equal(isOnSale("sponsorship", false), true);
+    assert.equal(isOnSale("individual", false), false);
+    assert.equal(isOnSale("developer", false), false);
+    assert.equal(isOnSale("individual", true), true);
+    assert.equal(isOnSale("developer", true), true);
   });
 
   it("sells sponsorship monthly only", () => {

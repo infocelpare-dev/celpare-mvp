@@ -59,15 +59,15 @@ function explain(error: { message: string; code?: string }): SaveResult {
       status: "error",
       message:
         cap[1] === "1"
-          ? "Your plan includes one collection. Upgrade for more."
-          : `Your plan includes ${cap[1]} collections.`,
+          ? "Your account includes one collection."
+          : `Your account includes ${cap[1]} collections.`,
     };
   }
   if (/plan_limit_reached:saved_(tools|models):(\d+)/.test(error.message)) {
     const n = /:(\d+)$/.exec(error.message)?.[1] ?? "";
     return {
       status: "error",
-      message: `You have saved ${n} items, which is this plan's limit.`,
+      message: `You have saved ${n} items, which is the limit.`,
     };
   }
   if (error.message.includes("uc_name_unique_per_user")) {

@@ -303,7 +303,7 @@ export default async function AdminDeveloperDetailPage({
               fields={{ id: dev.id }}
               name="plan"
               legend="Change the developer plan"
-              hint="Elite lets this developer request the blue tick for their tools, which you accept in Verification requests. Leaving Elite removes the ticks granted on request and cancels open requests. There is no billing integration yet, so this does not charge or refund anybody."
+              hint="Elite lets this developer request the blue tick for their tools, which you accept in Verification requests. Leaving Elite removes the ticks granted on request and cancels open requests. While any of their tools is sponsored they stay on Elite whatever is set here (D271). This does not charge or refund anybody."
               current={dev.plan}
               submitLabel="Change plan"
               options={[

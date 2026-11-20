@@ -53,14 +53,14 @@ export const CELPARE_DOCS: DocSection[] = [
   {
     id: "plans",
     title: "Plans and pricing",
-    keywords: ["pricing", "price", "plan", "plans", "cost", "subscription", "free", "pro", "premium", "how much", "upgrade", "limits", "quota"],
-    body: `There are three user plans. Free includes the assistant, tool pages, community access, trending tools and up to 5 saved tools. Pro at 7.99 a month adds more messages, up to 15 saved tools, 10 collections, advanced filters, advanced comparison and priority recommendations. Premium at 19.99 a month adds Deep match, unlimited saved tools and collections, and exclusive AI ranking. Developer plans are separate: Free with up to 2 tools, Pro at 20 a month with up to 5 tools and better placement, and Elite at 50 a month with unlimited tools, the developer badge, and the right to request a verified blue tick for their tools, which Celpare reviews before granting. Payments are not built yet, so everybody is on the free plan today.`,
+    keywords: ["pricing", "price", "plan", "plans", "cost", "subscription", "free", "pro", "premium", "how much", "upgrade", "limits", "quota", "sponsor", "sponsorship"],
+    body: `Paid plans for people (Pro, Premium) and for developers (Pro, Elite) are paused right now, so Celpare is free for everyone: the assistant, search, explore, compare, tool pages, the community, saving tools and listing your own tools all cost nothing. The one paid thing is a tool sponsorship for developers, 149.99 US dollars a month per tool, paid in crypto. It puts the tool in a labelled Sponsored slot at the top of Search and in assistant answers, only when it matches what was asked, and never changes the normal ranking. While a developer has an active sponsorship they also get developer analytics and can request the verified blue tick for their tools, which Celpare reviews before granting. Details are on the pricing page, which shows the paid plans again when they return.`,
   },
   {
     id: "ask-limits",
     title: "Assistant usage limits",
     keywords: ["how many messages", "limit", "run out", "rate limit", "quota", "daily", "reset", "used up"],
-    body: `Message limits are per day and reset at midnight. Signed out visitors get 5 questions a day and their chats are not saved. Free accounts get 25 a day, Pro 150 and Premium 500. Longer answers, more conversation history and a higher token ceiling come with the higher plans. Searching the Celpare catalogue is on every plan, including signed out. Web search is available to any account, so Free, Pro and Premium. Deep match, which compares catalogue tools and checks the web before giving the best fit or a build roadmap, is Premium only.`,
+    body: `Message limits are per day and reset at midnight. Signed out visitors get 5 questions a day and their chats are not saved. Every account gets 25 a day while paid plans are paused. Searching the Celpare catalogue is always on, including signed out. Web search is available to any account.`,
   },
   {
     id: "accounts",

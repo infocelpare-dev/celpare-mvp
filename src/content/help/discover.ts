@@ -23,15 +23,15 @@ export const askCelpare: Doc = {
       blocks: [
         {
           table: {
-            head: ["Mode", "What it does", "Plans"],
+            head: ["Mode", "What it does", "Who has it"],
             rows: [
-              ["Catalogue search", "Always on. Searches the Celpare catalogue for matching tools, models, SaaS and tech", "Every plan"],
-              ["Web search", "Looks up current information on the web when a question needs it", "Signed in plans"],
-              ["Deep match", "Compares catalogue tools and checks the web, then gives the best fit or a build roadmap, with sources", "Premium"],
+              ["Catalogue search", "Always on. Searches the Celpare catalogue for matching tools, models, SaaS and tech", "Everyone, signed out too"],
+              ["Web search", "Looks up current information on the web when a question needs it", "Every account"],
+              ["Deep match", "Compares catalogue tools and checks the web, then gives the best fit or a build roadmap, with sources", "Premium, while paid plans are on"],
             ],
           },
         },
-        "Catalogue search cannot be switched off, so every answer starts from the Celpare catalogue. A mode that is not on your plan shows a lock in the composer.",
+        "Catalogue search cannot be switched off, so every answer starts from the Celpare catalogue. A mode that needs an account shows a lock until you sign in.",
       ],
     },
     {

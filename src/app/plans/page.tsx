@@ -10,7 +10,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getViewerPlans } from "@/lib/pricing/viewer";
 import { plansFor, type Audience, type Billing } from "@/lib/pricing/plans";
 import { dismissPlans } from "@/app/actions/plans";
-import { isBillingOpen } from "@/lib/platform/settings";
+import { arePaidPlansOn, isBillingOpen } from "@/lib/platform/settings";
 
 export const metadata: Metadata = {
   title: "Plans",
@@ -36,6 +36,8 @@ export default async function PlansPage({
   searchParams: Promise<{ for?: string; billing?: string }>;
 }) {
   if (!isSupabaseConfigured()) redirect("/pricing");
+  /* Paused (D271): old links land on Ask, the home. */
+  if (!(await arePaidPlansOn())) redirect("/ask");
   const db = await createClient();
   const { data: { user } } = await db.auth.getUser();
   if (!user) redirect("/login");

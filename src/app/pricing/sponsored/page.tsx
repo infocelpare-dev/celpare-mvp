@@ -11,8 +11,9 @@ import { SponsorToolPicker } from "@/components/pricing/sponsor-tool-picker";
 import { initialChoice, sortChoices, sponsorChoice, type SponsorChoice } from "@/lib/sponsored/choice";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { formatUsd } from "@/lib/pricing/plans";
-import { isBillingOpen } from "@/lib/platform/settings";
-import { MAX_SPONSORED_TOOLS as SPONSORED_MAX, SPONSORSHIP_PRICE_CENTS } from "@/lib/sponsored/config";
+import { arePaidPlansOn, isBillingOpen } from "@/lib/platform/settings";
+import { SPONSORSHIP_PRICE_CENTS } from "@/lib/sponsored/config";
+import { SPONSOR_INCLUDES, SPONSOR_PLACES, SPONSOR_QUESTIONS } from "@/lib/sponsored/offer";
 
 export const metadata: Metadata = {
   title: "Sponsored tool",
@@ -22,62 +23,19 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /*
-  The Sponsored tool page (D204), inside Pricing. Reached from the Sponsored
-  card on the Developers tab and from Sponsor this tool on an owner's tool
-  page.
+  Choosing the tool to sponsor (D204). /pricing describes the offer to
+  everyone; this page is where a developer picks one of their tools and pays.
+  Reached from /pricing and from Sponsor this tool on an owner's tool page.
 
-  Developers only, the same rule as the Developers tab (D196): Developer Mode
-  decides what renders, and anyone else is sent to /pricing. The price is not
-  secret, so this is visibility, not access control.
-
-  Not on sale yet: the button says Coming soon, like every paid plan, until
-  payments open (Phase 7). There is no request to send.
+  Developers only (D196): Developer Mode decides what renders, and anyone else
+  is sent to /pricing. The price is not secret, so this is visibility, not
+  access control. The words come from lib/sponsored/offer.ts (D271).
 */
 
-const PLACES = [
-  {
-    icon: Search,
-    title: "Top of Search",
-    body: `Up to ${SPONSORED_MAX} sponsored tools lead the results, above everything else, when someone searches for what your tool does.`,
-  },
-  {
-    icon: MessageSquareText,
-    title: "In Ask Celpare",
-    body: `When someone asks about tools like yours, up to ${SPONSORED_MAX} sponsored tools appear first, then the rest of the answer.`,
-  },
-  {
-    icon: Target,
-    title: "Only where it fits",
-    body: "Your tool shows only on searches and questions it matches, so the people who see it are looking for it.",
-  },
-];
-
-const INCLUDED = [
-  "Sponsored placement in Search and Ask Celpare",
-  "The Sponsored label on every placement",
-  "Works with any developer plan",
-  "Monthly, per tool",
-  "Your place in the normal results stays exactly where it is",
-];
-
-const QUESTIONS = [
-  {
-    q: "Does sponsoring change my normal ranking?",
-    a: "No. Sponsored tools sit above the results in their own labelled slots. The normal results are ranked exactly as they would be without sponsorship.",
-  },
-  {
-    q: "Will my tool appear on every search?",
-    a: "No. Only on searches and questions it matches. Paying buys position among relevant results, never a place on an unrelated one.",
-  },
-  {
-    q: "How many sponsored tools can appear at once?",
-    a: `At most ${SPONSORED_MAX} on a search or an answer. The most relevant sponsored tools for that search take the slots.`,
-  },
-  {
-    q: "Does Ask Celpare recommend sponsored tools in its answer?",
-    a: "Sponsored tools appear as labelled cards. The written answer is not paid for and is the same with or without sponsorship.",
-  },
-];
+const PLACE_ICONS = { search: Search, ask: MessageSquareText, fit: Target } as const;
+const PLACES = SPONSOR_PLACES.map((p) => ({ ...p, icon: PLACE_ICONS[p.key] }));
+const INCLUDED = SPONSOR_INCLUDES;
+const QUESTIONS = SPONSOR_QUESTIONS.slice(1);
 
 /* "1 November 2026", pinned to UTC so the server and the browser agree. */
 function longDate(iso: string): string {
@@ -95,6 +53,7 @@ export default async function SponsoredPricingPage({
   /* slug to id, for the Request invoice link (phase BILL). Own tools only. */
   let toolIds: Record<string, string> = {};
   const billingOpen = await isBillingOpen();
+  const plansOn = await arePaidPlansOn();
 
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
@@ -165,7 +124,7 @@ export default async function SponsoredPricingPage({
   return (
     <AppShell banner={<AccountNotices />} adminLink={<AdminLink />} signedIn={signedIn}>
       <Container className="py-12 sm:py-16">
-        <BackLink href="/pricing?for=developers" label="Back to developer plans" />
+        <BackLink href="/pricing" label="Back to pricing" />
 
         <header className="mx-auto mt-6 max-w-[640px] text-center">
           <div className="flex justify-center">
@@ -188,7 +147,9 @@ export default async function SponsoredPricingPage({
             <h2 id="sponsored-price" className="text-[28px] font-medium leading-tight tracking-[-0.03em]">
               Sponsored tool
             </h2>
-            <p className="mt-1 text-[15px] leading-snug text-muted">An add-on for any developer plan</p>
+            <p className="mt-1 text-[15px] leading-snug text-muted">
+              {plansOn ? "An add-on for any developer plan" : "The one paid thing on Celpare while plans are paused"}
+            </p>
             <p className="mt-6 flex items-baseline gap-2">
               <span className="text-[44px] font-medium leading-none tracking-[-0.04em]">{price}</span>
               <span className="text-[13px] leading-tight text-muted">USD per month, per tool</span>

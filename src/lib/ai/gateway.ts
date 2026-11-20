@@ -14,6 +14,7 @@ import { filterInput } from "./input-filter";
 import { OutputFilter } from "./output-filter";
 import { buildChatPrompt, buildResearchPrompt, buildSystemPrompt, newCanary } from "./prompt";
 import { grantsFor } from "./modes";
+import { arePaidPlansOn } from "@/lib/platform/settings";
 import { runDeepResearch, type ResearchResult } from "./research";
 import { skillLevel } from "./deep-research/kinds";
 import { unverifiedFigures } from "./deep-research/verify";
@@ -211,7 +212,7 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
     back on a refusal too: the composer needs to know which toggles to lock
     whatever the answer turns out to be.
   */
-  const grants = grantsFor(identity.plan, input.feature);
+  const grants = grantsFor(identity.plan, input.feature, await arePaidPlansOn());
 
   /*
     The composer's toggles, intersected with the grants. Defaults matter here:

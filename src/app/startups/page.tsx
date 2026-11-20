@@ -9,11 +9,12 @@ import { DEVELOPER_PLANS, INDIVIDUAL_PLANS, formatUsd } from "@/lib/pricing/plan
 import { MAX_SPONSORED_TOOLS, SPONSORSHIP_PRICE_CENTS } from "@/lib/sponsored/config";
 import { VerifiedTick } from "@/components/ui/verified-tick";
 import {
-  BUILD_STAGES,
   LAUNCH_STEPS,
-  STARTUP_FAQ,
   TRUST_POINTS,
+  buildStages,
+  startupFaq,
 } from "@/content/startups";
+import { arePaidPlansOn } from "@/lib/platform/settings";
 
 export const metadata: Metadata = {
   title: "Grow your startup",
@@ -27,7 +28,12 @@ export const metadata: Metadata = {
   hero chips and the demo email can send people straight to theirs.
   ui-ux-pro-max: minimal, one primary action, bento cards for the stages.
 */
-export default function StartupsPage() {
+export default async function StartupsPage() {
+  /* Read when the page is built (it is static), so turning the paid plans
+     switch on or off shows here on the next deploy (D271). */
+  const plansOn = await arePaidPlansOn();
+  const BUILD_STAGES = buildStages(plansOn);
+  const STARTUP_FAQ = startupFaq(plansOn);
   return (
     <>
       <Navbar />
@@ -85,6 +91,8 @@ export default function StartupsPage() {
               ))}
             </ol>
 
+            {plansOn ? (
+            <>
             {/* Developer plans, read from plans.ts so they match /pricing (D238). */}
             <h3 id="developer-plans" className="mt-16 text-center font-display text-[clamp(1.4rem,2.6vw,1.9rem)] font-medium tracking-[-0.02em]">
               Developer plans
@@ -121,6 +129,9 @@ export default function StartupsPage() {
               ))}
             </ul>
 
+            </>
+            ) : null}
+
             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
               {/* The blue tick (D201): Elite only, requested from the tool page, granted by Celpare. */}
               <article id="verified" className="flex flex-col rounded-[20px] border border-border bg-surface p-6 sm:p-7">
@@ -134,7 +145,7 @@ export default function StartupsPage() {
                 </p>
                 <ol className="mt-4 space-y-2 text-[14px] leading-snug">
                   <li><span className="font-medium">1.</span> Verify that you own the tool.</li>
-                  <li><span className="font-medium">2.</span> Be on the Elite developer plan.</li>
+                  <li><span className="font-medium">2.</span> {plansOn ? "Be on the Elite developer plan, or sponsor one of your tools." : "Sponsor one of your tools."}</li>
                   <li><span className="font-medium">3.</span> Request it from the tool page. Celpare checks and grants it.</li>
                 </ol>
               </article>
@@ -151,8 +162,8 @@ export default function StartupsPage() {
                 </p>
                 <p className="mt-2 text-[15px] leading-relaxed text-muted">
                   Put a live tool in one of up to {MAX_SPONSORED_TOOLS} Sponsored places at the top of Search and in
-                  Ask Celpare, only when it matches what the person asked for. No bidding, one flat price, on any
-                  developer plan.
+                  Ask Celpare, only when it matches what the person asked for. No bidding, one flat price
+                  {plansOn ? ", on any developer plan." : ". It also opens developer analytics and the blue tick request."}
                 </p>
                 <p className="mt-3 text-[14px] leading-snug">
                   Always labelled Sponsored. It never changes the organic results.
@@ -224,6 +235,8 @@ export default function StartupsPage() {
           </Container>
         </Section>
 
+        {plansOn ? (
+        <>
         {/* Plans, read from plans.ts so they never drift from /pricing */}
         <Section className="border-t border-border">
           <Container>
@@ -256,6 +269,8 @@ export default function StartupsPage() {
             </p>
           </Container>
         </Section>
+        </>
+        ) : null}
 
         {/* FAQ, native details as on /pricing */}
         <Section className="border-t border-border">

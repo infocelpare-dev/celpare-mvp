@@ -36,7 +36,7 @@ export const developers: Doc = {
       id: "verify",
       heading: "The verified tick",
       blocks: [
-        "On the Elite developer plan, request the blue verified tick for a tool from its page. A Celpare admin reviews the request. A verified tool shows the tick wherever it appears, including on its posts.",
+        "On the Elite developer plan, or while one of your tools is sponsored, request the blue verified tick for a tool from its page. A Celpare admin reviews the request. A verified tool shows the tick wherever it appears, including on its posts.",
       ],
     },
     {
@@ -50,7 +50,7 @@ export const developers: Doc = {
       id: "analytics",
       heading: "Analytics",
       blocks: [
-        "Analytics is on the Pro and Elite developer plans. The board shows views of your listings over time, how people arrived, and the search terms that led them to your tool, for the last 24 hours, 7 days or 30 days. It never shows who viewed.",
+        "Analytics is open while any of your tools is sponsored, and on the Pro and Elite developer plans when paid plans are on. The board shows views of your listings over time, how people arrived, and the search terms that led them to your tool, for the last 24 hours, 7 days or 30 days. It never shows who viewed.",
       ],
     },
   ],

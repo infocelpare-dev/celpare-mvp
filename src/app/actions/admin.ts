@@ -76,7 +76,7 @@ function explain(error: { code?: string; message: string }): string {
   if (m.includes("invalid_context_window")) return "A context window cannot be negative.";
   if (m.includes("invalid_price")) return "A price cannot be negative.";
   if (m.includes("elite_required"))
-    return "This developer is not on the Elite plan, so the tool cannot be verified. Decline the request instead.";
+    return "This developer has neither the Elite plan nor an active sponsorship, so the tool cannot be verified. Decline the request instead.";
   if (m.includes("request_not_pending")) return "That request has already been decided or was cancelled.";
   if (m.includes("request_not_found")) return "That request no longer exists.";
   if (m.includes("tool_not_live")) return "The tool is not published, so it cannot be verified.";
