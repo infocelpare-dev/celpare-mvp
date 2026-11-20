@@ -19,6 +19,7 @@ const NOTICES: Record<string, { tone: "success" | "error"; text: string }> = {
   "email-partial": { tone: "success", text: "One address confirmed. Open the link we sent to the other address to finish the change." },
   "link-expired": { tone: "error", text: "That link has expired or was already used. Start again from Settings." },
   "link-invalid": { tone: "error", text: "That link is not complete. Open it again from the email." },
+  idle: { tone: "error", text: "You were logged out because you had not used Celpare for 3 days. Log in again to continue." },
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
