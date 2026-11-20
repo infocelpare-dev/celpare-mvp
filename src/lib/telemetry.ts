@@ -37,7 +37,7 @@ import { isBot } from "@/lib/statsig/core";
   the Statsig page views (isBot). Outside a request there are no headers;
   that is a script, so it is not counted either.
 */
-async function fromCrawler(): Promise<boolean> {
+export async function fromCrawler(): Promise<boolean> {
   try {
     return isBot((await headers()).get("user-agent"));
   } catch {
