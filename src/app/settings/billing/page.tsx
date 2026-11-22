@@ -94,7 +94,7 @@ export default async function BillingPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/get-started");
+  if (!user) redirect("/get-started?next=%2Fsettings%2Fbilling");
 
   const [open, reqs, subs, invs, evs] = await Promise.all([
     isBillingOpen(),

@@ -21,7 +21,7 @@ export default async function MyToolsPage({
 }) {
   const { gate: g, db } = await gate();
 
-  if (g.state === "signed-out") redirect("/get-started");
+  if (g.state === "signed-out") redirect("/get-started?next=%2Fdeveloper%2Ftools");
   if (g.state === "mode-off") return <ModeOff />;
   if (g.state === "needs-onboarding") redirect("/developer");
 

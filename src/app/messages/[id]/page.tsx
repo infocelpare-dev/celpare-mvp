@@ -36,7 +36,7 @@ export default async function ThreadPage({ params }: PageProps<"/messages/[id]">
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/get-started");
+  if (!user) redirect(`/get-started?next=${encodeURIComponent(`/messages/${id}`)}`);
 
   /*
     THREE READS AT ONCE, not one after another (4AZ). They do not depend on each

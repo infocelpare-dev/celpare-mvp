@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function SubmitToolPage() {
   const { gate: g } = await gate();
 
-  if (g.state === "signed-out") redirect("/get-started");
+  if (g.state === "signed-out") redirect("/get-started?next=%2Fdeveloper%2Fsubmit");
   if (g.state === "mode-off") return <ModeOff />;
   if (g.state === "needs-onboarding") redirect("/developer");
 

@@ -42,7 +42,7 @@ export default async function NewPostPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/get-started");
+  if (!user) redirect("/get-started?next=%2Fcommunity%2Fnew");
 
   const [topics, tools, models] = await Promise.all([
     getTopics(supabase),

@@ -27,7 +27,7 @@ export default async function DeveloperTermsPage() {
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/get-started");
+  if (!user) redirect("/get-started?next=%2Fdeveloper%2Fterms");
 
   // Already a developer: there is nothing to decide here.
   const { data: dev } = await supabase

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { VerifyForm } from "@/components/auth/verify-form";
 import { FormAlert } from "@/components/ui/field";
 import { maskEmail } from "@/lib/auth/second-factor";
+import { returnPath, withNext } from "@/lib/auth/return-to";
 
 export const metadata: Metadata = {
   title: "Confirm your email",
@@ -17,6 +18,8 @@ export default async function VerifyPage({ searchParams }: PageProps<"/verify">)
      really passed; this only decides the words. */
   const login = params?.mode === "login";
   const sentRecently = params?.sent === "recent";
+  /* The page they were on before logging in or signing up (lib/auth/return-to.ts). */
+  const next = returnPath(params?.next) ?? undefined;
 
   // Nothing to verify without an address, so send them back rather than
   // showing an input that cannot work.
@@ -50,13 +53,13 @@ export default async function VerifyPage({ searchParams }: PageProps<"/verify">)
       )}
 
       <div className="mt-8">
-        <VerifyForm email={email} mode={login ? "login" : "signup"} />
+        <VerifyForm email={email} mode={login ? "login" : "signup"} next={next} />
       </div>
 
       <p className="mt-8 border-t border-border pt-6 text-center text-[14px] text-muted">
         {login ? "Not you?" : "Wrong address?"}{" "}
         <Link
-          href={login ? "/login" : "/signup"}
+          href={withNext(login ? "/login" : "/signup", next)}
           className="text-foreground underline underline-offset-4 transition-colors duration-200 ease-out hover:text-muted"
         >
           {login ? "Back to log in" : "Start again"}

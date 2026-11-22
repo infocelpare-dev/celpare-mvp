@@ -4,6 +4,7 @@ import { LoginForm } from "@/components/auth/login-form";
 import { GoogleButton, AuthDivider } from "@/components/auth/google-button";
 import { LegalConsent } from "@/components/auth/legal-consent";
 import { FormAlert } from "@/components/ui/field";
+import { returnPath, withNext } from "@/lib/auth/return-to";
 
 export const metadata: Metadata = {
   title: "Log in",
@@ -26,6 +27,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const params = await searchParams;
   const oauthFailed = params?.error === "google";
   const notice = typeof params?.notice === "string" ? NOTICES[params.notice] : undefined;
+  /* The page they were on, carried through every way in (lib/auth/return-to.ts). */
+  const next = returnPath(params?.next) ?? undefined;
 
   return (
     <div>
@@ -52,12 +55,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       )}
 
       <div className="mt-8">
-        <GoogleButton
-          label="Continue with Google"
-          next={typeof params?.next === "string" ? params.next : undefined}
-        />
+        <GoogleButton label="Continue with Google" next={next} />
         <AuthDivider />
-        <LoginForm />
+        <LoginForm next={next} />
         <p className="mt-4 text-center text-[14px]">
           <Link
             href="/forgot-password"
@@ -72,7 +72,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       <p className="mt-8 border-t border-border pt-6 text-center text-[14px] text-muted">
         New to Celpare?{" "}
         <Link
-          href="/signup"
+          href={withNext("/signup", next)}
           className="text-foreground underline underline-offset-4 transition-colors duration-200 ease-out hover:text-muted"
         >
           Create an account

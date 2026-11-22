@@ -39,10 +39,13 @@ function ResendButton() {
 export function VerifyForm({
   email,
   mode = "signup",
+  next,
 }: {
   email: string;
   /* "login" is step two of password then code (D188). */
   mode?: "signup" | "login";
+  /* The page to go back to afterwards; the action checks it (lib/auth/return-to.ts). */
+  next?: string;
 }) {
   const [state, formAction] = useActionState(verifyCode, initial);
   const [resendState, resendAction] = useActionState(resendCode, initial);
@@ -60,6 +63,7 @@ export function VerifyForm({
       <form action={formAction} noValidate>
         <input type="hidden" name="email" value={email} />
         <input type="hidden" name="mode" value={mode} />
+        {next && <input type="hidden" name="next" value={next} />}
         <Field
           id={codeId}
           name="code"

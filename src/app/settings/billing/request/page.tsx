@@ -59,7 +59,7 @@ export default async function BillingRequestPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/get-started");
+  if (!user) redirect("/get-started?next=%2Fsettings%2Fbilling%2Frequest");
 
   const kind = q.kind ?? "";
   const plan = q.plan ?? "";

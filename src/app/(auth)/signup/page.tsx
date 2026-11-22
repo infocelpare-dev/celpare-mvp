@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { SignupForm } from "@/components/auth/signup-form";
-import { GoogleButton, AuthDivider } from "@/components/auth/google-button";
+import { AuthDivider } from "@/components/auth/google-button";
+import { GoogleButtonHere, LinkHere } from "@/components/auth/return-to-client";
 import { LegalConsent } from "@/components/auth/legal-consent";
 
 export const metadata: Metadata = {
@@ -12,6 +12,9 @@ export const metadata: Metadata = {
 /*
   One account for everyone. There is no separate founder signup. Developer mode
   is a toggle on the profile, turned on later from inside the app.
+
+  Prebuilt on purpose: `?next=` (the page to go back to) is read in the browser
+  by the Here components and the form, see return-to-client.tsx.
 */
 export default function SignupPage() {
   return (
@@ -24,7 +27,7 @@ export default function SignupPage() {
       </p>
 
       <div className="mt-8">
-        <GoogleButton label="Continue with Google" />
+        <GoogleButtonHere label="Continue with Google" />
         <AuthDivider />
         <SignupForm />
         <LegalConsent creating="account" />
@@ -32,12 +35,12 @@ export default function SignupPage() {
 
       <p className="mt-8 border-t border-border pt-6 text-center text-[14px] text-muted">
         Already have an account?{" "}
-        <Link
+        <LinkHere
           href="/login"
           className="text-foreground underline underline-offset-4 transition-colors duration-200 ease-out hover:text-muted"
         >
           Log in
-        </Link>
+        </LinkHere>
       </p>
     </div>
   );

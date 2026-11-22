@@ -88,7 +88,7 @@ export default async function SettingsPage() {
 
   // Settings belong to an account. A signed out visitor has nothing to change,
   // so send them to the gate rather than showing a form that cannot save.
-  if (!user) redirect("/get-started");
+  if (!user) redirect("/get-started?next=%2Fsettings");
 
   /* plan and ask_settings are not readable from the table (D194); they come
      from my_profile_private(), which answers for the caller only. */
