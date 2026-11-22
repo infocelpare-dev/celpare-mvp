@@ -11,13 +11,16 @@ import { createAnonClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
   Tool and model profiles were missing until 2026-11-12. They are read with the
   anon client, so RLS decides what is public: approved rows only, exactly what
-  the profile pages themselves will render. Rebuilt at most once an hour.
+  the profile pages themselves will render. Rebuilt by each deploy.
 
   A failed read throws rather than returning the static pages alone: a sitemap
-  that silently drops every tool would tell Google they are gone. Thrown during
-  revalidation, Next keeps serving the last good sitemap.
+  that silently drops every tool would tell Google they are gone. Thrown during the
+  build, the deploy fails instead of shipping an empty one.
 */
-export const revalidate = 3600;
+/* Never on a timer: a stale copy started a render past the Workers free plan
+   budget of 10 ms (error 1102). The next deploy rebuilds it, see
+   app/anon/tools/[slug]/page.tsx. */
+export const revalidate = false;
 
 type Row = { slug: string; updated_at: string | null };
 
