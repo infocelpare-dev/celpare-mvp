@@ -7,6 +7,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient, hasServiceRole } from "@/lib/supabase/admin";
 import { afterLogin, markPlansDue } from "@/lib/auth/after-login";
 import { afterSignOutPath } from "@/lib/auth/after-sign-out";
+import { withNext } from "@/lib/auth/return-to";
 import { PLANS_COOKIE } from "@/lib/pricing/due";
 import { withinBurst } from "@/lib/security/burst";
 import { newPassword } from "@/lib/auth/password-rules";
@@ -320,9 +321,11 @@ async function signUpImpl(formData: FormData): Promise<AuthState> {
     no code is ever sent. Sending that person to /verify would strand them on a
     page waiting for an email that does not exist. Handle both configurations.
   */
-  if (data.session) redirect("/app");
+  /* Back to what they were doing once the account exists (lib/auth/return-to.ts). */
+  const next = formData.get("next");
+  if (data.session) redirect(withNext("/app", next));
 
-  redirect(`/verify?email=${encodeURIComponent(email)}`);
+  redirect(withNext(`/verify?email=${encodeURIComponent(email)}`, next));
 }
 
 export async function signIn(
@@ -342,6 +345,8 @@ async function signInImpl(formData: FormData): Promise<AuthState> {
   if (!isSupabaseConfigured()) return notConfigured;
 
   const { email, password, captchaToken } = parsed.data;
+  /* Where they were before logging in, carried to the code step (lib/auth/return-to.ts). */
+  const next = formData.get("next");
 
   const captchaRequired = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
   if (captchaRequired && !captchaToken) {
@@ -376,7 +381,7 @@ async function signInImpl(formData: FormData): Promise<AuthState> {
         console.error("[auth] confirmation resend failed", sendError.message);
       }
       if (!sendError) await resetWrongCodes("signup", email);
-      redirect(`/verify?email=${encodeURIComponent(email)}`);
+      redirect(withNext(`/verify?email=${encodeURIComponent(email)}`, next));
     }
     /*
       A captcha failure is NOT a wrong password, and saying so is the
@@ -430,7 +435,7 @@ async function signInImpl(formData: FormData): Promise<AuthState> {
      development without Supabase secrets keeps the old one step login. */
   if (!secondFactorEnabled()) {
     await markPlansDue();
-    redirect("/app");
+    redirect(withNext("/app", next));
   }
 
   /*
@@ -456,7 +461,10 @@ async function signInImpl(formData: FormData): Promise<AuthState> {
   if (!sendError) await resetWrongCodes("login", email);
   await setAuthCookie(LOGIN_PENDING_COOKIE, await signPendingLogin(email), LOGIN_PENDING_TTL_S);
   redirect(
-    `/verify?mode=login&email=${encodeURIComponent(email)}${sendError ? "&sent=recent" : ""}`,
+    withNext(
+      `/verify?mode=login&email=${encodeURIComponent(email)}${sendError ? "&sent=recent" : ""}`,
+      next,
+    ),
   );
 }
 
@@ -526,7 +534,7 @@ export async function verifyCode(
   /* Known browser check (New login email), and Welcome after a signup (D192). */
   if (data.user) await afterLogin(data.user, { welcome: !login });
   if (login) (await cookies()).delete(LOGIN_PENDING_COOKIE);
-  redirect("/app");
+  redirect(withNext("/app", formData.get("next")));
 }
 
 export async function resendCode(

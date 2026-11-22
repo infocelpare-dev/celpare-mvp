@@ -4,6 +4,7 @@ import { useActionState, useId, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowRight } from "lucide-react";
 import { signUp, type AuthState } from "@/app/actions/auth";
+import { useReturnTo } from "./return-to-client";
 import { Button } from "@/components/ui/button";
 import { Field, PasswordField, FormAlert } from "@/components/ui/field";
 import { PasswordStrength } from "./password-strength";
@@ -32,6 +33,8 @@ function Submit() {
   live next to the field, so wiping it punishes the wrong mistake.
 */
 export function SignupForm() {
+  /* Read in the browser so /signup stays prebuilt (return-to-client.tsx). */
+  const next = useReturnTo();
   const [state, formAction] = useActionState(signUp, initial);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -93,6 +96,8 @@ export function SignupForm() {
           resetKey={state.attempt}
         />
         <input type="hidden" name="captchaToken" value={captchaToken} />
+        {/* The page to go back to afterwards; the action checks it (lib/auth/return-to.ts). */}
+        {next && <input type="hidden" name="next" value={next} />}
       </div>
 
       <Submit />

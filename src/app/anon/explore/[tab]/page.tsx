@@ -9,11 +9,14 @@ import { EXPLORE_TABS, isExploreTab } from "@/lib/explore/types";
 
   force-static: cookies() and headers() read as empty, which is a signed out
   visitor, the only one who reaches this route. Rankings and shelves are
-  refreshed at most every five minutes.
+  rebuilt by each deploy.
 */
 
 export const dynamic = "force-static";
-export const revalidate = 3600;
+/* Never on a timer: a stale copy started a render past the Workers free plan
+   budget of 10 ms (error 1102). The next deploy rebuilds it, see
+   app/anon/tools/[slug]/page.tsx. */
+export const revalidate = false;
 
 /*
   Every tab is built at build time (Cloudflare Workers free plan: rendering

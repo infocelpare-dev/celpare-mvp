@@ -55,12 +55,12 @@ export default async function EditToolPage({
   params: Promise<{ id: string }>;
 }) {
   const { gate: g, db } = await gate();
+  const { id } = await params;
 
-  if (g.state === "signed-out") redirect("/get-started");
+  if (g.state === "signed-out") redirect(`/get-started?next=${encodeURIComponent(`/developer/tools/${id}/edit`)}`);
   if (g.state === "mode-off") return <ModeOff />;
   if (g.state === "needs-onboarding") redirect("/developer");
 
-  const { id } = await params;
   const tool = await getToolForEdit(db!, g.userId, id);
 
   /* Not yours, or not there. The same answer for both, so this page cannot be

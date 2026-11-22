@@ -27,7 +27,7 @@ function Submit() {
   clears, which is the usual convention and the right one here, since a wrong
   password is the likely reason we are back on this screen.
 */
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const [state, formAction] = useActionState(signIn, initial);
   const [email, setEmail] = useState("");
   /*
@@ -81,6 +81,8 @@ export function LoginForm() {
           resetKey={state.attempt}
         />
         <input type="hidden" name="captchaToken" value={captchaToken} />
+        {/* The page to go back to afterwards; the action checks it (lib/auth/return-to.ts). */}
+        {next && <input type="hidden" name="next" value={next} />}
       </div>
 
       <Submit />

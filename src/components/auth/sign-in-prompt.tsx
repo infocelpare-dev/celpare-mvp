@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { withNext } from "@/lib/auth/return-to";
 
 /*
   The sign in prompt. Founder instruction 2026-10-01: a signed out visitor who
@@ -34,9 +35,16 @@ export function openSignInPrompt() {
 export function SignInPromptHost() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
+  /* The page the prompt opened on, so Sign up and Log in come back to it
+     (lib/auth/return-to.ts). Read when it opens: the root layout keeps this
+     component across client navigations. */
+  const [here, setHere] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    const onOpen = () => setOpen(true);
+    const onOpen = () => {
+      setHere(`${window.location.pathname}${window.location.search}${window.location.hash}`);
+      setOpen(true);
+    };
     window.addEventListener(OPEN_EVENT, onOpen);
     return () => window.removeEventListener(OPEN_EVENT, onOpen);
   }, []);
@@ -82,10 +90,10 @@ export function SignInPromptHost() {
         <div className="mt-6 space-y-3">
           {/* Closed on tap: the dialog lives in the root layout, which a client
               navigation keeps, so it would still be open on the form page. */}
-          <ButtonLink href="/signup" className="w-full" onClick={close}>
+          <ButtonLink href={withNext("/signup", here)} className="w-full" onClick={close}>
             Sign up
           </ButtonLink>
-          <ButtonLink href="/login" variant="outline" className="w-full" onClick={close}>
+          <ButtonLink href={withNext("/login", here)} variant="outline" className="w-full" onClick={close}>
             Log in
           </ButtonLink>
         </div>

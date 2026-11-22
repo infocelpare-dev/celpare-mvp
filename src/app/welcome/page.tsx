@@ -8,6 +8,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getOnboarding, loadOptions } from "@/lib/onboarding/server";
 import { declaredFrom } from "@/lib/onboarding/prior";
 import { STEPS, type StepKey } from "@/lib/onboarding/options";
+import { returnPath } from "@/lib/auth/return-to";
 
 export const metadata: Metadata = {
   title: "Welcome",
@@ -19,14 +20,16 @@ export const metadata: Metadata = {
   The questions after sign up (phase ONB). /app sends a new account here once;
   anybody already done, or signed out, is sent on rather than shown it again.
 */
-export default async function WelcomePage() {
+export default async function WelcomePage({ searchParams }: PageProps<"/welcome">) {
+  /* The page they were on before signing up (lib/auth/return-to.ts). */
+  const finishTo = returnPath((await searchParams)?.next) ?? "/ask";
   if (!isSupabaseConfigured()) redirect("/community");
   const db = await createClient();
   const { data: { user } } = await db.auth.getUser();
   if (!user) redirect("/login");
 
   const state = await getOnboarding(db);
-  if (!state || state.onboardedAt) redirect("/ask");
+  if (!state || state.onboardedAt) redirect(finishTo);
 
   const options = await loadOptions(db);
   const a = (state.answers ?? {}) as Record<string, unknown>;
@@ -56,6 +59,7 @@ export default async function WelcomePage() {
         <div className="w-full max-w-[640px]">
           <OnboardingFlow
             startAt={startAt}
+            finishTo={finishTo}
             options={options}
             initial={{
               role: declared.role,

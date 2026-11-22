@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 export default async function DeveloperHome() {
   const { gate: g, db } = await gate();
 
-  if (g.state === "signed-out") redirect("/get-started");
+  if (g.state === "signed-out") redirect("/get-started?next=%2Fdeveloper");
   if (g.state === "mode-off") return <ModeOff />;
 
   /* One terms surface, not two. The scroll gated one at /developer/terms is

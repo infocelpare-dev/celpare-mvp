@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function SubmitModelPage() {
   const { gate: g } = await gate();
 
-  if (g.state === "signed-out") redirect("/get-started");
+  if (g.state === "signed-out") redirect("/get-started?next=%2Fdeveloper%2Fmodels%2Fnew");
   if (g.state === "mode-off") return <ModeOff />;
   if (g.state === "needs-onboarding") redirect("/developer");
 

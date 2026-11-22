@@ -5,6 +5,7 @@ import { getOnboarding } from "@/lib/onboarding/server";
 import { getViewerPlans } from "@/lib/pricing/viewer";
 import { isFreeForPlans, PLANS_COOKIE } from "@/lib/pricing/due";
 import { arePaidPlansOn } from "@/lib/platform/settings";
+import { returnPath, withNext } from "@/lib/auth/return-to";
 
 /*
   Every entry path lands here: sign up, log in, the OAuth callback, and skip.
@@ -26,17 +27,20 @@ import { arePaidPlansOn } from "@/lib/platform/settings";
   accounts, and any failed read, go straight home. Not while paid plans are
   paused (D271): there is nothing to show.
 */
-export default async function AppPage() {
+export default async function AppPage({ searchParams }: PageProps<"/app">) {
+  /* The page they were on before logging in or signing up, if any
+     (lib/auth/return-to.ts). Onboarding still comes first and carries it on. */
+  const next = (await searchParams)?.next;
   if (isSupabaseConfigured()) {
     const db = await createClient();
     const { data: { user } } = await db.auth.getUser();
     if (user) {
       const state = await getOnboarding(db);
-      if (state && !state.onboardedAt) redirect("/welcome");
+      if (state && !state.onboardedAt) redirect(withNext("/welcome", next));
 
       const due = (await cookies()).get(PLANS_COOKIE)?.value === "1";
       if (due && (await arePaidPlansOn()) && isFreeForPlans(await getViewerPlans(db, user.id))) redirect("/plans");
     }
   }
-  redirect("/ask");
+  redirect(returnPath(next) ?? "/ask");
 }

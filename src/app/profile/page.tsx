@@ -40,7 +40,7 @@ export default async function ProfilePage({
   // A profile belongs to an account. This guard was missing while the page was
   // a placeholder: a signed out visitor used to get the placeholder rather
   // than the gate. Same pattern as settings/page.tsx.
-  if (!user) redirect("/get-started");
+  if (!user) redirect("/get-started?next=%2Fprofile");
 
   const profile = await getProfileById(supabase, user.id);
 

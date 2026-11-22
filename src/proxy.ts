@@ -10,6 +10,7 @@ import {
   sessionClaims,
 } from "@/lib/auth/second-factor";
 import { IDLE_COOKIE, IDLE_COOKIE_MAX_AGE, idleValue, idleVerdict } from "@/lib/auth/idle";
+import { withNext } from "@/lib/auth/return-to";
 import { cleanRef, REF_COOKIE, REF_MAX_AGE } from "@/lib/onboarding/options";
 import { EDGE_HEADER, TRUSTED_HEADER, edgeVerdict } from "@/lib/edge/origin";
 import { isExploreTab } from "@/lib/explore/types";
@@ -161,7 +162,9 @@ export async function proxy(request: NextRequest) {
       response.cookies.delete(SECOND_FACTOR_COOKIE);
       response.cookies.delete(IDLE_COOKIE);
       if (isPageVisit(request)) {
-        const redirect = NextResponse.redirect(new URL("/login?notice=idle", request.url));
+        /* Logging in again returns to this page (lib/auth/return-to.ts). */
+        const here = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+        const redirect = NextResponse.redirect(new URL(withNext("/login?notice=idle", here), request.url));
         for (const c of response.cookies.getAll()) redirect.cookies.set(c);
         redirect.headers.set("cache-control", "no-store");
         return redirect;

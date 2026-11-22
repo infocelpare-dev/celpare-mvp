@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { safeNext } from "@/lib/auth/safe-next";
+import { withNext } from "@/lib/auth/return-to";
 import { withinBurst } from "@/lib/security/burst";
 import {
   GOOGLE_STATE_COOKIE,
@@ -23,7 +24,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const { origin, searchParams } = new URL(request.url);
-  const next = safeNext(searchParams.get("next"), origin);
+  /* Always through /app, so a new account gets onboarding before it is sent
+     back to the page it came from (lib/auth/return-to.ts). */
+  const next = safeNext(withNext("/app", searchParams.get("next")), origin);
 
   if (!(await withinBurst("google_signin"))) {
     return NextResponse.redirect(`${origin}/login?error=google`, { status: 303 });

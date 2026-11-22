@@ -38,7 +38,7 @@ type Search = { tab?: string; before?: string };
 export default async function NotificationsPage({ searchParams }: { searchParams: Promise<Search> }) {
   if (!isSupabaseConfigured()) redirect("/community");
   const user = await getCurrentUser();
-  if (!user) redirect("/get-started");
+  if (!user) redirect("/get-started?next=%2Fnotifications");
 
   const sp = await searchParams;
   const tab = sp.tab === "mentions" ? "mentions" : "all";

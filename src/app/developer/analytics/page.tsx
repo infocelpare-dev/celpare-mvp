@@ -63,7 +63,7 @@ export default async function DeveloperAnalyticsPage({
 }) {
   const { gate: g, db } = await gate();
 
-  if (g.state === "signed-out") redirect("/get-started");
+  if (g.state === "signed-out") redirect("/get-started?next=%2Fdeveloper%2Fanalytics");
   if (g.state === "mode-off") return <ModeOff />;
   if (g.state === "needs-onboarding") redirect("/developer/terms");
 

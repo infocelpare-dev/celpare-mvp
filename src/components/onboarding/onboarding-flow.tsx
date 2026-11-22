@@ -39,11 +39,15 @@ export function OnboardingFlow({
   options,
   initial,
   startAt = 0,
+  finishTo = "/ask",
 }: {
   options: { categories: Option[]; topics: Option[]; tools: ToolOption[] };
   initial: Answers;
   /* The step to open on, 0 based. */
   startAt?: number;
+  /* Where Done goes: the page they were on before signing up, else Ask.
+     Already checked by the page (lib/auth/return-to.ts). */
+  finishTo?: string;
 }) {
   const router = useRouter();
   const [index, setIndex] = useState(Math.min(Math.max(0, startAt), STEPS.length - 1));
@@ -87,7 +91,7 @@ export function OnboardingFlow({
     start(async () => {
       const r = await finishOnboarding();
       if (!r.ok) return setError(r.message);
-      router.replace("/ask");
+      router.replace(finishTo);
     });
   }
 

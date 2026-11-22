@@ -11,14 +11,18 @@ import { approvedSlugs } from "@/lib/catalogue/static-slugs";
   signed out visitor.
 
   Every approved profile is built at build time (Cloudflare Workers free plan:
-  a render on demand needs more than its 10 ms of CPU, error 1102). A copy is
-  refreshed in the background at most hourly; if that refresh fails, the last
-  good copy keeps being served, and the next deploy rebuilds them all. A tool
+  a render on demand needs more than its 10 ms of CPU, error 1102). A tool
   approved after the build is rendered on its first visit.
+
+  revalidate is false (2026-11-22): the copies are never refreshed on a timer,
+  only by the next deploy or an admin action that calls revalidatePath. With
+  3600 every copy went stale an hour after the deploy, and each visit to a
+  stale copy started a background render that blew the 10 ms budget, so about
+  one request in five failed with 1102 and the refresh never landed anyway.
 */
 
 export const dynamic = "force-static";
-export const revalidate = 3600;
+export const revalidate = false;
 
 export function generateStaticParams() {
   return approvedSlugs("tools");

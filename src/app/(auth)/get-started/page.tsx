@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   description: "Create a Celpare account, log in, or look around first.",
 };
 
+/* Prebuilt on purpose: EntryGate reads `?next=` in the browser
+   (return-to-client.tsx). */
 export default function GetStartedPage() {
   return (
     <div>

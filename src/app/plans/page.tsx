@@ -40,7 +40,7 @@ export default async function PlansPage({
   if (!(await arePaidPlansOn())) redirect("/ask");
   const db = await createClient();
   const { data: { user } } = await db.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?next=%2Fplans");
 
   const params = await searchParams;
   const v = await getViewerPlans(db, user.id);

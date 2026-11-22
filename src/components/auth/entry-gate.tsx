@@ -6,6 +6,8 @@ import { ArrowRight } from "lucide-react";
 import { Turnstile } from "./turnstile";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { withNext } from "@/lib/auth/return-to";
+import { useReturnTo } from "./return-to-client";
 
 /*
   Verify first, then choose. The three options stay hidden until Turnstile
@@ -45,6 +47,9 @@ import { cn } from "@/lib/utils";
   trapping everyone behind a widget that can never load.
 */
 export function EntryGate() {
+  /* The page that sent them here, read in the browser so /get-started stays
+     prebuilt (return-to-client.tsx). */
+  const next = useReturnTo();
   const [verified, setVerified] = useState(
     () => !process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   );
@@ -91,13 +96,13 @@ export function EntryGate() {
         )}
       >
         <div className="space-y-3">
-          <ButtonLink href="/signup" className="w-full" tabIndex={verified ? 0 : -1}>
+          <ButtonLink href={withNext("/signup", next)} className="w-full" tabIndex={verified ? 0 : -1}>
             Create an account
             <ArrowRight className="h-4 w-4" aria-hidden />
           </ButtonLink>
 
           <ButtonLink
-            href="/login"
+            href={withNext("/login", next)}
             variant="outline"
             className="w-full"
             tabIndex={verified ? 0 : -1}

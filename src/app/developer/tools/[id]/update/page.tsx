@@ -33,12 +33,12 @@ export default async function LaunchFeaturePage({
   params: Promise<{ id: string }>;
 }) {
   const { gate: g, db } = await gate();
+  const { id } = await params;
 
-  if (g.state === "signed-out") redirect("/get-started");
+  if (g.state === "signed-out") redirect(`/get-started?next=${encodeURIComponent(`/developer/tools/${id}/update`)}`);
   if (g.state === "mode-off") return <ModeOff />;
   if (g.state === "needs-onboarding") redirect("/developer");
 
-  const { id } = await params;
   const tool = await getToolForEdit(db!, g.userId, id);
   if (!tool) notFound();
 

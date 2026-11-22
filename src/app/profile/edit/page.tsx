@@ -25,7 +25,7 @@ export default async function EditProfilePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/get-started");
+  if (!user) redirect("/get-started?next=%2Fprofile%2Fedit");
 
   const profile = await getProfileById(supabase, user.id);
   if (!profile) redirect("/community");
