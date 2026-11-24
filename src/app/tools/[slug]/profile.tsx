@@ -48,6 +48,7 @@ import { getAdminSession } from "@/lib/admin/guard";
 import { ProfileRecommendations } from "@/components/recommend/profile-recommendations";
 import { RecommendationsSkeleton } from "@/components/recommend/recommendations";
 import { RecommendationTracker } from "@/components/recommend/recommendation-tracker";
+import { ScreenshotGallery } from "@/components/tools/screenshot-gallery";
 
 /*
   The public tool profile.
@@ -230,7 +231,9 @@ export async function ToolProfilePage({
     submission form stopped collecting it, so the set drains rather than being
     deleted. Screenshots are where a wide image belongs.
   */
-  const screenshots = profileMedia.filter((m) => m.kind === "screenshot");
+  const screenshots = profileMedia
+    .filter((m) => m.kind === "screenshot" && m.url)
+    .map((m) => ({ id: m.id, url: m.url!, caption: m.caption ?? null }));
   const videos = profileMedia.filter((m) => m.kind === "video");
   const site = process.env.NEXT_PUBLIC_SITE_URL ?? "";
   const shareUrl = `${site}/tools/${tool.slug}`;
@@ -504,22 +507,7 @@ export async function ToolProfilePage({
 
         {screenshots.length > 0 ? (
           <Section title="Screenshots">
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {screenshots.map((s) => (
-                <li key={s.id}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={s.url ?? ""}
-                    alt={s.caption ?? ""}
-                    loading="lazy"
-                    className="w-full rounded-xl border border-border object-cover"
-                  />
-                  {s.caption ? (
-                    <p className="mt-1.5 text-[13px] text-muted">{s.caption}</p>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+            <ScreenshotGallery items={screenshots} />
           </Section>
         ) : null}
 
