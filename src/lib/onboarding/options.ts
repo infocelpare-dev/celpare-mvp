@@ -52,11 +52,18 @@ export const HEARD_FROM = [
   { key: "other", label: "Somewhere else" },
 ] as const satisfies readonly Choice[];
 
+/* "Do you use crypto?" (founder 2026-11-24). Stored as the boolean
+   uses_crypto; the keys are what the admin counts are grouped by. */
+export const CRYPTO = [
+  { key: "yes", label: "Yes" },
+  { key: "no", label: "No" },
+] as const satisfies readonly Choice[];
+
 export type RoleKey = (typeof ROLES)[number]["key"];
 export type GoalKey = (typeof GOALS)[number]["key"];
 export type HeardKey = (typeof HEARD_FROM)[number]["key"];
 
-export const STEPS = ["role", "goals", "interests", "tools", "heard", "people"] as const;
+export const STEPS = ["role", "goals", "interests", "tools", "crypto", "heard", "people"] as const;
 export type StepKey = (typeof STEPS)[number];
 
 export const ROLE_KEYS = ROLES.map((r) => r.key) as [RoleKey, ...RoleKey[]];

@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/admin/guard";
 import { ErrorState, PageHeader, Table, TableWrap, Td, Th, Tr } from "@/components/admin/ui";
 import { getOnboardingSummary, type Count, type OnboardingSummary } from "@/lib/onboarding/server";
-import { GOALS, HEARD_FROM, labelOf, ROLES, type Choice } from "@/lib/onboarding/options";
+import { CRYPTO, GOALS, HEARD_FROM, labelOf, ROLES, type Choice } from "@/lib/onboarding/options";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +70,14 @@ const QUESTIONS: Question[] = [
     base: "answered_tools",
     counts: (s) => s.tools,
     multi: true,
+  },
+  {
+    title: "Do they use crypto",
+    lead: "Yes or no, one each. Asked from 2026-11-24, so older sign ups are not in the base.",
+    base: "answered_crypto",
+    counts: (s) => s.crypto ?? [],
+    labels: CRYPTO,
+    allChoices: true,
   },
   {
     title: "Campaign links",

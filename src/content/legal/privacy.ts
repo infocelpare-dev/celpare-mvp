@@ -12,8 +12,8 @@ export const privacy: Doc = {
   title: "Privacy Policy",
   description:
     "What personal data Celpare collects, why, who processes it, how long it is kept, and how to see, download or delete it.",
-  version: "1.6",
-  effective: "2026-11-15",
+  version: "1.7",
+  effective: "2026-11-24",
   summary: [
     "We collect what you give us (your account, profile, posts, messages and questions) and what using Celpare produces (searches, views, devices). We do not sell it and we run no advertising trackers.",
     "Your posts, comments and public profile are visible to anyone. Your email, messages, Ask Celpare chats, searches and devices are not.",
@@ -40,7 +40,7 @@ export const privacy: Doc = {
           list: [
             "Account: your name, email address and password (stored only as a hash by our authentication provider). If you sign in with Google, Google shares your name, email address and profile picture with us.",
             "Profile: username, bio, location, website, interests, skills, profile picture, and your privacy choices. Whatever you put in your profile is yours to leave blank.",
-            "Questions after sign up: what best describes you, what you want to do on Celpare, the categories and topics you are interested in, the AI tools you already use, and where you heard about Celpare. Every question can be skipped. Your answers are private: they are not on your profile, and you can change them in Settings.",
+            "Questions after sign up: what best describes you, what you want to do on Celpare, the categories and topics you are interested in, the AI tools you already use, whether you use crypto, and where you heard about Celpare. Every question can be skipped. Your answers are private: they are not on your profile, and you can change them in Settings.",
             "Content: posts, photos and videos, comments, replies, likes, reposts, saves, follows, collections, reviews and reactions to tools.",
             "Direct messages: the text, photos, videos, voice notes and TXT or CSV files you send, and who you send them to.",
             "Ask Celpare: the questions you ask and the answers you receive. If you are signed in and have history switched on, the conversation is saved to your account. If you are signed out, nothing is saved.",
@@ -240,6 +240,7 @@ export const privacy: Doc = {
     },
   ],
   changes: [
+    { version: "1.7", date: "2026-11-24", note: "The questions after sign up now also ask whether you use crypto (yes or no). It can be skipped and stays private like the other answers." },
     { version: "1.6", date: "2026-11-15", note: "Added masked session recordings: what they show, that text and form fields are hidden before they leave your browser, who receives them, and how to opt out." },
     { version: "1.5", date: "2026-11-11", note: "Visits and product events are counted without cookies and sent to Statsig: what is counted, the daily id for signed out visitors, and how to opt out." },
     { version: "1.4", date: "2026-11-10", note: "Paid plans are paid in crypto through NOWPayments: what payment data we keep, and that blockchain transactions are public. Payoneer is no longer used." },

@@ -33,6 +33,7 @@ const schema = z.object({
   categoryIds: uuidList(LIMITS.CATEGORIES).optional(),
   topicIds: uuidList(LIMITS.TOPICS).optional(),
   toolIds: uuidList(LIMITS.TOOLS).optional(),
+  usesCrypto: z.boolean().nullable().optional(),
   heardFrom: z.enum(HEARD_KEYS).nullable().optional(),
   heardOther: z.string().trim().max(LIMITS.HEARD_OTHER).optional(),
   skipped: z.enum(STEPS).optional(),
@@ -83,6 +84,7 @@ export async function saveOnboarding(input: OnboardingInput): Promise<Onboarding
   if (d.categoryIds !== undefined) patch.category_ids = await existing(s, "categories", d.categoryIds);
   if (d.topicIds !== undefined) patch.topic_ids = await existing(s, "topics", d.topicIds);
   if (d.toolIds !== undefined) patch.tool_ids = await existing(s, "tools", d.toolIds);
+  if (d.usesCrypto !== undefined) patch.uses_crypto = d.usesCrypto;
   if (d.heardFrom !== undefined) {
     patch.heard_from = d.heardFrom;
     patch.heard_from_other = d.heardFrom === "other" && d.heardOther ? d.heardOther : null;
