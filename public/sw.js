@@ -11,7 +11,8 @@
   - Page loads only (request.mode "navigate", GET). Scripts, images, data
     fetches, server actions and everything else go straight to the network:
     no respondWith, so the browser behaves exactly as if this file did not exist.
-  - Never /api, /auth or /monitoring. An OAuth callback must not be replayed.
+  - Never /api, /auth or /monitoring. An OAuth callback must not be replayed,
+    which is also why navigation preload stays off (see activate).
   - It caches nothing but the logo, for the offline page.
 
   How it knows the reply is Cloudflare's and not ours: every Celpare response
@@ -28,7 +29,7 @@
   and deploy. Deleting it leaves the old one running in browsers that have it.
 */
 
-const VERSION = "celpare-sw-1";
+const VERSION = "celpare-sw-2";
 const LOGO = "/brand/celpare-mark-dark-64.png";
 const SKIP = /^\/(api|auth|monitoring)(\/|$)/;
 const RETRY_DELAYS_MS = [400, 1200];
@@ -48,8 +49,17 @@ self.addEventListener("activate", (event) => {
     (async () => {
       const keys = await caches.keys();
       await Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)));
+      /*
+        Navigation preload OFF, and switched off in browsers where celpare-sw-1
+        turned it on (the setting outlives the worker). With it on, Chrome sends
+        every page load once as a preload; for a load this worker skips (/auth),
+        the preload is thrown away and the browser sends the request again. The
+        Google callback ran twice: the first swapped the one time code and
+        signed in, the second got invalid_grant and showed "Google sign in did
+        not complete" (founder, 2026-11-24, Android Chrome).
+      */
       if (self.registration.navigationPreload) {
-        await self.registration.navigationPreload.enable().catch(() => undefined);
+        await self.registration.navigationPreload.disable().catch(() => undefined);
       }
       await self.clients.claim();
     })(),
@@ -86,8 +96,7 @@ async function load(event) {
   let code = null;
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
     try {
-      const preload = attempt === 0 ? await event.preloadResponse : undefined;
-      res = preload || (await fetch(event.request.clone()));
+      res = await fetch(event.request.clone());
     } catch {
       /* No network at all. Offline is not something a retry here fixes. */
       return page("offline", null);
