@@ -74,7 +74,10 @@ export type OnboardingSummary = {
     answered_interests: number;
     answered_tools: number;
     answered_ref: number;
+    answered_crypto: number;
   };
+  /* "yes" and "no" counts for Do you use crypto? */
+  crypto: Count[];
   heard_from: Count[];
   heard_other: Count[];
   refs: Count[];

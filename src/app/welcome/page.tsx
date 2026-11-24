@@ -42,6 +42,7 @@ export default async function WelcomePage({ searchParams }: PageProps<"/welcome"
     goals: declared.goals.length > 0,
     interests: declared.categoryIds.length + declared.topicIds.length > 0,
     tools: declared.toolIds.length > 0,
+    crypto: typeof a.uses_crypto === "boolean",
     heard: typeof a.heard_from === "string",
     people: false,
   };
@@ -67,6 +68,7 @@ export default async function WelcomePage({ searchParams }: PageProps<"/welcome"
               categoryIds: declared.categoryIds,
               topicIds: declared.topicIds,
               toolIds: declared.toolIds,
+              usesCrypto: typeof a.uses_crypto === "boolean" ? a.uses_crypto : null,
               heardFrom: typeof a.heard_from === "string" ? a.heard_from : null,
               heardOther: typeof a.heard_from_other === "string" ? a.heard_from_other : "",
             }}

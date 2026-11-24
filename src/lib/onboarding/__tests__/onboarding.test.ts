@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { cleanRef, GOALS, HEARD_FROM, ROLES, STEPS } from "../options";
+import { cleanRef, CRYPTO, GOALS, HEARD_FROM, ROLES, STEPS } from "../options";
 import { declaredFrom, declaredWeight, hasDeclared, NO_DECLARED, PRIOR } from "../prior";
 import { declaredRelevance } from "../../community/intelligence/features";
 import type { ContentItem } from "../../community/intelligence/types";
@@ -25,8 +25,12 @@ describe("Options", () => {
     for (const k of ["everyday", "professional", "hobbyist", "curious"]) assert.ok(keys.includes(k), k);
   });
 
-  it("asks six questions in order", () => {
-    assert.deepEqual([...STEPS], ["role", "goals", "interests", "tools", "heard", "people"]);
+  it("asks seven questions in order", () => {
+    assert.deepEqual([...STEPS], ["role", "goals", "interests", "tools", "crypto", "heard", "people"]);
+  });
+
+  it("asks about crypto with exactly yes and no (founder 2026-11-24)", () => {
+    assert.deepEqual(CRYPTO.map((c) => c.key), ["yes", "no"]);
   });
 
   it("keeps only safe campaign tags", () => {

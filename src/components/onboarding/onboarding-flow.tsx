@@ -9,7 +9,7 @@ import { VerifiedTick } from "@/components/ui/verified-tick";
 import { FollowButton } from "@/components/profile/follow-button";
 import { Chip, ChipGroup } from "@/components/onboarding/chips";
 import { finishOnboarding, saveOnboarding, suggestFollows, type OnboardingInput } from "@/app/actions/onboarding";
-import { GOALS, HEARD_FROM, LIMITS, ROLES, STEPS, type StepKey } from "@/lib/onboarding/options";
+import { CRYPTO, GOALS, HEARD_FROM, LIMITS, ROLES, STEPS, type StepKey } from "@/lib/onboarding/options";
 import type { Option, Suggestion, ToolOption } from "@/lib/onboarding/server";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,7 @@ type Answers = {
   categoryIds: string[];
   topicIds: string[];
   toolIds: string[];
+  usesCrypto: boolean | null;
   heardFrom: string | null;
   heardOther: string;
 };
@@ -28,6 +29,7 @@ const COPY: Record<StepKey, { title: string; hint: string }> = {
   goals: { title: "What do you want to do on Celpare?", hint: "Pick as many as you like." },
   interests: { title: "What are you interested in?", hint: `Pick ${LIMITS.SUGGESTED_INTERESTS} or more and your feed starts with them.` },
   tools: { title: "Which AI tools do you already use?", hint: "We will suggest what goes well with them, not what you already have." },
+  crypto: { title: "Do you use crypto?", hint: "Tap one." },
   heard: { title: "Where did you hear about Celpare?", hint: "Tap one. It helps us reach more people like you." },
   people: { title: "People you might like", hint: "They post about what you picked. Follow anyone you want." },
 };
@@ -82,6 +84,7 @@ export function OnboardingFlow({
       case "goals": return { goals: a.goals as OnboardingInput["goals"] };
       case "interests": return { categoryIds: a.categoryIds, topicIds: a.topicIds };
       case "tools": return { toolIds: a.toolIds };
+      case "crypto": return { usesCrypto: a.usesCrypto };
       case "heard": return { heardFrom: a.heardFrom as OnboardingInput["heardFrom"], heardOther: a.heardOther };
       case "people": return {};
     }
@@ -120,6 +123,12 @@ export function OnboardingFlow({
     next(false, { role: key as OnboardingInput["role"] });
   }
 
+  function pickCrypto(yes: boolean) {
+    if (pending) return;
+    setA((s) => ({ ...s, usesCrypto: yes }));
+    next(false, { usesCrypto: yes });
+  }
+
   function pickHeard(key: string) {
     if (pending) return;
     setA((s) => ({ ...s, heardFrom: key }));
@@ -131,6 +140,7 @@ export function OnboardingFlow({
     : step === "goals" ? a.goals.length > 0
     : step === "interests" ? a.categoryIds.length + a.topicIds.length > 0
     : step === "tools" ? a.toolIds.length > 0
+    : step === "crypto" ? a.usesCrypto !== null
     : step === "heard" ? a.heardFrom !== null && (a.heardFrom !== "other" || a.heardOther.trim().length > 0)
     : true;
 
@@ -216,6 +226,19 @@ export function OnboardingFlow({
 
         {step === "tools" ? (
           <ToolPicker tools={options.tools} categoryIds={a.categoryIds} selected={a.toolIds} onToggle={(id) => toggle("toolIds", id)} />
+        ) : null}
+
+        {step === "crypto" ? (
+          <ChipGroup label={COPY.crypto.title}>
+            {CRYPTO.map((c) => {
+              const yes = c.key === "yes";
+              return (
+                <Chip key={c.key} selected={a.usesCrypto === yes} onToggle={() => pickCrypto(yes)}>
+                  {c.label}
+                </Chip>
+              );
+            })}
+          </ChipGroup>
         ) : null}
 
         {step === "heard" ? (
