@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SignInPromptHost } from "@/components/auth/sign-in-prompt";
 import { PageviewBeacon } from "@/components/analytics/pageview-beacon";
 import { SessionRecorder } from "@/components/analytics/session-recorder";
+import { ServiceWorker } from "@/components/pwa/service-worker";
 import "./globals.css";
 
 /*
@@ -83,6 +84,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <PageviewBeacon />
           {/* Masked session recordings, nothing stored in the browser (D269). */}
           <SessionRecorder />
+          {/* Celpare's own page instead of Cloudflare's Error 1102. */}
+          <ServiceWorker />
         </ThemeProvider>
       </body>
     </html>
