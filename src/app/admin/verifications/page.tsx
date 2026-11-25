@@ -41,6 +41,14 @@ type RequestRow = {
   tools: { name: string; slug: string; status: string; verified: boolean } | null;
 };
 
+/* The address a rename moves a tool to, as admin_decide_tool_rename builds it
+   (D275). A preview only: the database adds a number when it is taken and
+   keeps the old address when the name has no Latin letters or digits. */
+function previewSlug(name: string, current: string | undefined): string {
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 56).replace(/-+$/, "");
+  return base.length >= 2 ? base : (current ?? base);
+}
+
 /* elite is the Elite plan or an active sponsorship, which sets it while it runs (D271). */
 const PLAN_LABEL: Record<string, string> = { free: "Free", pro: "Pro", elite: "Elite or sponsored" };
 
@@ -162,12 +170,12 @@ export default async function AdminVerificationsPage({
                   <div className="mt-4 flex flex-wrap items-start gap-2 border-t border-border pt-4">
                     <ActionForm
                       action={decideToolRename}
-                      fields={{ id: r.id, decision: "approve" }}
+                      fields={{ id: r.id, decision: "approve", ...(r.tools ? { slug: r.tools.slug } : {}) }}
                       label="Rename"
                       tone="primary"
                       confirm={{
                         title: `Rename ${r.current_name} to ${r.requested_name}?`,
-                        body: "The new name shows everywhere on Celpare at once. The address, ratings and history stay. Signed out pages show it after the next deploy.",
+                        body: `The new name shows everywhere on Celpare at once, and the address changes to match it (about /tools/${previewSlug(r.requested_name, r.tools?.slug)}; a number is added if that is taken). The old address redirects there for good. Ratings and history stay.`,
                         confirmLabel: "Rename",
                       }}
                     />

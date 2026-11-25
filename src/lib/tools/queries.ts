@@ -83,6 +83,29 @@ const TOOL_COLUMNS =
    same slug in one request; this makes it one database read instead of two. */
 export const getToolProfile = cache(loadToolProfile);
 
+/*
+  An address a tool had before a rename (D275): the tool's current slug, or
+  null. Read only after a slug found no tool, so a normal page view never pays
+  for it. RLS on tools decides whether the target can be seen, so an old
+  address of a tool that is no longer public resolves to nothing.
+*/
+export async function resolveToolSlugRedirect(oldSlug: string): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  const db = createAnonClient();
+  const { data, error } = await db
+    .from("tool_slug_redirects")
+    .select("tools(slug)")
+    .eq("old_slug", oldSlug)
+    .maybeSingle();
+  if (error) {
+    console.error("[tools] slug redirect lookup failed", error.code, error.message);
+    return null;
+  }
+  const target = (data as { tools: { slug: string } | { slug: string }[] | null } | null)?.tools;
+  const slug = Array.isArray(target) ? target[0]?.slug : target?.slug;
+  return slug && slug !== oldSlug ? slug : null;
+}
+
 async function loadToolProfile(slug: string): Promise<ToolProfile | null> {
   if (!isSupabaseConfigured()) return null;
 

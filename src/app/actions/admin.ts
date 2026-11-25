@@ -611,16 +611,22 @@ export async function decideToolRename(
       id: uuid,
       decision: z.enum(["approve", "reject"]),
       reason: optionalReason,
+      /* The tool's address before the rename. Only used to drop its cached
+         page, so the old address starts redirecting (D275); the database
+         decides the new one. */
+      slug: z.string().regex(/^[a-z0-9-]{1,80}$/).optional(),
     })
     .safeParse({
       id: formData.get("id"),
       decision: formData.get("decision"),
       reason: formData.get("reason") ?? undefined,
+      slug: formData.get("slug") ?? undefined,
     });
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the form." };
   }
 
+  const old = parsed.data.slug;
   return run(
     "submissions.review",
     "admin_decide_tool_rename",
@@ -629,8 +635,14 @@ export async function decideToolRename(
       p_decision: parsed.data.decision,
       p_reason: parsed.data.reason ?? null,
     },
-    ["/admin/verifications", "/admin/tools"],
-    parsed.data.decision === "approve" ? "Tool renamed." : "Rename declined.",
+    [
+      "/admin/verifications",
+      "/admin/tools",
+      ...(old && parsed.data.decision === "approve" ? [`/tools/${old}`, `/anon/tools/${old}`] : []),
+    ],
+    parsed.data.decision === "approve"
+      ? "Tool renamed. Its address follows the new name and the old one redirects."
+      : "Rename declined.",
   );
 }
 
