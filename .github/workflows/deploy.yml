@@ -1,36 +1,42 @@
 name: Deploy
 
-# Continuous deployment to Vercel (D253), with Cloudflare in front of celpare.com.
-#
-# Every green CI run on main ships the build that run made (.vercel/output), so the
-# deployed code is exactly the tested code (D244). Nothing is rebuilt here.
+# Continuous deployment to the Cloudflare Worker `celpare` (Workers free plan
+# since 2026-11-18; replaces the Vercel and Netlify paths, USE.14, D276).
 #
 #   CI on main passes
 #     -> founder approves (GitHub environment "production", required reviewer)
-#     -> vercel deploy --prebuilt --prod --skip-domain   (a production deployment
-#        that takes no celpare.com traffic yet)
-#     -> scripts/smoke.mjs <that deployment's URL> <sha>
-#          fail -> record failed, stop. Production never changed.
-#     -> vercel promote <url>          (celpare.com now serves it)
-#     -> if SITE_ON_VERCEL: scripts/smoke.mjs <site> <sha>
-#          ok   -> GitHub Deployment success, holding the deployment URL
-#          fail -> vercel rollback <last healthy URL>, ONCE, smoke that,
-#                  mark this deployment failed, fail the run. Never a retry loop.
+#     -> build the approved commit here: opennextjs-cloudflare build, with the
+#        public build values and the service role key, which prebuilds the
+#        signed out pages (no .env file exists in the checkout)
+#     -> wrangler dry run + scripts/check-worker-build.mjs (no server key in the
+#        bundle, no secret shapes in assets, size under the guard)
+#     -> note the version serving celpare.com now: the rollback target
+#     -> populateCache remote (without it even prebuilt pages render on demand
+#        and fail with 1102)
+#     -> wrangler versions upload, then versions deploy <id>@100%
+#     -> scripts/smoke.mjs <site> <sha>
+#          ok   -> GitHub Deployment success, holding the Worker version id
+#          fail -> versions deploy <previous>@100%, ONCE, smoke that, mark this
+#                  deployment failed, fail the run. Never a retry loop.
 #
-# "Last healthy" is read from GitHub Deployments written by this workflow, never
-# "whatever ran before", so a rollback never lands on a deployment that failed.
+# WHY THIS JOB BUILDS instead of shipping the CI artifact (D244 shipped CI's
+# build): the Worker build prebuilds pages from the database and needs the
+# service role key. CI runs on pull requests and must never hold it. Here it is
+# readable only after the founder approves. Same commit, same lockfile.
 #
-# A rollback restores code only. Vercel environment variables keep their current
-# values and the database is untouched (migrations are applied by hand, D246).
+# The rollback target is the version that was live a moment before this
+# deploy, read from Cloudflare, not from GitHub records: deploys were made by
+# hand from 2026-11-18 to 2026-11-25 and left no records.
 #
-# PR previews are off until there is a staging database (D252).
+# A rollback restores code only. Worker secrets keep their values and the
+# database is untouched (migrations are applied by hand, D246). The R2 cache is
+# not rolled back: populateCache writes it per build id, so the older version
+# reads its own entries.
 #
-# Needs (founder), environment "production": secrets VERCEL_TOKEN (scoped to the
-# team), VERCEL_AUTOMATION_BYPASS_SECRET (Deployment Protection, Protection Bypass
-# for Automation), EDGE_SECRET (the value Cloudflare adds as x-celpare-edge, D254).
-# Repository variables: VERCEL_ORG_ID, VERCEL_PROJECT_ID, and SITE_ON_VERCEL set
-# to "true" once celpare.com points at Vercel (cutover). Before that, a deploy is
-# smoke tested on its own URL only.
+# Needs (founder), environment "production": secrets CLOUDFLARE_API_TOKEN
+# (Workers Scripts edit and Workers R2 Storage edit, this account only),
+# CLOUDFLARE_ACCOUNT_ID, SUPABASE_SERVICE_ROLE_KEY. Repository variables: the
+# NEXT_PUBLIC_* build values CI already uses.
 
 on:
   workflow_run:
@@ -44,41 +50,32 @@ permissions:
 jobs:
   production:
     name: Deploy to production
-    # Production moved to Netlify on 2026-11-13 after Vercel disabled the Hobby
-    # team. Netlify builds main itself until this workflow is rewritten for it,
-    # so the Vercel path only runs if HOST is set back to vercel.
     if: >-
-      vars.HOST == 'vercel' &&
-      github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # The approval pause happens here, before any step runs and before the
-    # Vercel token is readable.
+    timeout-minutes: 45
+    # The approval pause happens here, before any step runs and before any
+    # secret is readable.
     environment:
       name: production
       url: ${{ vars.NEXT_PUBLIC_SITE_URL }}
     # One production change at a time, and never cancelled halfway: a cancelled
-    # deploy could leave a deployment live without its smoke test or record.
+    # deploy could leave a version live without its smoke test or record.
     concurrency:
       group: production
       cancel-in-progress: false
     permissions:
       contents: read
-      actions: read        # download the build artifact from the CI run
-      deployments: write   # history: which deployment, which commit, which outcome
+      deployments: write   # history: which version, which commit, which outcome
     env:
       SHA: ${{ github.event.workflow_run.head_sha }}
-      CI_RUN_ID: ${{ github.event.workflow_run.id }}
       SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
-      SITE_ON_VERCEL: ${{ vars.SITE_ON_VERCEL }}
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
-      VERCEL_TELEMETRY_DISABLED: "1"
+      WRANGLER_SEND_METRICS: "false"
+      NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - name: Checkout the tested commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -87,13 +84,13 @@ jobs:
           persist-credentials: false
 
       # An approval can sit for hours. If main moved on meanwhile, a newer CI
-      # run will offer a newer build; shipping this older one would go backwards.
+      # run will offer a newer commit; shipping this older one would go backwards.
       - name: Skip if main has moved on
         id: fresh
         run: |
           tip=$(gh api "repos/$GH_REPO/commits/main" --jq .sha)
           if [ "$tip" != "$SHA" ]; then
-            echo "main is at $tip, this run built $SHA. Not deploying an older build." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "main is at $tip, this run is for $SHA. Not deploying an older commit." | tee -a "$GITHUB_STEP_SUMMARY"
             echo "ship=false" >> "$GITHUB_OUTPUT"
           else
             echo "ship=true" >> "$GITHUB_OUTPUT"
@@ -106,161 +103,160 @@ jobs:
           node-version: 24
           cache: npm
 
-      # vercel is a pinned devDependency; this installs it, nothing is built.
       - name: Install dependencies
         if: steps.fresh.outputs.ship == 'true'
         run: npm ci
 
-      - name: Download the build CI made
+      # The checkout has no .env file (all gitignored), so only what is passed
+      # here is built in: public values, which ship to every browser by design,
+      # and the service role key, which the guard below proves never reaches
+      # the bundle. NEXT_PUBLIC_COMMIT_SHA is what /api/health reports and what
+      # the smoke test compares.
+      - name: Build the Worker
+        if: steps.fresh.outputs.ship == 'true'
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+          NEXT_PUBLIC_SENTRY_ENVIRONMENT: production
+          NEXT_PUBLIC_COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::SUPABASE_SERVICE_ROLE_KEY is not set in the production environment. Signed out pages cannot be prebuilt without it."
+            exit 1
+          fi
+          npx opennextjs-cloudflare build
+
+      - name: Check the Worker before upload
         if: steps.fresh.outputs.ship == 'true'
         run: |
-          # The tar holds .vercel/output plus the files its functions borrow
-          # (.next chunks, node_modules), exactly as CI tested them. Unpacked
-          # over the npm ci tree, the same lockfile makes those identical.
-          gh run download "$CI_RUN_ID" --name "vercel-$SHA" --dir "$RUNNER_TEMP/bundle"
-          tar -xf "$RUNNER_TEMP/bundle/vercel-bundle.tar"
-          node -e 'require("fs").writeFileSync(".vercel/project.json", JSON.stringify({
-            projectId: process.env.VERCEL_PROJECT_ID, orgId: process.env.VERCEL_ORG_ID,
-            settings: { framework: "nextjs", nodeVersion: "24.x" } }))'
+          npx wrangler deploy --dry-run --outdir .wrangler/dry-run
+          npm run -s check:worker -- .wrangler/dry-run
 
-      # The same guard CI ran, again on what is about to ship.
-      - name: Check the build before upload
-        if: steps.fresh.outputs.ship == 'true'
-        run: npm run -s check:vercel
-
-      - name: Work out version and last healthy deploy
+      - name: Note the live version (rollback target)
         if: steps.fresh.outputs.ship == 'true'
         id: meta
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           version=$(node -p "require('./package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "short=${SHA:0:7}" >> "$GITHUB_OUTPUT"
-          # Newest production deployment written by this workflow (it carries a
-          # vercel_url) that reached success and never failed. Checked over all
-          # its statuses: GitHub may later mark an old one "inactive", which does
-          # not make it unhealthy. Worker era records have no vercel_url.
-          last=""; last_sha=""
-          for id in $(gh api "repos/$GH_REPO/deployments?environment=production&per_page=50" \
-                        --jq '.[] | select(.payload.vercel_url != null) | .id'); do
-            state=$(gh api "repos/$GH_REPO/deployments/$id/statuses?per_page=100" \
-                      --jq 'if any(.[]; .state == "failure" or .state == "error") then "bad"
-                            elif any(.[]; .state == "success") then "success" else "none" end')
-            if [ "$state" = "success" ]; then
-              last=$(gh api "repos/$GH_REPO/deployments/$id" --jq .payload.vercel_url)
-              last_sha=$(gh api "repos/$GH_REPO/deployments/$id" --jq .sha)
-              break
-            fi
-          done
-          echo "last_url=$last" >> "$GITHUB_OUTPUT"
-          echo "last_sha=$last_sha" >> "$GITHUB_OUTPUT"
-          echo "Shipping v$version+${SHA:0:7}. Last healthy deployment: ${last:-none (first deploy)}." | tee -a "$GITHUB_STEP_SUMMARY"
+          npx wrangler deployments status --json > "$RUNNER_TEMP/live.json"
+          prev=$(node -e '
+            const d = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+            const v = (d.versions ?? []).find((x) => x.percentage === 100);
+            if (v && /^[0-9a-f-]{36}$/.test(v.version_id)) console.log(v.version_id);
+          ' "$RUNNER_TEMP/live.json")
+          echo "prev_id=$prev" >> "$GITHUB_OUTPUT"
+          echo "Shipping v$version+${SHA:0:7}. Live now: ${prev:-unknown (no rollback target)}." | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload as a production deployment (no traffic yet)
+      # Before the upload, so the new version finds its prebuilt pages the
+      # moment it takes traffic. Entries are keyed by build id: the live
+      # version keeps reading its own until the switch.
+      - name: Fill the page cache
+        if: steps.fresh.outputs.ship == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx opennextjs-cloudflare populateCache remote
+
+      - name: Upload the new version (serves no traffic yet)
         if: steps.fresh.outputs.ship == 'true'
         id: upload
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-upload.json
+          MESSAGE: v${{ steps.meta.outputs.version }}+${{ steps.meta.outputs.short }}
+          TAG: ${{ steps.meta.outputs.short }}
         run: |
-          url=$(npx vercel deploy --prebuilt --prod --skip-domain --yes --token "$VERCEL_TOKEN")
-          url=$(printf '%s' "$url" | tail -n1 | tr -d '\r')
-          if ! printf '%s' "$url" | grep -Eq '^https://[a-z0-9.-]+\.vercel\.app$'; then
-            echo "::error::vercel deploy did not return a deployment URL."; exit 1
-          fi
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "Uploaded deployment $url" | tee -a "$GITHUB_STEP_SUMMARY"
+          npx wrangler versions upload --message "$MESSAGE" --tag "$TAG"
+          id=$(node -e '
+            const lines = require("fs").readFileSync(process.argv[1], "utf8").trim().split("\n");
+            const up = lines.map((l) => JSON.parse(l)).find((e) => e.type === "version-upload");
+            if (!up || !/^[0-9a-f-]{36}$/.test(up.version_id ?? "")) process.exit(1);
+            console.log(up.version_id);
+          ' "$WRANGLER_OUTPUT_FILE_PATH")
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "Uploaded Worker version $id" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Open a GitHub Deployment record
         if: steps.fresh.outputs.ship == 'true'
         id: record
         env:
           VERSION: ${{ steps.meta.outputs.version }}
-          VERCEL_URL: ${{ steps.upload.outputs.url }}
+          WORKER_ID: ${{ steps.upload.outputs.id }}
+          PREV_ID: ${{ steps.meta.outputs.prev_id }}
         run: |
           payload=$(node -e 'console.log(JSON.stringify({
             ref: process.env.SHA, environment: "production", auto_merge: false,
             required_contexts: [], transient_environment: false, production_environment: true,
             description: `v${process.env.VERSION}`,
-            payload: { version: process.env.VERSION, sha: process.env.SHA,
-                       vercel_url: process.env.VERCEL_URL, url: process.env.SITE_URL,
-                       timestamp: new Date().toISOString() } }))')
+            payload: { era: "workers-free", version: process.env.VERSION, sha: process.env.SHA,
+                       worker_version_id: process.env.WORKER_ID,
+                       previous_version_id: process.env.PREV_ID || null,
+                       url: process.env.SITE_URL, timestamp: new Date().toISOString() } }))')
           id=$(echo "$payload" | gh api "repos/$GH_REPO/deployments" --input - --jq .id)
           echo "id=$id" >> "$GITHUB_OUTPUT"
           gh api "repos/$GH_REPO/deployments/$id/statuses" -f state=in_progress >/dev/null
 
-      # Before any traffic: the deployment's own URL, through Deployment
-      # Protection (bypass header) and the origin check (edge header).
-      - name: Smoke test the new deployment
+      - name: Send all traffic to the new version
         if: steps.fresh.outputs.ship == 'true'
-        id: smoke_new
+        id: switch
         env:
-          SMOKE_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          SMOKE_EDGE: ${{ secrets.EDGE_SECRET }}
-          SMOKE_WARMUP_ROUNDS: "1"
-          VERCEL_URL: ${{ steps.upload.outputs.url }}
-        run: node scripts/smoke.mjs "$VERCEL_URL" "$SHA"
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WORKER_ID: ${{ steps.upload.outputs.id }}
+          MESSAGE: v${{ steps.meta.outputs.version }}+${{ steps.meta.outputs.short }}
+        run: npx wrangler versions deploy "$WORKER_ID@100%" --message "$MESSAGE" --yes
 
-      - name: Record a deployment that failed before taking traffic
-        if: failure() && steps.record.outputs.id != '' && steps.smoke_new.outcome == 'failure'
-        env:
-          DEPLOYMENT_ID: ${{ steps.record.outputs.id }}
-        run: |
-          gh api "repos/$GH_REPO/deployments/$DEPLOYMENT_ID/statuses" \
-            -f state=failure -f description="Smoke failed on its own URL; never promoted" >/dev/null
-          echo "::error::The new deployment failed its smoke test and was not promoted. Production is unchanged."
-
-      - name: Send celpare.com to the new deployment
-        if: steps.fresh.outputs.ship == 'true'
-        id: promote
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_URL: ${{ steps.upload.outputs.url }}
-        run: node scripts/vercel-traffic.mjs promote "$VERCEL_URL"
-
-      # Through Cloudflare, as visitors see it. Only once celpare.com points at
-      # Vercel; before the cutover it still serves the Cloudflare Worker.
+      # Through Cloudflare, as visitors see it: health with the database, the
+      # commit, eight public pages and the security headers, after warm up.
       - name: Smoke test production
-        if: steps.fresh.outputs.ship == 'true' && env.SITE_ON_VERCEL == 'true'
+        if: steps.fresh.outputs.ship == 'true'
         id: smoke
         continue-on-error: true
         run: node scripts/smoke.mjs "$SITE_URL" "$SHA"
 
       - name: Record success
-        if: >-
-          steps.fresh.outputs.ship == 'true' &&
-          (steps.smoke.outcome == 'success' || env.SITE_ON_VERCEL != 'true')
+        if: steps.fresh.outputs.ship == 'true' && steps.smoke.outcome == 'success'
         env:
           DEPLOYMENT_ID: ${{ steps.record.outputs.id }}
-          VERCEL_URL: ${{ steps.upload.outputs.url }}
+          WORKER_ID: ${{ steps.upload.outputs.id }}
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
           gh api "repos/$GH_REPO/deployments/$DEPLOYMENT_ID/statuses" \
             -f state=success -f environment_url="$SITE_URL" \
             -f description="Live, smoke test passed" >/dev/null
-          echo "Live: v$VERSION, commit $SHA, deployment $VERCEL_URL." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Live: v$VERSION, commit $SHA, Worker version $WORKER_ID." | tee -a "$GITHUB_STEP_SUMMARY"
 
       # Exactly once. If the rollback's own smoke test fails too, the run says
       # so loudly and stops; a human decides what happens next.
-      - name: Roll back to the last healthy deployment
-        if: >-
-          steps.fresh.outputs.ship == 'true' && env.SITE_ON_VERCEL == 'true' &&
-          steps.smoke.outcome != 'success'
+      - name: Roll back to the version that was live before
+        if: steps.fresh.outputs.ship == 'true' && steps.switch.outcome == 'success' && steps.smoke.outcome != 'success'
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DEPLOYMENT_ID: ${{ steps.record.outputs.id }}
-          LAST_URL: ${{ steps.meta.outputs.last_url }}
-          LAST_SHA: ${{ steps.meta.outputs.last_sha }}
+          PREV_ID: ${{ steps.meta.outputs.prev_id }}
         run: |
-          if [ -z "$LAST_URL" ]; then
+          if [ -z "$PREV_ID" ]; then
             gh api "repos/$GH_REPO/deployments/$DEPLOYMENT_ID/statuses" \
-              -f state=failure -f description="Smoke failed; no healthy deployment to roll back to" >/dev/null
-            echo "::error::Smoke test failed and there is no earlier healthy deployment. The new one is still live. Investigate now."
+              -f state=failure -f description="Smoke failed; no earlier version known to roll back to" >/dev/null
+            echo "::error::Smoke test failed and the previous version is unknown. The new version is still live. Investigate now."
             exit 1
           fi
-          node scripts/vercel-traffic.mjs rollback "$LAST_URL"
-          if node scripts/smoke.mjs "$SITE_URL" "$LAST_SHA"; then
-            outcome="Smoke failed; rolled back to $LAST_URL, which passed its smoke test"
+          npx wrangler versions deploy "$PREV_ID@100%" --message "Automatic: smoke test failed for ${SHA:0:7}" --yes
+          if node scripts/smoke.mjs "$SITE_URL"; then
+            outcome="Smoke failed; rolled back to $PREV_ID, which passed its smoke test"
           else
-            outcome="Smoke failed; rolled back to $LAST_URL, whose smoke test ALSO failed"
+            outcome="Smoke failed; rolled back to $PREV_ID, whose smoke test ALSO failed"
           fi
           gh api "repos/$GH_REPO/deployments/$DEPLOYMENT_ID/statuses" \
             -f state=failure -f description="${outcome:0:140}" >/dev/null
@@ -268,16 +264,15 @@ jobs:
           echo "$outcome" >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
-      # A step failed before any smoke test judged it (upload or promote): close
-      # the record as failed so it is never mistaken for a healthy target.
+      # A step failed before the smoke test judged anything (build, cache,
+      # upload or switch): close the record, and say where production stands.
       - name: Record a deploy that did not finish
         if: >-
           failure() && steps.record.outputs.id != '' &&
-          steps.smoke_new.outcome != 'failure' &&
           steps.smoke.outcome != 'success' && steps.smoke.outcome != 'failure'
         env:
           DEPLOYMENT_ID: ${{ steps.record.outputs.id }}
         run: |
           gh api "repos/$GH_REPO/deployments/$DEPLOYMENT_ID/statuses" \
             -f state=error -f description="Deploy step failed before the smoke test" >/dev/null
-          echo "::error::The deploy did not finish. Check which deployment serves celpare.com: npx vercel ls --prod"
+          echo "::error::The deploy did not finish. Check which version serves traffic: npx wrangler deployments status"
