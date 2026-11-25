@@ -600,6 +600,40 @@ export async function decideToolVerification(
   );
 }
 
+/* Accept or decline a developer's request to rename a live tool (D274).
+   admin_decide_tool_rename checks ownership and that the tool is still live. */
+export async function decideToolRename(
+  _prev: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const parsed = z
+    .object({
+      id: uuid,
+      decision: z.enum(["approve", "reject"]),
+      reason: optionalReason,
+    })
+    .safeParse({
+      id: formData.get("id"),
+      decision: formData.get("decision"),
+      reason: formData.get("reason") ?? undefined,
+    });
+  if (!parsed.success) {
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the form." };
+  }
+
+  return run(
+    "submissions.review",
+    "admin_decide_tool_rename",
+    {
+      p_request: parsed.data.id,
+      p_decision: parsed.data.decision,
+      p_reason: parsed.data.reason ?? null,
+    },
+    ["/admin/verifications", "/admin/tools"],
+    parsed.data.decision === "approve" ? "Tool renamed." : "Rename declined.",
+  );
+}
+
 /* ----------------------------------------------------------- sponsorship */
 
 /*

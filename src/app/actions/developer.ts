@@ -575,10 +575,12 @@ export async function submitTool(
   caller's choice.
 
   WHERE IT LANDS IS public.update_tool'S DECISION, not this function's. A draft
-  stays a draft; a live listing goes back to the review queue and off the
-  catalogue, which is the founder's decision of 2026-09-17 and what keeps
-  "approved" meaning somebody read what is actually public. The RPC returns the
-  status it settled on, and this only reports it.
+  stays a draft; a live listing stays live and the edit is public at once
+  (D274, founder 2026-11-25, replacing the 2026-09-17 rule that sent every live
+  edit back to review). Two limits: the name of a live tool is locked
+  (requestToolRename below), and a website on another domain sends the tool
+  back to review. The RPC returns the status it settled on, and this only
+  reports it.
 
   Ownership is not checked here either. update_tool re-checks it, and a check
   in this action would be the kind that can be skipped by calling the RPC
@@ -765,6 +767,9 @@ export async function updateTool(
         "This one cannot be edited right now. A submission in the review queue is waiting on a decision, and a rejected one is closed.",
       );
     }
+    if (error.message.includes("name_locked")) {
+      return fail("A live tool's name is locked. Ask for a new name under the form instead.", "name");
+    }
     if (error.message.includes("not_authorised") || error.code === "42501") {
       return fail("That is not yours to edit.");
     }
@@ -800,8 +805,9 @@ export async function updateTool(
      the same event and a page that called both "saved" would be misreporting
      what just happened to somebody's live listing. */
   const requeued = ended === "pending";
+  const live = ended === "approved";
   redirect(
-    `/developer/tools?saved=${encodeURIComponent(d.name)}${requeued ? "&sent=1" : ""}`,
+    `/developer/tools?saved=${encodeURIComponent(d.name)}${requeued ? "&sent=1" : live ? "&live=1" : ""}`,
   );
 }
 
@@ -944,6 +950,64 @@ export async function sendForReview(
   after(() => emailToolSubmitted(user?.email, kind, id));
 
   return { status: "success", message: "Sent for review." };
+}
+
+/* ------------------------------------------------------- rename request */
+
+/*
+  The name of a live tool is locked (D274, founder 2026-11-25). Its owner asks
+  for a new one here and an admin decides in /admin/verifications; the tool
+  stays live under its old name meanwhile. request_tool_rename checks the
+  owner and the live state in SQL.
+*/
+export async function requestToolRename(
+  _prev: DeveloperState,
+  formData: FormData,
+): Promise<DeveloperState> {
+  if (!isSupabaseConfigured()) return { status: "error", message: "Not connected." };
+
+  const parsed = z
+    .object({
+      toolId: z.string().uuid(),
+      name: z.string().trim().min(1, "Write the new name.").max(120, "Keep the name under 120 characters."),
+      message: z.string().trim().max(1000, "Keep it under 1,000 characters.").optional(),
+    })
+    .safeParse({
+      toolId: formData.get("toolId"),
+      name: formData.get("name") ?? "",
+      message: formData.get("message") ?? undefined,
+    });
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return { status: "error", message: issue?.message ?? "That did not work.", field: issue?.path[0] === "name" ? "name" : undefined };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("request_tool_rename", {
+    p_tool: parsed.data.toolId,
+    p_name: parsed.data.name,
+    p_message: parsed.data.message || null,
+  });
+
+  if (error) {
+    console.error("[developer] rename request failed", error.code, error.message);
+    if (error.message.includes("already_requested")) {
+      return { status: "error", message: "You already asked for a new name. An admin will decide on that one first." };
+    }
+    if (error.message.includes("same_name")) {
+      return { status: "error", message: "That is the name it already has.", field: "name" };
+    }
+    if (error.message.includes("tool_not_live")) {
+      return { status: "error", message: "Only a live tool needs a rename request. Change the name in the form instead." };
+    }
+    if (error.message.includes("not_owner") || error.code === "42501") {
+      return { status: "error", message: "That is not yours to rename." };
+    }
+    return { status: "error", message: "Could not send the request. Please try again." };
+  }
+
+  revalidatePath(`/developer/tools/${parsed.data.toolId}/edit`);
+  return { status: "success", message: "Request sent. Your tool stays live under its current name until an admin decides." };
 }
 
 /* ------------------------------------------------- verification request */
