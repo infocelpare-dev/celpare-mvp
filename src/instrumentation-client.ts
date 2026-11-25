@@ -1,4 +1,8 @@
 import * as Sentry from "@sentry/nextjs";
+import { installTranslateGuard } from "@/lib/dom/translate-guard";
+
+/* Before anything renders: page translation must not crash React (see the file). */
+installTranslateGuard();
 
 /*
   Sentry in the browser.
