@@ -105,45 +105,56 @@ export function SearchInput({
     setValue(initialQuery);
   }
 
+  /*
+    One fetch for both lists. An empty q asks for the caller's recent searches
+    (founder, 2026-11-25: history has to be visible where people search, not
+    only on the empty /search page); anything longer is autocomplete.
+  */
+  function fetchSuggestions(q: string) {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const seq = (seqRef.current += 1);
+
+    fetch(`/api/search/suggest?q=${encodeURIComponent(q)}`, {
+      signal: controller.signal,
+    })
+      .then((r) => (r.ok ? r.json() : { suggestions: [] }))
+      .then((data: { suggestions?: Suggestion[] }) => {
+        /* A late answer for an earlier query is dropped rather than shown. */
+        if (seq !== seqRef.current) return;
+        const next = data.suggestions ?? [];
+        setSuggestions(next);
+        setActive(-1);
+        setOpen(next.length > 0 && document.activeElement === inputRef.current);
+      })
+      .catch(() => {
+        /* An aborted request is the normal case here, not a failure. A real
+           network error means no suggestions, which is what the field already
+           shows. */
+      });
+  }
+
   useEffect(() => {
     if (!typedRef.current) return;
     const q = value.trim();
     /*
-      Too short to suggest anything. Nothing is CLEARED here on purpose: a
-      setState in an effect body is the cascading render above, and it is not
-      needed, because whether the list shows is derived below from the length of
-      what is in the field. Stale suggestions sit in state unseen until the next
-      answer replaces them.
+      Too short to suggest anything, but not empty. Nothing is CLEARED here on
+      purpose: a setState in an effect body is the cascading render above, and it
+      is not needed, because whether the list shows is derived below from what is
+      in the field. Stale suggestions sit in state unseen until the next answer
+      replaces them. An emptied field asks for recent searches again.
     */
-    if (q.length < MIN_CHARS) return;
+    if (q.length > 0 && q.length < MIN_CHARS) return;
 
-    const timer = setTimeout(() => {
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const seq = (seqRef.current += 1);
-
-      fetch(`/api/search/suggest?q=${encodeURIComponent(q)}`, {
-        signal: controller.signal,
-      })
-        .then((r) => (r.ok ? r.json() : { suggestions: [] }))
-        .then((data: { suggestions?: Suggestion[] }) => {
-          /* A late answer for an earlier query is dropped rather than shown. */
-          if (seq !== seqRef.current) return;
-          const next = data.suggestions ?? [];
-          setSuggestions(next);
-          setActive(-1);
-          setOpen(next.length > 0 && document.activeElement === inputRef.current);
-        })
-        .catch(() => {
-          /* An aborted request is the normal case here, not a failure. A real
-             network error means no suggestions, which is what the field already
-             shows. */
-        });
-    }, DEBOUNCE_MS);
-
+    const timer = setTimeout(() => fetchSuggestions(q), DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [value]);
+
+  /* The empty /search page autofocuses the field and already lists recent
+     searches under it, so the first, automatic focus does not open a second
+     copy over them. Any later focus does. */
+  const autoFocusedRef = useRef(autoFocus);
 
   function close() {
     setOpen(false);
@@ -177,7 +188,27 @@ export function SearchInput({
   }
 
   function choose(suggestion: Suggestion) {
+    const typed = value.trim();
+    const shown = suggestions.length;
     finish();
+    /*
+      A suggestion that opens a thing skips the result page, which is what
+      records a search, so the typed words are sent as a beacon on the way out
+      and land in recent searches like any other search (api/search/picked,
+      signed in only). One that runs a search is recorded by that page.
+    */
+    if (typed.length >= MIN_CHARS && !suggestion.href.startsWith("/search")) {
+      const body = JSON.stringify({ q: typed, n: shown });
+      try {
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon("/api/search/picked", new Blob([body], { type: "application/json" }));
+        } else {
+          void fetch("/api/search/picked", { method: "POST", body, headers: { "content-type": "application/json" }, keepalive: true });
+        }
+      } catch {
+        /* History is a convenience; losing one entry never blocks the navigation. */
+      }
+    }
     /* A suggestion either runs a search or opens a thing. Both are real URLs, so
        both are a navigation rather than a state change. */
     router.push(suggestion.href);
@@ -217,8 +248,12 @@ export function SearchInput({
 
   /* Derived, not stored. `open` is the person's intent (focused, not escaped) and
      this is whether there is anything to show for it. */
+  const typedLength = value.trim().length;
   const showList =
-    open && !voiceOpen && suggestions.length > 0 && value.trim().length >= MIN_CHARS;
+    open &&
+    !voiceOpen &&
+    suggestions.length > 0 &&
+    (typedLength >= MIN_CHARS || (typedLength === 0 && suggestions.every((s) => s.kind === "recent")));
 
   return (
     <div className="relative flex-1">
@@ -252,6 +287,16 @@ export function SearchInput({
           }}
           onKeyDown={onKeyDown}
           onFocus={() => {
+            if (autoFocusedRef.current) {
+              autoFocusedRef.current = false;
+              return;
+            }
+            if (value.trim().length === 0) {
+              /* Recent searches, fetched fresh so one just run is in the list. */
+              typedRef.current = true;
+              fetchSuggestions("");
+              return;
+            }
             if (typedRef.current && suggestions.length > 0) setOpen(true);
           }}
           onBlur={() => {
@@ -286,6 +331,9 @@ export function SearchInput({
           <button
             type="button"
             onClick={() => {
+              /* An emptied field shows recent searches, as a focus on an
+                 empty field does. typedRef lets the effect fetch them. */
+              typedRef.current = true;
               setValue("");
               setSuggestions([]);
               close();

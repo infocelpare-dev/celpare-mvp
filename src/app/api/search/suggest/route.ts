@@ -47,6 +47,45 @@ export async function GET(request: NextRequest) {
   }
 
   const q = parsed.data.q.trim();
+
+  /*
+    An empty field: the caller's own recent searches, the way every search box
+    opens on focus (founder, 2026-11-25: "i search many times trulata and i cant
+    see recent histories"). Before this the list only lived on the empty /search
+    page, which a signed in visit renders on demand and the Workers free plan
+    stops with error 1102. my_recent_searches reads auth.uid() itself, so a
+    signed out caller gets nothing.
+  */
+  if (q.length === 0 && isSupabaseConfigured()) {
+    if (!(await withinBurst("suggest"))) {
+      return NextResponse.json({ suggestions: [] }, { status: 429 });
+    }
+    try {
+      const session = await createClient();
+      const {
+        data: { user },
+      } = await session.auth.getUser();
+      if (!user) return NextResponse.json({ suggestions: [] });
+      const { data, error } = await session.rpc("my_recent_searches", { p_limit: parsed.data.limit });
+      if (error) {
+        console.error("[search] recent suggest failed", error.code, error.message);
+        return NextResponse.json({ suggestions: [] });
+      }
+      const suggestions: Suggestion[] = ((data as { query: string }[] | null) ?? []).map((r) => ({
+        kind: "recent",
+        label: r.query,
+        sublabel: "Recent search",
+        href: `/search?q=${encodeURIComponent(r.query)}`,
+      }));
+      const response = NextResponse.json({ suggestions });
+      response.headers.set("Cache-Control", "private, no-store");
+      return response;
+    } catch (err) {
+      console.error("[search] recent suggest threw", err);
+      return NextResponse.json({ suggestions: [] });
+    }
+  }
+
   /* One character matches most of the catalogue, so it is not a suggestion, it is
      a table scan with a dropdown attached. */
   if (q.length < 2 || !isSupabaseConfigured()) {
