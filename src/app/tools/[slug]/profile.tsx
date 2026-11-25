@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { VerifiedTick } from "@/components/ui/verified-tick";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import {
   ArrowLeft,
   BookOpen,
@@ -34,6 +34,7 @@ import {
   getRatingBreakdown,
   getToolPriceCheck,
   getToolProfile,
+  resolveToolSlugRedirect,
   getToolReviews,
   type PriceCheck,
   getViewerState,
@@ -179,7 +180,12 @@ export async function ToolProfilePage({
 }) {
   const { slug } = await params;
   const tool = await getToolProfile(slug);
-  if (!tool) notFound();
+  if (!tool) {
+    /* A renamed tool's old address goes to its new one, permanently (D275). */
+    const moved = await resolveToolSlugRedirect(slug);
+    if (moved) permanentRedirect(`/tools/${moved}`);
+    notFound();
+  }
 
   const [viewer, reviews, breakdown, developer, priceCheck] = await Promise.all([
     getViewerState(tool.id, tool.developer_id),

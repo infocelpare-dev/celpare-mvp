@@ -11,7 +11,8 @@ import { TextareaField } from "@/components/ui/textarea-field";
   Asking for a new name for a live tool (D274, founder 2026-11-25). The name in
   the form above is locked; this is the only way to change it. An admin decides
   in /admin/verifications and the tool stays live under its current name
-  meanwhile, keeping its address, ratings and history.
+  meanwhile. Accepting moves the slug to match the new name and the old
+  address redirects (D275); ratings and history stay.
 
   Its own form under the edit form, never inside it: nested forms are invalid
   HTML and the browser would drop the inner one.
@@ -44,8 +45,9 @@ export function RenameRequest({
       </h2>
       <p className="mt-1.5 max-w-[60ch] text-[14px] leading-relaxed text-muted">
         A live tool&apos;s name is locked so people can trust what they found. Ask for a new one here.
-        {" "}{currentName} stays live under its current name until an admin decides, and keeps its address,
-        ratings and history.
+        {" "}{currentName} stays live under its current name until an admin decides. Once accepted, its
+        address changes to match the new name and the old address keeps working by sending people to the
+        new one. Ratings and history stay.
       </p>
 
       {waiting ? (
