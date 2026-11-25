@@ -26,6 +26,7 @@ import { paidModelRefusal } from "./providers/free-only";
 import { checkIdentityLimits, countIdentityMessage, countIdentityTokens, nextResetIso } from "./ratelimit";
 import { withinCeiling } from "@/lib/security/ceiling";
 import { loadToolCards, type ToolCard } from "./tool-search";
+import { namedIn } from "./named";
 import { getSponsoredCampaigns, serveSponsored, viewerKeyFrom } from "@/lib/sponsored/server";
 import { askSponsoredCandidates } from "@/lib/sponsored/search";
 import { MAX_SPONSORED_TOOLS } from "@/lib/sponsored/config";
@@ -594,16 +595,10 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
         }
 
         /*
-          The cards are a second read of the public record, not the projection
-          the model was given. It only happens when there is something to show,
-          and losing it never fails the answer.
+          The cards are drawn AFTER the answer, from what it names (ASK.NOISE,
+          founder 2026-11-25): see the block after the stream and lib/ai/named.ts.
+          The model cards are built here and filtered there the same way.
         */
-        if (relevant.length > 0) {
-          const cards = await loadToolCards(relevant.map((t) => t.slug));
-          emit(controller, { t: "cards", citations: relevant, cards });
-          if (candidates) void recordAskImpressions(candidates, identity.userId, cards.map((c) => c.slug));
-        }
-
         if (catalogueModels.length > 0) {
           modelCards = catalogueModels.map((m) => ({
             kind: "model" as const,
@@ -617,8 +612,9 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
             outputPrice: m.output_price_per_m === null ? null : Number(m.output_price_per_m),
             openWeights: m.open_weights,
           }));
-          emit(controller, { t: "models", models: modelCards });
         }
+        /* Nothing is shown until the answer says which of these it is about. */
+        shownTools = [];
 
         /* TypeScript narrows `candidates` to null after the closure assigned
            it, so it is read back through a cast, as recordAskImpressions'
@@ -771,6 +767,31 @@ export async function ask(input: AskInput): Promise<GatewayResponse & { identity
           const link = `\n\n[See these models side by side in Compare](${evidence.compareHref})`;
           answer += link;
           emit(controller, { t: "text", v: link });
+        }
+
+        /*
+          The cards: only the catalogue tools and models the answer names. A
+          question about one tool's pricing gets that tool's card and nothing
+          else (ASK.NOISE, founder 2026-11-25). The cards are a second read of
+          the public record, not the projection the model was given, and losing
+          them never fails the answer.
+        */
+        if (answer.trim().length > 0 && !filter.canaryTripped) {
+          const namedTools = namedIn(answer, relevant, (t) => [t.name]);
+          if (namedTools.length > 0) {
+            try {
+              const cards = await loadToolCards(namedTools.map((t) => t.slug));
+              emit(controller, { t: "cards", citations: namedTools, cards });
+              shownTools = namedTools;
+              if (candidates) void recordAskImpressions(candidates, identity.userId, cards.map((c) => c.slug));
+            } catch (err) {
+              console.error("[ai] cards failed", err);
+            }
+          }
+          modelCards = namedIn(answer, modelCards, (m) => [m.name]);
+          if (modelCards.length > 0) emit(controller, { t: "models", models: modelCards });
+        } else {
+          modelCards = [];
         }
 
         /*

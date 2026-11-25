@@ -197,9 +197,9 @@ export function ToolSubmitForm({
      hint: update_tool re-checks ownership itself and refuses a tool that is
      not the caller's, so a forged id here buys nothing. */
   toolId?: string;
-  /* Editing something that is currently live. Saving takes it off the
-     catalogue and back into the review queue, so the form says so before
-     anybody presses the button rather than after. */
+  /* Editing something that is currently live. Saving publishes at once and
+     the name is locked (D274), so the form says so before anybody presses the
+     button rather than after. */
   liveEdit?: boolean;
 }) {
   const editing = Boolean(toolId);
@@ -405,16 +405,26 @@ export function ToolSubmitForm({
           </legend>
 
           <div className="mt-5 space-y-5">
+            {/*
+              Locked on a live tool (D274): update_tool refuses a new name, and
+              a rename is asked for under the form and decided by an admin.
+              Read only rather than disabled, so the value is still submitted.
+            */}
             <Field
               id="name"
               name="name"
               label="Tool name"
               required
+              readOnly={liveEdit}
               maxLength={120}
               defaultValue={was("name")}
-              onBlur={suggestSlug}
+              onBlur={liveEdit ? undefined : suggestSlug}
               invalid={invalid("name")}
-              hint="The name people know it by."
+              hint={
+                liveEdit
+                  ? "Locked while the tool is live. To change it, ask for a new name under this form."
+                  : "The name people know it by."
+              }
             />
 
             {/*
@@ -823,10 +833,8 @@ export function ToolSubmitForm({
                 <strong className="font-medium text-foreground">
                   This tool is live.
                 </strong>{" "}
-                Saving takes it out of the public catalogue and puts it back in
-                the review queue, and it returns once Celpare approves it again.
-                That is how an approved listing keeps meaning that somebody read
-                what is actually on it.
+                Saving updates its public page straight away. Only a website on a
+                different domain sends it back for review first.
               </>
             ) : (
               "Saving keeps this where it is. Send it for review from My Tools when it is ready."
@@ -866,14 +874,10 @@ export function ToolSubmitForm({
             </Button>
           ) : editing ? (
             /* One button. Where an edit lands is not the owner's choice: a
-               draft stays a draft and a live listing goes back to the queue,
-               and update_tool is what decides, not this form. */
+               draft stays a draft and a live listing stays live (D274), and
+               update_tool is what decides, not this form. */
             <Button type="submit" disabled={pending}>
-              {pending
-                ? "Saving..."
-                : liveEdit
-                  ? "Save and send for review"
-                  : "Save changes"}
+              {pending ? "Saving..." : liveEdit ? "Save and publish" : "Save changes"}
             </Button>
           ) : (
             <>

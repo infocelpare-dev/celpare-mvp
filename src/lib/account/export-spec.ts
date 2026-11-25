@@ -61,6 +61,7 @@ export const EXPORT_TABLES: ExportTable[] = [
   { key: "models_you_listed", table: "models", column: "developer_id", select: "*" },
   { key: "tool_sponsorships", table: "tool_sponsorships", column: "developer_id", select: "*" },
   { key: "verification_requests", table: "tool_verification_requests", column: "developer_id", select: "*" },
+  { key: "rename_requests", table: "tool_rename_requests", column: "developer_id", select: "id, tool_id, current_name, requested_name, status, message, decision_reason, decided_at, created_at" },
   { key: "message_threads", table: "dm_participants", column: "user_id", select: "*" },
 ];
 

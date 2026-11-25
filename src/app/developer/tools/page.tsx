@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function MyToolsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; sent?: string }>;
+  searchParams: Promise<{ saved?: string; sent?: string; live?: string }>;
 }) {
   const { gate: g, db } = await gate();
 
@@ -39,6 +39,8 @@ export default async function MyToolsPage({
      event. Saying "Saved" after somebody pressed Submit would misreport what
      happened to their submission. */
   const sent = params.sent === "1";
+  /* A live tool edited by its owner stays live (D274). */
+  const live = !sent && params.live === "1";
 
   return (
     <DeveloperShell
@@ -57,6 +59,8 @@ export default async function MyToolsPage({
               your owner email to confirm you represent it. It does not go live
               until that is done and the review passes.
             </>
+          ) : live ? (
+            <>Saved. Your changes to {saved} are live now.</>
           ) : (
             <>
               Saved. {saved} is a private draft. Send it for review when it is

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin/guard";
 import { profilesByIds } from "@/lib/admin/queries";
-import { decideToolVerification } from "@/app/actions/admin";
+import { decideToolRename, decideToolVerification } from "@/app/actions/admin";
 import { ActionForm } from "@/components/admin/action-form";
 import { FilterTabs } from "@/components/admin/filters";
 import { EmptyState, PageHeader, PersonCell, Status, When } from "@/components/admin/ui";
@@ -78,14 +78,123 @@ export default async function AdminVerificationsPage({
     ((plans.data ?? []) as { id: string; plan: string }[]).map((p) => [p.id, p.plan]),
   );
 
+  /* Rename requests (D274): the name of a live tool is locked, and a new one
+     is asked for here. Pending only; decisions are in the audit log. */
+  const renames = await session.db
+    .from("tool_rename_requests")
+    .select("id, tool_id, developer_id, current_name, requested_name, message, created_at, tools(slug)")
+    .eq("status", "pending")
+    .order("created_at", { ascending: true })
+    .limit(100);
+  if (renames.error) throw new Error(`rename requests: ${renames.error.message}`);
+  type RenameRow = {
+    id: string;
+    tool_id: string;
+    developer_id: string;
+    current_name: string;
+    requested_name: string;
+    message: string | null;
+    created_at: string;
+    tools: { slug: string } | null;
+  };
+  const renameRows = (renames.data ?? []) as unknown as RenameRow[];
+  const renameOwners = await profilesByIds(session.db, [...new Set(renameRows.map((r) => r.developer_id))]);
+
   return (
     <>
       <PageHeader
         title="Verification requests"
-        lead="Elite developers asking for the blue tick on a tool. Accepting checks the plan again and verifies the tool everywhere on Celpare."
+        lead="Elite developers asking for the blue tick on a tool, and owners asking to rename a live tool. Accepting a tick checks the plan again and verifies the tool everywhere on Celpare."
       />
 
-      <div className="mt-5">
+      <section className="mt-6" aria-labelledby="renames-heading">
+        <h2 id="renames-heading" className="font-display text-[15px] font-semibold">
+          Rename requests{renameRows.length > 0 ? ` (${renameRows.length})` : ""}
+        </h2>
+        {renameRows.length === 0 ? (
+          <p className="mt-1.5 text-[13px] text-muted">
+            None waiting. A live tool&apos;s name is locked; its owner asks for a new one from the edit page.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-3">
+            {renameRows.map((r) => {
+              const owner = renameOwners.get(r.developer_id);
+              return (
+                <li key={r.id} className="rounded-xl border border-border p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[15px]">
+                        <Link href={`/admin/tools/${r.tool_id}`} className="font-display font-semibold hover:underline">
+                          {r.current_name}
+                        </Link>
+                        <span className="text-muted"> to </span>
+                        <strong className="font-display font-semibold">{r.requested_name}</strong>
+                      </p>
+                      {r.message ? (
+                        <p className="mt-2 max-w-[70ch] whitespace-pre-wrap text-[13px] leading-relaxed">{r.message}</p>
+                      ) : (
+                        <p className="mt-2 text-[13px] text-muted">No message.</p>
+                      )}
+                      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted">
+                        <span>
+                          Requested <When iso={r.created_at} time />
+                        </span>
+                        {owner ? (
+                          <PersonCell
+                            id={owner.id}
+                            username={owner.username}
+                            fullName={owner.full_name}
+                            avatarUrl={owner.avatar_url}
+                            accountStatus={owner.account_status}
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                    {r.tools ? (
+                      <Link
+                        href={`/tools/${r.tools.slug}`}
+                        className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-[13px] text-muted transition-colors duration-200 ease-out hover:bg-surface hover:text-foreground"
+                      >
+                        Public page
+                      </Link>
+                    ) : null}
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-start gap-2 border-t border-border pt-4">
+                    <ActionForm
+                      action={decideToolRename}
+                      fields={{ id: r.id, decision: "approve" }}
+                      label="Rename"
+                      tone="primary"
+                      confirm={{
+                        title: `Rename ${r.current_name} to ${r.requested_name}?`,
+                        body: "The new name shows everywhere on Celpare at once. The address, ratings and history stay. Signed out pages show it after the next deploy.",
+                        confirmLabel: "Rename",
+                      }}
+                    />
+                    <ActionForm
+                      action={decideToolRename}
+                      fields={{ id: r.id, decision: "reject" }}
+                      label="Decline"
+                      tone="danger"
+                      requireReason
+                      reasonLabel="Why, shown to the developer"
+                      confirm={{
+                        title: `Decline renaming ${r.current_name}?`,
+                        body: "The developer sees your reason on their edit page and can ask again.",
+                        confirmLabel: "Decline",
+                      }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <h2 className="mt-10 font-display text-[15px] font-semibold">Blue tick requests</h2>
+
+      <div className="mt-3">
         <FilterTabs
           label="Request status"
           active={`/admin/verifications?status=${status}`}
