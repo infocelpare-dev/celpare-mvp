@@ -8,9 +8,11 @@
   plan. The browser is the only place left that can step in.
 
   What it touches:
-  - Page loads only (request.mode "navigate", GET). Scripts, images, data
-    fetches, server actions and everything else go straight to the network:
-    no respondWith, so the browser behaves exactly as if this file did not exist.
+  - Page loads (request.mode "navigate", GET), and in app page data (GET with
+    the RSC header), which is retried but never replaced. Scripts, images,
+    other fetches, server actions and everything else go straight to the
+    network: no respondWith, so the browser behaves as if this file did not
+    exist.
   - Never /api, /auth or /monitoring. An OAuth callback must not be replayed,
     which is also why navigation preload stays off (see activate).
   - It caches nothing but the logo, for the offline page.
@@ -29,7 +31,15 @@
   and deploy. Deleting it leaves the old one running in browsers that have it.
 */
 
-const VERSION = "celpare-sw-2";
+/*
+  In app navigations too (celpare-sw-3, founder 2026-11-25: "Something broke
+  on our side" many times). Tapping a link inside Celpare does not load a page,
+  it fetches the next page's data (a GET with an RSC header). A 1102 there
+  reached the app's last error screen, because only full page loads were
+  retried. Those GETs are now retried the same way, quietly, and the reply is
+  passed back untouched: the app, not this file, decides what to show.
+*/
+const VERSION = "celpare-sw-3";
 const LOGO = "/brand/celpare-mark-dark-64.png";
 const SKIP = /^\/(api|auth|monitoring)(\/|$)/;
 const RETRY_DELAYS_MS = [400, 1200];
@@ -74,10 +84,34 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(caches.match(LOGO).then((hit) => hit || fetch(req)));
     return;
   }
-  if (req.mode !== "navigate" || req.method !== "GET") return;
+  if (req.method !== "GET") return;
   if (url.origin !== self.location.origin || SKIP.test(url.pathname)) return;
-  event.respondWith(load(event));
+  if (req.mode === "navigate") {
+    event.respondWith(load(event));
+    return;
+  }
+  /* An in app navigation or prefetch: the RSC header, or Next's _rsc marker. */
+  if (req.headers.get("rsc") === "1" || url.searchParams.has("_rsc")) {
+    event.respondWith(retryData(req));
+  }
 });
+
+/* Retries an in app page request on a Cloudflare CPU error, then hands back
+   whatever came last. Never builds a page: the app reads this reply. */
+async function retryData(req) {
+  let res = await fetch(req.clone());
+  for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
+    const code = await cloudflareError(res);
+    if (!code || !retryable(code)) return res;
+    await sleep(RETRY_DELAYS_MS[attempt]);
+    try {
+      res = await fetch(req.clone());
+    } catch {
+      return res;
+    }
+  }
+  return res;
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

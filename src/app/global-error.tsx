@@ -1,7 +1,35 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
+
+/*
+  RELOAD FIRST, ASK SECOND (founder, 2026-11-25: people saw this screen many
+  times and had to reload by hand). On the Workers free plan most of what lands
+  here is a page that ran out of CPU once (Error 1102) and loads fine a moment
+  later. So the screen reloads the page by itself, up to AUTO_RELOADS times per
+  address within GUARD_MS, and only then asks. The count lives in
+  sessionStorage so a page that really is broken cannot reload forever; when
+  storage is unavailable it never auto reloads.
+*/
+const AUTO_RELOADS = 2;
+const GUARD_MS = 60_000;
+const KEY = "cp_error_reloads";
+
+function claimAutoReload(): boolean {
+  try {
+    const here = location.pathname + location.search;
+    const now = Date.now();
+    const raw = sessionStorage.getItem(KEY);
+    const prev = raw ? (JSON.parse(raw) as { at: string; n: number; t: number }) : null;
+    const fresh = prev && prev.at === here && now - prev.t < GUARD_MS ? prev : { at: here, n: 0, t: now };
+    if (fresh.n >= AUTO_RELOADS) return false;
+    sessionStorage.setItem(KEY, JSON.stringify({ at: here, n: fresh.n + 1, t: fresh.t }));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /*
   The last catch. A global-error replaces the root layout, so it renders when
@@ -19,14 +47,55 @@ import * as Sentry from "@sentry/nextjs";
 */
 export default function GlobalError({
   error,
-  reset,
 }: {
   error: Error & { digest?: string };
+  /* Passed by Next and not used: see retry below. */
   reset: () => void;
 }) {
+  /* Starts as "reloading" so the first paint is a quiet loading line rather
+     than the error, which would flash before the reload. */
+  const [reloading, setReloading] = useState(true);
+
   useEffect(() => {
     Sentry.captureException(error);
+    if (claimAutoReload()) {
+      /* A full page load, through the service worker's own retries. */
+      const t = setTimeout(() => location.reload(), 600);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setReloading(false), 0);
+    return () => clearTimeout(t);
   }, [error]);
+
+  /* reset() re-renders the tree that just failed; a reload asks the server
+     again, which is what fixes a CPU error. */
+  const retry = () => {
+    setReloading(true);
+    location.reload();
+  };
+
+  if (reloading) {
+    return (
+      <html lang="en">
+        <body
+          style={{
+            margin: 0,
+            minHeight: "100dvh",
+            display: "grid",
+            placeItems: "center",
+            background: "#FFFFFF",
+            color: "#5A5A5A",
+            fontFamily: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+            fontSize: "15px",
+          }}
+        >
+          <p role="status" aria-live="polite">
+            Loading
+          </p>
+        </body>
+      </html>
+    );
+  }
 
   return (
     <html lang="en">
@@ -79,7 +148,7 @@ export default function GlobalError({
           >
             <button
               type="button"
-              onClick={() => reset()}
+              onClick={retry}
               style={{
                 cursor: "pointer",
                 border: "1px solid transparent",
